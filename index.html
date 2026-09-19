@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Pilares</title>
+<meta name="description" content="Rutina de gimnasio, agenda academica y libreticas de dinero en una sola aplicacion.">
+<meta name="theme-color" content="#090C14">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pilares">
+<meta property="og:title" content="Pilares">
+<meta property="og:description" content="Ejercicio, estudio y finanzas en una sola aplicacion.">
+<meta property="og:type" content="website">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Newsreader:ital,opsz,wght@1,6..72,200..400&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div id="screen"></div>
+
+<!-- Plantilla del diseno: la interpreta assets/runtime.js -->
+<template id="dc-template">
+<div style="height:100dvh;display:flex;flex-direction:column;position:relative;background:#090C14;color:#fff;overflow:hidden">
+
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;min-height:0;display:flex;flex-direction:column">
+  <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 10px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
+    <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:#4A566B">{{ todayLine }}</div>
+    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:.005em;color:#EDF1F7">Resumen</div>
+    <div style="font:500 12px/1.35 Manrope,sans-serif;color:#8E9AAE">{{ homeSub }}</div>
+    <div sc-camel-on-click="{{ openPanel }}" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9AA6BA" stroke-linecap="round">
+        <path stroke-width="4.6" d="M20.2 12 L21.2 12 M3.8 12 L2.8 12 M12 20.2 L12 21.2 M12 3.8 L12 2.8 M17.8 17.8 L18.5 18.5 M6.2 6.2 L5.5 5.5 M6.2 17.8 L5.5 18.5 M17.8 6.2 L18.5 5.5"></path>
+        <circle cx="12" cy="12" r="7.4" stroke-width="5.2"></circle>
+      </svg>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;overflow:auto;padding:8px 14px 24px;display:flex;flex-direction:column;gap:12px">
+
+    <sc-if value="{{ hasNext }}" hint-placeholder-val="{{ true }}">
+      <div sc-camel-on-click="{{ goNext }}" style="background:#121724;border:1px solid {{ nextBorder }};border-radius:16px;padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="font:700 8.5px/1 Manrope,sans-serif;letter-spacing:.14em;padding:5px 8px;border-radius:7px;background:{{ nextTint }};color:{{ nextColor }}">{{ nextBadge }}</div>
+          <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.1em;color:{{ nextColor }}">{{ nextPlazo }}</div>
+        </div>
+        <div style="font:700 19px/1.2 Manrope,sans-serif;letter-spacing:-.2px;margin-top:13px;text-wrap:pretty">{{ nextTitle }}</div>
+        <div style="font:600 11.5px/1.3 Manrope,sans-serif;color:#8E9AAE;margin-top:8px">{{ nextCuaderno }}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:13px;border-top:1px solid rgba(255,255,255,.06)">
+          <div style="flex:1;font:700 11px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE">{{ nextFecha }}</div>
+          <div style="font:700 11px/1 Manrope,sans-serif;color:#9AA6BA">Ver en agenda ›</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px">
+      <sc-for list="{{ kpisEst }}" as="k" hint-placeholder-count="3">
+        <div sc-camel-on-click="{{ k.go }}" style="background:#121724;border:1px solid rgba(255,255,255,.07);border-radius:13px;padding:13px 11px;cursor:pointer">
+          <div style="font:800 22px/1 Manrope,sans-serif;letter-spacing:-.03em;color:{{ k.color }}">{{ k.value }}</div>
+          <div style="font:700 8.5px/1.2 Manrope,sans-serif;letter-spacing:.1em;color:#8E9AAE;margin-top:9px">{{ k.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="background:#121724;border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:16px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px">
+        <div style="font:800 13px/1 Manrope,sans-serif">Próximas entregas</div>
+        <div sc-camel-on-click="{{ goEstudio }}" style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#9AA6BA;cursor:pointer">VER AGENDA</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+        <sc-for list="{{ urgentAcad }}" as="u" hint-placeholder-count="4">
+          <div sc-camel-on-click="{{ u.go }}" style="border-left:3px solid {{ u.color }};background:rgba(255,255,255,.03);border-radius:4px 12px 12px 4px;padding:11px 12px;cursor:pointer;display:flex;align-items:center;gap:10px">
+            <div style="flex:1;min-width:0">
+              <div style="font:700 13px/1.25 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ u.title }}</div>
+              <div style="font:700 9.5px/1.2 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE;margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ u.badge }} · {{ u.meta }}</div>
+            </div>
+            <div style="flex:none;text-align:right">
+              <div style="font:700 12px/1 Manrope,sans-serif;color:{{ u.color }}">{{ u.right }}</div>
+              <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.08em;color:#8E9AAE;margin-top:7px">{{ u.plazo }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="background:#121724;border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:16px 14px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 2px">
+        <div style="font:800 13px/1 Manrope,sans-serif">Carga por semana</div>
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE">PRÓX. 6 SEMANAS</div>
+      </div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px;height:96px;margin-top:16px;padding:0 2px">
+        <sc-for list="{{ bars }}" as="b" hint-placeholder-count="6">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px">
+            <div style="font:700 10px/1 Manrope,sans-serif;color:{{ b.fg }}">{{ b.n }}</div>
+            <div style="width:100%;border-radius:6px 6px 3px 3px;background:{{ b.bg }};height:{{ b.h }}"></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:9px;padding:0 2px">
+        <sc-for list="{{ bars }}" as="b2" hint-placeholder-count="6">
+          <div style="flex:1;text-align:center;font:700 9px/1 Manrope,sans-serif;letter-spacing:.04em;color:#8E9AAE">{{ b2.label }}</div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div sc-camel-on-click="{{ goEjercicio }}" style="display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:13px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);cursor:pointer">
+      <div style="width:6px;height:6px;flex:none;border-radius:50%;background:{{ dayColor }}"></div>
+      <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.14em;color:#6C7789">GIMNASIO HOY</div>
+      <div style="flex:1;min-width:0;font:700 12px/1 Manrope,sans-serif;color:#B8C2D2;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ gymLine }}</div>
+      <div style="flex:none;width:5px;height:5px;border-top:1.6px solid #4A566B;border-right:1.6px solid #4A566B;transform:rotate(45deg)"></div>
+    </div>
+
+    <div sc-camel-on-click="{{ goFinanzas }}" style="display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:13px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);cursor:pointer">
+      <div style="width:6px;height:6px;flex:none;border-radius:50%;background:#57B9A0"></div>
+      <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.14em;color:#6C7789">LIBRETICAS</div>
+      <div style="flex:1;min-width:0;font:700 12px/1 Manrope,sans-serif;color:#B8C2D2;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ finLine }}</div>
+      <div style="flex:none;width:5px;height:5px;border-top:1.6px solid #4A566B;border-right:1.6px solid #4A566B;transform:rotate(45deg)"></div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isEjercicio }}">
+<div style="flex:1;min-height:0;display:flex;flex-direction:column">
+  <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
+    <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:#4A566B">{{ dayHeader }}</div>
+    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:.005em;color:#EDF1F7;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ dayGroup }}</div>
+    <div style="font:800 9.5px/1 Manrope,sans-serif;letter-spacing:.1em;color:{{ dayColor }};padding:5px 9px;border-radius:7px;background:{{ dayChipBg }}">DÍA {{ dayNum }} · {{ dayStateTxt }}</div>
+    <div sc-camel-on-click="{{ openPanel }}" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
+  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9AA6BA" stroke-linecap="round">
+        <path stroke-width="4.6" d="M20.2 12 L21.2 12 M3.8 12 L2.8 12 M12 20.2 L12 21.2 M12 3.8 L12 2.8 M17.8 17.8 L18.5 18.5 M6.2 6.2 L5.5 5.5 M6.2 17.8 L5.5 18.5 M17.8 6.2 L18.5 5.5"></path>
+        <circle cx="12" cy="12" r="7.4" stroke-width="5.2"></circle>
+      </svg>
+      <sc-if value="{{ editOn }}"><div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#CE7F55;border:2px solid #090C14"></div></sc-if>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;overflow:auto;padding:0 0 24px">
+    <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:0 14px 10px">
+      <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+        <div sc-camel-on-click="{{ d.select }}" style="min-width:0;padding:7px 0 6px;border-radius:10px;cursor:pointer;text-align:center;background:{{ d.bg }};border:1px solid {{ d.border }}" style-active="transform:translateY(1px)">
+          <div style="font:700 8.5px/1 Manrope,sans-serif;letter-spacing:.04em;color:{{ d.sub }}">{{ d.dow }}</div>
+          <div style="font:800 16px/1.15 Manrope,sans-serif;color:{{ d.fg }};margin-top:3px">{{ d.n }}</div>
+          <div style="font:800 10px/1.1 Manrope,sans-serif;letter-spacing:.02em;margin-top:3px;color:{{ d.abbrColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.abbr }}</div>
+          <div style="width:4px;height:4px;border-radius:2px;margin:4px auto 0;background:{{ d.dot }};border:1px solid {{ d.dotBorder }}"></div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="padding:0 14px">
+      <div style="background:#121724;border:1px solid #1D2534;border-radius:14px;padding:12px 13px;display:flex;gap:11px;align-items:center">
+        <div style="position:relative;width:50px;height:50px;flex:none">
+          <svg width="50" height="50" viewBox="0 0 61 61">
+            <circle cx="30.5" cy="30.5" r="26" fill="none" stroke="#28324A" stroke-width="5.5"></circle>
+            <circle cx="30.5" cy="30.5" r="26" fill="none" stroke="{{ ringColor }}" stroke-width="5.5" stroke-linecap="round" stroke-dasharray="163.4" stroke-dashoffset="{{ ringOffset }}" transform="rotate(-90 30.5 30.5)"></circle>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 12.5px/1 Manrope,sans-serif;color:{{ ringColor }}">{{ pctText }}</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font:700 14.5px/1.2 Manrope,sans-serif">{{ seriesText }}</div>
+          <div style="font:500 11.5px/1.35 Manrope,sans-serif;color:#8E9AAE;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ exCountText }}</div>
+        </div>
+        <sc-if value="{{ canReset }}">
+          <div sc-camel-on-click="{{ resetDay }}" style="flex:none;padding:7px 10px;border-radius:7px;background:transparent;border:1px solid #28324A;font:700 11px/1 Manrope,sans-serif;color:#4A566B;cursor:pointer" style-hover="color:#8E9AAE" style-active="transform:translateY(1px)">Reiniciar</div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div style="padding:10px 14px 0;display:flex;flex-direction:column;gap:10px">
+      <sc-for list="{{ exList }}" as="ex" hint-placeholder-count="4">
+        <div style="background:#121724;border:1px solid {{ ex.cardBorder }};border-radius:16px;overflow:hidden;opacity:{{ ex.cardOpacity }}">
+          <div sc-camel-on-click="{{ ex.toggle }}" style="padding:13px 14px;display:flex;gap:12px;align-items:center;cursor:pointer">
+            <div style="width:46px;height:46px;flex:none;border-radius:12px;background:{{ ex.iconBg }};border:1px solid {{ ex.iconBorder }};display:flex;align-items:center;justify-content:center">{{ ex.icon }}</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:7px">
+                <div style="font:800 11px/1 Manrope,sans-serif;color:#4A566B">{{ ex.num }}</div>
+                <div style="font:700 14.5px/1.25 Manrope,sans-serif;letter-spacing:-.2px;flex:1;min-width:0;color:{{ ex.nameColor }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ex.name }}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;margin-top:6px;color:#8E9AAE">
+                <div style="width:11px;height:11px;border-radius:50%;border:1.3px solid #8E9AAE;position:relative">
+                  <div style="position:absolute;top:1.5px;left:3.6px;width:1.3px;height:3.4px;background:#8E9AAE;border-radius:1px"></div>
+                </div>
+                <div style="font:600 11.5px/1 Manrope,sans-serif">{{ ex.restTxt }}</div>
+              </div>
+            </div>
+            <div style="flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+              <div style="font:800 12px/1 Manrope,sans-serif;color:{{ ex.countColor }}">{{ ex.countTxt }}</div>
+              <div style="display:flex;gap:3px">
+                <sc-for list="{{ ex.segs }}" as="s" hint-placeholder-count="3">
+                  <div style="width:12px;height:3px;border-radius:2px;background:{{ s.bg }}"></div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <sc-if value="{{ ex.open }}">
+            <div style="padding:12px 14px 14px;border-top:1px solid #1D2534">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="font:700 10.5px/1 Manrope,sans-serif;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:{{ ex.tierBg }};color:{{ ex.tierColor }}">{{ ex.tier }}</div>
+              </div>
+              <div style="font:500 12px/1.5 Manrope,sans-serif;color:#8E9AAE;margin-top:10px;text-wrap:pretty">{{ ex.desc }}</div>
+
+              <sc-if value="{{ editOn }}">
+                <div style="margin-top:14px;padding:14px;border-radius:12px;background:rgba(206,127,85,.07);border:1px solid rgba(206,127,85,.24)">
+                  <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#CE7F55">MODO EDICIÓN</div>
+                  <input value="{{ ex.name }}" sc-camel-on-change="{{ ex.onName }}" style="margin-top:11px;width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#fff;font:700 14px Manrope,sans-serif;padding:10px 12px">
+                  <div style="display:flex;gap:8px;margin-top:9px">
+                    <div style="flex:1">
+                      <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.1em;color:#8E9AAE;margin-bottom:5px">SERIES</div>
+                      <input value="{{ ex.sets }}" sc-camel-on-change="{{ ex.onSets }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#fff;font:700 14px Manrope,sans-serif;padding:9px 10px">
+                    </div>
+                    <div style="flex:1">
+                      <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.1em;color:#8E9AAE;margin-bottom:5px">REPS</div>
+                      <input value="{{ ex.reps }}" sc-camel-on-change="{{ ex.onReps }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#fff;font:700 14px Manrope,sans-serif;padding:9px 10px">
+                    </div>
+                    <div style="flex:1.2">
+                      <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.1em;color:#8E9AAE;margin-bottom:5px">DESCANSO</div>
+                      <input value="{{ ex.rest }}" sc-camel-on-change="{{ ex.onRest }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#fff;font:700 14px Manrope,sans-serif;padding:9px 10px">
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <div style="margin-top:14px;display:grid;grid-template-columns:{{ ex.grid }};gap:7px;margin-bottom:7px;font:800 9.5px/1 Manrope,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#4A566B;text-align:center">
+                <div>#</div>
+                <div>Peso</div>
+                <sc-if value="{{ ex.drops }}"><div>−1</div><div>−2</div></sc-if>
+                <div></div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <sc-for list="{{ ex.rows }}" as="row" hint-placeholder-count="3">
+                  <div style="display:grid;grid-template-columns:{{ ex.grid }};gap:7px;align-items:center;opacity:{{ row.op }}">
+                    <div style="font:800 12px/1 Manrope,sans-serif;color:#4A566B;text-align:center">{{ row.label }}</div>
+                    <input value="{{ row.weight }}" sc-camel-on-change="{{ row.onWeight }}" placeholder="—" style="width:100%;box-sizing:border-box;background:#0E131F;border:1px solid {{ row.inputBorder }};border-radius:7px;color:#fff;font:700 15px Manrope,sans-serif;padding:9px 8px;text-align:center">
+                    <sc-if value="{{ ex.drops }}">
+                      <input value="{{ row.d1 }}" sc-camel-on-change="{{ row.onD1 }}" placeholder="—" style="width:100%;box-sizing:border-box;background:#0E131F;border:1px solid {{ row.inputBorder }};border-radius:7px;color:#fff;font:700 15px Manrope,sans-serif;padding:9px 8px;text-align:center">
+                      <input value="{{ row.d2 }}" sc-camel-on-change="{{ row.onD2 }}" placeholder="—" style="width:100%;box-sizing:border-box;background:#0E131F;border:1px solid {{ row.inputBorder }};border-radius:7px;color:#fff;font:700 15px Manrope,sans-serif;padding:9px 8px;text-align:center">
+                    </sc-if>
+                    <div sc-camel-on-click="{{ row.toggle }}" style="width:42px;height:42px;flex:none;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;background:{{ row.checkBg }};border:1.5px solid {{ row.checkBorder }};font:800 16px/1 Manrope,sans-serif;color:{{ row.tickColor }}">{{ row.tickTxt }}</div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div sc-camel-on-click="{{ ex.startRest }}" style="margin-top:11px;height:42px;border-radius:9px;background:rgba(75,123,229,.09);border:1px solid rgba(75,123,229,.23);color:#93b6ff;font:700 13px/1 Manrope,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgba(75,123,229,.16)" style-active="transform:translateY(1px)">Iniciar descanso · {{ ex.rest }}</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+
+      <sc-if value="{{ hasDone }}">
+        <div sc-camel-on-click="{{ toggleDone }}" style="margin-top:1px;height:42px;border-radius:10px;background:transparent;border:1px solid #28324A;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font:700 12.5px/1 Manrope,sans-serif;color:#8E9AAE" style-hover="background:rgba(255,255,255,.03)" style-active="transform:translateY(1px)">
+          <div style="width:9px;height:5px;border-left:2.2px solid #5EA37D;border-bottom:2.2px solid #5EA37D;transform:rotate(-45deg);margin-top:-3px"></div>
+          {{ doneLabel }} · {{ doneAction }}
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isEstudio }}">
+<div style="flex:1;min-height:0;display:flex;flex-direction:column">
+  <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
+    <div sc-camel-on-click="{{ backCuadernos }}" style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:{{ estudioKickerColor }};cursor:pointer">{{ estudioKicker }}</div>
+    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:.005em;color:#EDF1F7;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ estudioTitle }}</div>
+    <div style="display:flex;gap:9px;position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px">
+      <sc-if value="{{ agendaOn }}">
+        <div sc-camel-on-click="{{ openModal }}" style="width:44px;height:44px;border-radius:12px;background:rgba(206,127,85,.14);border:1px solid rgba(206,127,85,.34);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer">
+          <div style="width:18px;height:2px;border-radius:2px;background:#CE7F55"></div>
+          <div style="width:12px;height:2px;border-radius:2px;background:#CE7F55"></div>
+          <div style="width:18px;height:2px;border-radius:2px;background:#CE7F55"></div>
+        </div>
+      </sc-if>
+    </div>
+      <div sc-camel-on-click="{{ openPanel }}" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9AA6BA" stroke-linecap="round">
+        <path stroke-width="4.6" d="M20.2 12 L21.2 12 M3.8 12 L2.8 12 M12 20.2 L12 21.2 M12 3.8 L12 2.8 M17.8 17.8 L18.5 18.5 M6.2 6.2 L5.5 5.5 M6.2 17.8 L5.5 18.5 M17.8 6.2 L18.5 5.5"></path>
+        <circle cx="12" cy="12" r="7.4" stroke-width="5.2"></circle>
+      </svg>
+        <sc-if value="{{ editOn }}"><div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#CE7F55;border:2px solid #090C14"></div></sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{ segOn }}">
+    <div style="flex:none;padding:4px 22px 12px;display:flex;gap:7px">
+      <sc-for list="{{ segs }}" as="sg" hint-placeholder-count="2">
+        <div sc-camel-on-click="{{ sg.go }}" style="flex:1;padding:13px;border-radius:12px;text-align:center;cursor:pointer;font:700 12.5px/1 Manrope,sans-serif;background:{{ sg.bg }};border:1px solid {{ sg.border }};color:{{ sg.fg }}" style-active="transform:translateY(1px)">{{ sg.t }}</div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <div style="flex:1;min-height:0;overflow:auto;padding:2px 22px 24px">
+
+    <sc-if value="{{ agendaOn }}">
+      <div style="background:#121724;border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:18px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px 14px">
+          <div sc-camel-on-click="{{ prevMonth }}" style="width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <div style="width:6px;height:6px;border-left:1.6px solid #8E9AAE;border-bottom:1.6px solid #8E9AAE;transform:rotate(45deg);margin-left:-2px"></div>
+          </div>
+          <div style="font:700 12px/1 Manrope,sans-serif;letter-spacing:.14em;color:#fff">{{ monthLabel }}</div>
+          <div sc-camel-on-click="{{ nextMonth }}" style="width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <div style="width:6px;height:6px;border-top:1.6px solid #8E9AAE;border-right:1.6px solid #8E9AAE;transform:rotate(45deg);margin-right:-2px"></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding-bottom:6px">
+          <sc-for list="{{ dowNames }}" as="w" hint-placeholder-count="7">
+            <div style="text-align:center;font:700 9px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE">{{ w.t }}</div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+          <sc-for list="{{ cells }}" as="cell" hint-placeholder-count="35">
+            <div sc-camel-on-click="{{ cell.select }}" style="aspect-ratio:1;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;background:{{ cell.bg }};border:1px solid {{ cell.border }}">
+              <div style="font:700 12px/1 Manrope,sans-serif;color:{{ cell.fg }}">{{ cell.n }}</div>
+              <div style="display:flex;gap:2px;height:5px;align-items:center">
+                <sc-for list="{{ cell.dots }}" as="dot" hint-placeholder-count="0">
+                  <div style="width:5px;height:5px;border-radius:50%;background:{{ dot.c }}"></div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:18px 2px 12px">
+        <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.16em;color:#CE7F55">{{ actsLabel }}</div>
+        <div style="flex:1;height:1px;background:rgba(255,255,255,.07)"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ acts }}" as="a" hint-placeholder-count="3">
+          <div sc-camel-on-click="{{ a.edit }}" style="background:#121724;border:1px solid rgba(255,255,255,.07);border-left:3px solid {{ a.color }};border-radius:12px;padding:15px 16px;cursor:pointer">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.12em;padding:5px 8px;border-radius:6px;background:{{ a.tint }};color:{{ a.color }}">{{ a.tipo }}</div>
+              <div style="font:700 11px/1 Manrope,sans-serif;color:{{ a.color }}">{{ a.plazo }}</div>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:9px;margin-top:11px">
+              <div style="font:700 14px/1.2 Manrope,sans-serif">{{ a.fechaTxt }}</div>
+              <div style="font:600 11px/1.2 Manrope,sans-serif;color:#8E9AAE;min-width:0">· {{ a.cuad }}</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+              <sc-for list="{{ a.asuntos }}" as="t" hint-placeholder-count="2">
+                <div style="font:500 11px/1 Manrope,sans-serif;color:#8E9AAE;padding:6px 9px;border-radius:8px;background:rgba(255,255,255,.05)">{{ t.t }}</div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noActs }}">
+          <div style="padding:26px;border-radius:14px;border:1px dashed rgba(255,255,255,.12);text-align:center;font:500 12.5px/1.5 Manrope,sans-serif;color:#8E9AAE">Sin actividades este mes.<br>Usa el ícono de menú para agendar una.</div>
+        </sc-if>
+      </div>
+
+      <div style="margin-top:18px;padding:15px 16px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)">
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE">URGENCIA</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px">
+          <sc-for list="{{ legend }}" as="l" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="width:7px;height:7px;border-radius:50%;background:{{ l.c }}"></div>
+              <div style="font:500 10.5px/1 Manrope,sans-serif;color:#8E9AAE">{{ l.t }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ cuadListOn }}">
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <sc-for list="{{ cuadernos }}" as="c" hint-placeholder-count="6">
+          <div style="background:#121724;border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:14px">
+            <div style="width:34px;height:40px;flex:none;border-radius:5px 10px 10px 5px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-left:3px solid {{ c.spine }};display:flex;align-items:center;justify-content:center">
+              <div style="font:700 11px/1 Manrope,sans-serif;color:#8E9AAE">{{ c.n }}</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <sc-if value="{{ editOn }}">
+                <input value="{{ c.nombre }}" sc-camel-on-change="{{ c.onName }}" style="width:100%;box-sizing:border-box;background:rgba(206,127,85,.07);border:1px solid rgba(206,127,85,.3);border-radius:9px;color:#fff;font:700 15px Manrope,sans-serif;padding:8px 10px">
+              </sc-if>
+              <sc-if value="{{ c.showName }}">
+                <div sc-camel-on-click="{{ c.open }}" style="font:700 15px/1.2 Manrope,sans-serif;cursor:pointer">{{ c.nombre }}</div>
+              </sc-if>
+              <div sc-camel-on-click="{{ c.open }}" style="font:700 11.5px/1 Manrope,sans-serif;color:#8E9AAE;margin-top:7px;cursor:pointer">{{ c.meta }}</div>
+            </div>
+            <div sc-camel-on-click="{{ c.open }}" style="width:6px;height:6px;flex:none;border-top:1.6px solid #8E9AAE;border-right:1.6px solid #8E9AAE;transform:rotate(45deg);cursor:pointer"></div>
+          </div>
+        </sc-for>
+        <div sc-camel-on-click="{{ addCuaderno }}" style="margin-top:3px;padding:16px;border-radius:12px;cursor:pointer;background:rgba(206,127,85,.1);border:1px solid rgba(206,127,85,.32);font:700 13.5px/1 Manrope,sans-serif;color:#CE7F55;display:flex;align-items:center;justify-content:center;gap:9px" style-hover="background:rgba(206,127,85,.16)" style-active="transform:translateY(1px)"><div style="width:15px;height:15px;position:relative;display:flex;align-items:center;justify-content:center"><div style="position:absolute;width:13px;height:1.8px;border-radius:2px;background:#CE7F55"></div><div style="position:absolute;width:1.8px;height:13px;border-radius:2px;background:#CE7F55"></div></div>Crear cuaderno</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ fileOn }}">
+      <label for="pilares-upload" style="display:block;padding:30px 20px;border-radius:16px;border:1px dashed rgba(206,127,85,.45);background:rgba(206,127,85,.06);text-align:center;cursor:pointer">
+        <div style="width:44px;height:44px;margin:0 auto;border-radius:12px;background:rgba(206,127,85,.16);display:flex;align-items:center;justify-content:center;position:relative">
+          <div style="width:2px;height:18px;border-radius:2px;background:#CE7F55"></div>
+          <div style="position:absolute;width:18px;height:2px;border-radius:2px;background:#CE7F55"></div>
+        </div>
+        <div style="font:800 15px/1.2 Manrope,sans-serif;margin-top:14px;color:#fff">Subir archivos de la materia</div>
+        <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:8px">Guías, talleres, diapositivas o apuntes.<br>PDF · DOCX · XLSX · PNG</div>
+      </label>
+      <input id="pilares-upload" type="file" multiple="" sc-camel-on-change="{{ onFiles }}" style="display:none">
+
+      <div style="display:flex;align-items:center;gap:10px;margin:20px 2px 12px">
+        <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.16em;color:#CE7F55">{{ filesLabel }}</div>
+        <div style="flex:1;height:1px;background:rgba(255,255,255,.07)"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <sc-for list="{{ files }}" as="fl" hint-placeholder-count="2">
+          <div style="background:#121724;border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px 15px;display:flex;align-items:center;gap:13px">
+            <div style="width:32px;height:38px;flex:none;border-radius:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font:700 8px/1 Manrope,sans-serif;color:{{ fl.color }}">{{ fl.ext }}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font:700 13px/1.25 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ fl.n }}</div>
+              <div style="font:700 10px/1 Manrope,sans-serif;color:#8E9AAE;margin-top:7px">{{ fl.s }}</div>
+            </div>
+            <div sc-camel-on-click="{{ fl.remove }}" style="flex:none;font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.08em;color:#8E9AAE;cursor:pointer;padding:9px 11px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)" style-hover="background:rgba(255,255,255,.12);color:#C46461" style-active="transform:translateY(1px)">QUITAR</div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noFiles }}">
+          <div style="padding:22px;border-radius:12px;border:1px dashed rgba(255,255,255,.12);text-align:center;font:500 12px/1.5 Manrope,sans-serif;color:#8E9AAE">Este cuaderno aún no tiene archivos.</div>
+        </sc-if>
+      </div>
+
+      <div style="margin-top:16px;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);font:500 11.5px/1.5 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">Las actividades se agendan desde la Agenda, no desde el cuaderno. Aquí solo vive el material de la materia.</div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isFinanzas }}">
+<div style="flex:1;min-height:0;display:flex;flex-direction:column">
+  <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
+    <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:#4A566B">LIBRETICAS · COP</div>
+    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:.005em;color:#EDF1F7">Finanzas</div>
+    <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE;padding:5px 9px;border-radius:7px;background:rgba(255,255,255,.05)">{{ finanzasSummary }}</div>
+    <div sc-camel-on-click="{{ openPanel }}" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
+  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9AA6BA" stroke-linecap="round">
+        <path stroke-width="4.6" d="M20.2 12 L21.2 12 M3.8 12 L2.8 12 M12 20.2 L12 21.2 M12 3.8 L12 2.8 M17.8 17.8 L18.5 18.5 M6.2 6.2 L5.5 5.5 M6.2 17.8 L5.5 18.5 M17.8 6.2 L18.5 5.5"></path>
+        <circle cx="12" cy="12" r="7.4" stroke-width="5.2"></circle>
+      </svg>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;overflow:auto;padding:6px 22px 24px;display:flex;flex-direction:column;gap:12px">
+    <sc-for list="{{ libs }}" as="l" hint-placeholder-count="4">
+      <div style="background:{{ l.bg }};border:1px solid {{ l.border }};border-radius:16px;padding:18px;opacity:{{ l.opacity }}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div sc-camel-on-click="{{ l.flip }}" style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;padding:6px 9px;border-radius:8px;cursor:pointer;background:{{ l.tint }};color:{{ l.color }}">{{ l.dirLabel }}</div>
+          <div sc-camel-on-click="{{ l.togglePaid }}" style="display:flex;align-items:center;gap:9px;cursor:pointer">
+            <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.1em;color:#8E9AAE">{{ l.paidLabel }}</div>
+            <div style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:{{ l.checkBg }};border:1.6px solid {{ l.checkBorder }}">
+              <div style="width:10px;height:5px;border-left:2px solid {{ l.tick }};border-bottom:2px solid {{ l.tick }};transform:rotate(-45deg);margin-top:-3px"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:9px">
+          <div>
+            <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">DEUDOR</div>
+            <input value="{{ l.deudor }}" sc-camel-on-change="{{ l.onDeudor }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:9px;color:#fff;font:700 14px Manrope,sans-serif;padding:9px 11px">
+          </div>
+          <div>
+            <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">PRESTAMISTA</div>
+            <input value="{{ l.prestamista }}" sc-camel-on-change="{{ l.onPrestamista }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:9px;color:#8E9AAE;font:600 14px Manrope,sans-serif;padding:9px 11px">
+          </div>
+        </div>
+
+        <div style="margin-top:16px;display:flex;align-items:center;gap:10px">
+          <div style="font:800 22px/1 Manrope,sans-serif;color:{{ l.color }}">$</div>
+          <input value="{{ l.monto }}" sc-camel-on-change="{{ l.onMonto }}" style="flex:1;min-width:0;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.12);border-radius:0;color:{{ l.color }};font:800 30px Manrope,sans-serif;letter-spacing:-.02em;padding:2px 0 7px">
+        </div>
+      </div>
+    </sc-for>
+
+    <div sc-camel-on-click="{{ addLib }}" style="margin-top:2px;padding:16px;border-radius:12px;cursor:pointer;background:rgba(206,127,85,.1);border:1px solid rgba(206,127,85,.32);font:700 13.5px/1 Manrope,sans-serif;color:#CE7F55;display:flex;align-items:center;justify-content:center;gap:9px" style-hover="background:rgba(206,127,85,.16)" style-active="transform:translateY(1px)"><div style="width:15px;height:15px;position:relative;display:flex;align-items:center;justify-content:center"><div style="position:absolute;width:13px;height:1.8px;border-radius:2px;background:#CE7F55"></div><div style="position:absolute;width:1.8px;height:13px;border-radius:2px;background:#CE7F55"></div></div>Nueva libretica</div>
+
+    <sc-if value="{{ hasPaid }}">
+      <div sc-camel-on-click="{{ toggleHist }}" style="margin-top:4px;padding:16px 18px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+        <div style="font:600 12.5px/1 Manrope,sans-serif;color:#8E9AAE">{{ histLabel }}</div>
+        <div style="font:700 11px/1 Manrope,sans-serif;color:#57B9A0">{{ histAction }}</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showHist }}">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ paidLibs }}" as="p" hint-placeholder-count="1">
+          <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:15px 17px;display:flex;align-items:center;gap:13px">
+            <div style="width:26px;height:26px;flex:none;border-radius:7px;background:rgba(87,185,160,.16);display:flex;align-items:center;justify-content:center">
+              <div style="width:10px;height:5px;border-left:2px solid #57B9A0;border-bottom:2px solid #57B9A0;transform:rotate(-45deg);margin-top:-3px"></div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font:700 13.5px/1.2 Manrope,sans-serif;color:#8E9AAE;text-decoration:line-through">{{ p.deudor }}</div>
+              <div style="font:700 10.5px/1 Manrope,sans-serif;color:#8E9AAE;margin-top:6px">SALDADA · {{ p.prestamista }}</div>
+            </div>
+            <div style="font:700 15px/1 Manrope,sans-serif;color:#8E9AAE">{{ p.montoTxt }}</div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex:none">
+              <div sc-camel-on-click="{{ p.togglePaid }}" style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.08em;color:#8E9AAE;cursor:pointer;padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);text-align:center" style-hover="background:rgba(255,255,255,.12)" style-active="transform:translateY(1px)">DESHACER</div>
+              <div sc-camel-on-click="{{ p.remove }}" style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.08em;color:#C46461;cursor:pointer;padding:8px 10px;border-radius:9px;background:rgba(196,100,97,.08);border:1px solid rgba(196,100,97,.26);text-align:center" style-hover="background:rgba(196,100,97,.16)" style-active="transform:translateY(1px)">BORRAR</div>
+            </div>
+          </div>
+        </sc-for>
+        <div sc-camel-on-click="{{ clearHist }}" style="margin-top:2px;padding:16px;border-radius:12px;border:1px solid rgba(196,100,97,.28);background:rgba(196,100,97,.07);text-align:center;cursor:pointer;font:700 13px/1 Manrope,sans-serif;color:#C46461" style-hover="background:rgba(196,100,97,.14)" style-active="transform:translateY(1px)">{{ clearHistLabel }}</div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<div style="flex:none;padding:10px 16px calc(env(safe-area-inset-bottom,0px) + 12px);background:rgba(9,12,20,.94);border-top:1px solid rgba(255,255,255,.06);display:flex;gap:6px;backdrop-filter:blur(12px)">
+  <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+    <div sc-camel-on-click="{{ t.go }}" style="flex:1;padding:10px 4px 8px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;background:{{ t.bg }};border:1px solid {{ t.border }}" style-active="transform:translateY(1px)">
+      <div style="height:18px;display:flex;align-items:flex-end;gap:3px">
+        <div style="width:4px;border-radius:2px;background:{{ t.fg }};height:{{ t.h1 }}"></div>
+        <div style="width:4px;border-radius:2px;background:{{ t.fg }};height:{{ t.h2 }}"></div>
+        <div style="width:4px;border-radius:2px;background:{{ t.fg }};height:{{ t.h3 }}"></div>
+      </div>
+      <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.02em;color:{{ t.fg }}">{{ t.label }}</div>
+    </div>
+  </sc-for>
+</div>
+
+<sc-if value="{{ restOn }}">
+  <div style="position:absolute;inset:0;z-index:120;background:rgba(9,12,20,.975);display:flex;flex-direction:column;align-items:center;justify-content:center;animation:fadeUp .2s ease">
+    <div style="font:700 11px/1 Manrope,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8E9AAE;margin-bottom:10px">DESCANSO</div>
+    <div style="font:600 15px/1.3 Manrope,sans-serif;color:#fff;margin-bottom:40px;max-width:280px;text-align:center">{{ restName }}</div>
+    <div style="position:relative;width:188px;height:188px;display:flex;align-items:center;justify-content:center">
+      <svg width="188" height="188" viewBox="0 0 188 188" style="position:absolute;inset:0">
+        <circle cx="94" cy="94" r="88" fill="none" stroke="#28324A" stroke-width="6"></circle>
+        <circle cx="94" cy="94" r="88" fill="none" stroke="{{ restColor }}" stroke-width="6" stroke-linecap="round" stroke-dasharray="552.9" stroke-dashoffset="{{ restOffset }}" transform="rotate(-90 94 94)"></circle>
+      </svg>
+      <div style="position:relative;z-index:1;font:800 64px/1 Manrope,sans-serif;letter-spacing:-3px;color:{{ restColor }}">{{ restTxt }}</div>
+    </div>
+    <div style="font:500 12.5px/1 Manrope,sans-serif;color:#4A566B;margin-top:22px">Recomendado {{ restTotalTxt }}</div>
+    <div style="display:flex;gap:14px;margin-top:44px;align-items:center">
+      <div sc-camel-on-click="{{ restMinus }}" style="width:68px;height:68px;border-radius:34px;background:#1A2131;border:1px solid #28324A;color:#8E9AAE;font:700 13px/1 Manrope,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:#3A4661" style-active="transform:translateY(1px)">−15s</div>
+      <div sc-camel-on-click="{{ stopRest }}" style="height:58px;padding:0 34px;border-radius:12px;background:#57B9A0;color:#0A0E1A;font:800 16px/1 Manrope,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#7FD3BC" style-active="transform:translateY(1px)">Listo</div>
+      <div sc-camel-on-click="{{ restPlus }}" style="width:68px;height:68px;border-radius:34px;background:#1A2131;border:1px solid #28324A;color:#8E9AAE;font:700 13px/1 Manrope,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:#3A4661" style-active="transform:translateY(1px)">+15s</div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ modalOn }}">
+  <div style="position:absolute;inset:0;z-index:90;background:rgba(9,12,20,.94);display:flex;align-items:flex-end;backdrop-filter:blur(6px)">
+    <div style="width:100%;max-height:92%;overflow:auto;background:#0E131F;border-top:1px solid rgba(255,255,255,.1);border-radius:28px 28px 0 0;padding:22px 22px 34px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font:800 20px/1.1 Manrope,sans-serif">{{ modalTitle }}</div>
+        <div sc-camel-on-click="{{ closeModal }}" style="width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 16px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
+      </div>
+      <div style="font:500 12px/1.4 Manrope,sans-serif;color:#CE7F55;margin-top:7px">{{ modalCuaderno }}</div>
+
+      <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:20px 0 10px">CUADERNO</div>
+      <div style="display:flex;gap:7px;overflow:auto;padding-bottom:2px">
+        <sc-for list="{{ modalCuads }}" as="mq" hint-placeholder-count="6">
+          <div sc-camel-on-click="{{ mq.pick }}" style="flex:none;padding:12px 14px;border-radius:11px;cursor:pointer;font:700 12px/1 Manrope,sans-serif;background:{{ mq.bg }};border:1px solid {{ mq.border }};color:{{ mq.fg }}" style-active="transform:translateY(1px)">{{ mq.t }}</div>
+        </sc-for>
+      </div>
+      <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:20px 0 10px">TIPO</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px">
+        <sc-for list="{{ tipos }}" as="tp" hint-placeholder-count="5">
+          <div sc-camel-on-click="{{ tp.pick }}" style="padding:12px 14px;border-radius:11px;cursor:pointer;font:700 12px/1 Manrope,sans-serif;background:{{ tp.bg }};border:1px solid {{ tp.border }};color:{{ tp.fg }}" style-active="transform:translateY(1px)">{{ tp.t }}</div>
+        </sc-for>
+      </div>
+
+      <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:20px 0 10px">FECHA · {{ modalMonth }}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+        <sc-for list="{{ modalCells }}" as="mc" hint-placeholder-count="35">
+          <div sc-camel-on-click="{{ mc.select }}" style="aspect-ratio:1;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font:700 12px/1 Manrope,sans-serif;background:{{ mc.bg }};border:1px solid {{ mc.border }};color:{{ mc.fg }}">{{ mc.n }}</div>
+        </sc-for>
+      </div>
+
+      <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:20px 0 10px">ASUNTO · TEMAS A EVALUAR</div>
+      <div style="display:flex;gap:8px">
+        <input value="{{ modalTema }}" sc-camel-on-change="{{ onTema }}" placeholder="ej. Interpolación de Lagrange" style="flex:1;min-width:0;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;font:600 13px Manrope,sans-serif;padding:11px 12px">
+        <div sc-camel-on-click="{{ addTema }}" style="flex:none;padding:13px 17px;border-radius:11px;background:rgba(206,127,85,.12);border:1px solid rgba(206,127,85,.34);cursor:pointer;font:700 13px/1.2 Manrope,sans-serif;color:#CE7F55" style-hover="background:rgba(206,127,85,.2)" style-active="transform:translateY(1px)">Añadir</div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:11px">
+        <sc-for list="{{ modalTemas }}" as="mt" hint-placeholder-count="0">
+          <div sc-camel-on-click="{{ mt.remove }}" style="display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:9px;background:rgba(255,255,255,.05);cursor:pointer;font:500 12px/1 Manrope,sans-serif;color:#8E9AAE">{{ mt.t }}<span style="color:#8E9AAE">×</span></div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:20px;padding:15px 16px;border-radius:12px;background:{{ modalTint }};border:1px solid {{ modalColor }}">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="width:8px;height:8px;border-radius:50%;background:{{ modalColor }}"></div>
+          <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.12em;color:{{ modalColor }}">{{ modalUrgLabel }}</div>
+        </div>
+        <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:9px">{{ modalUrgNote }}</div>
+      </div>
+
+      <div style="display:flex;gap:9px;margin-top:18px">
+        <div sc-camel-on-click="{{ closeModal }}" style="flex:1;padding:16px;border-radius:12px;text-align:center;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);font:700 13.5px/1 Manrope,sans-serif;color:#8E9AAE" style-hover="background:rgba(255,255,255,.1)" style-active="transform:translateY(1px)">Cancelar</div>
+        <div sc-camel-on-click="{{ saveAct }}" style="flex:1.6;padding:16px;border-radius:12px;text-align:center;cursor:pointer;background:#CE7F55;font:800 13.5px/1 Manrope,sans-serif;letter-spacing:.01em;color:#0A0E1A" style-hover="background:#FF9264" style-active="transform:translateY(1px)">{{ modalCta }}</div>
+      </div>
+      <sc-if value="{{ modalEditing }}">
+        <div sc-camel-on-click="{{ deleteAct }}" style="margin-top:10px;padding:14px;border-radius:12px;text-align:center;cursor:pointer;background:rgba(196,100,97,.08);border:1px solid rgba(196,100,97,.26);font:700 11px/1 Manrope,sans-serif;letter-spacing:.1em;color:#C46461" style-hover="background:rgba(196,100,97,.15)" style-active="transform:translateY(1px)">ELIMINAR ACTIVIDAD</div>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ panelOn }}">
+  <div style="position:absolute;inset:0;z-index:95;background:rgba(9,12,20,.94);display:flex;align-items:flex-start;backdrop-filter:blur(6px)">
+    <div style="width:100%;max-height:100%;overflow:auto;background:#0E131F;border-bottom:1px solid rgba(255,255,255,.1);border-radius:0 0 28px 28px;padding:calc(env(safe-area-inset-top,0px) + 14px) 22px 26px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div>
+          <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">PANEL DE CUSTOMIZACIÓN</div>
+          <div style="font:800 24px/1.1 Manrope,sans-serif;letter-spacing:-.02em;margin-top:9px">Tu perfil</div>
+        </div>
+        <div sc-camel-on-click="{{ closePanel }}" style="width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 16px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
+      </div>
+
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:11px">
+        <div>
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">NOMBRE</div>
+          <input value="{{ pNombre }}" sc-camel-on-change="{{ onNombre }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:700 15px Manrope,sans-serif;padding:11px 12px">
+        </div>
+        <div style="display:flex;gap:9px">
+          <div style="flex:1">
+            <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">ALTURA (CM)</div>
+            <input value="{{ pAltura }}" sc-camel-on-change="{{ onAltura }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:700 15px Manrope,sans-serif;padding:11px 12px">
+          </div>
+          <div style="flex:1">
+            <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">PESO (KG)</div>
+            <input value="{{ pPeso }}" sc-camel-on-change="{{ onPeso }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:700 15px Manrope,sans-serif;padding:11px 12px">
+          </div>
+        </div>
+        <div>
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">SEXO</div>
+          <div style="display:flex;gap:7px">
+            <sc-for list="{{ sexos }}" as="s" hint-placeholder-count="3">
+              <div sc-camel-on-click="{{ s.pick }}" style="flex:1;padding:13px;border-radius:11px;text-align:center;cursor:pointer;font:700 12.5px/1 Manrope,sans-serif;background:{{ s.bg }};border:1px solid {{ s.border }};color:{{ s.fg }}" style-active="transform:translateY(1px)">{{ s.t }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;padding:15px 16px;border-radius:12px;background:rgba(87,185,160,.08);border:1px solid rgba(87,185,160,.22)">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="width:7px;height:7px;border-radius:50%;background:#57B9A0"></div>
+          <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.12em;color:#57B9A0">RUTINA AJUSTADA SEGÚN TU PERFIL</div>
+        </div>
+        <div style="font:500 11.5px/1.5 Manrope,sans-serif;color:#8E9AAE;margin-top:9px;text-wrap:pretty">{{ profileNote }}</div>
+      </div>
+
+      <div sc-camel-on-click="{{ toggleEdit }}" style="margin-top:14px;padding:17px;border-radius:14px;background:{{ editCardBg }};border:1px solid {{ editCardBorder }};display:flex;align-items:center;gap:14px;cursor:pointer">
+        <div style="flex:1;min-width:0">
+          <div style="font:700 15px/1.1 Manrope,sans-serif;color:{{ editTitleColor }}">Modo edición</div>
+          <div style="font:500 11.5px/1.4 Manrope,sans-serif;color:#8E9AAE;margin-top:6px">Renombrar y editar valores en Ejercicio y Estudio</div>
+        </div>
+        <div style="width:48px;height:28px;flex:none;border-radius:12px;padding:3px;background:{{ switchBg }};display:flex;justify-content:{{ switchJustify }}">
+          <div style="width:22px;height:22px;border-radius:50%;background:{{ switchKnob }}"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);font:500 11.5px/1.5 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">En Finanzas la edición está siempre habilitada: los campos de la libretica se editan directamente en la tarjeta.</div>
+    </div>
+  </div>
+</sc-if>
+
+</div>
+</template>
+
+<script src="assets/runtime.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

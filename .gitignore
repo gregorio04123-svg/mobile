@@ -1,0 +1,27 @@
+# Dependencias (este proyecto no usa ninguna)
+node_modules/
+
+# Vercel CLI
+.vercel/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*~
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Registros y temporales
+*.log
+npm-debug.log*
+*.tmp

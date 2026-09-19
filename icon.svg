@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Pilares">
+  <rect width="120" height="120" fill="#090C14"/>
+  <rect x="34" y="72" width="11" height="22" rx="3" fill="#57B9A0"/>
+  <rect x="54" y="56" width="11" height="38" rx="3" fill="#CE7F55"/>
+  <rect x="74" y="38" width="11" height="56" rx="3" fill="#57B9A0"/>
+  <circle cx="60" cy="26" r="8" fill="none" stroke="#CE7F55" stroke-width="3"/>
+</svg>
