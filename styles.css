@@ -8,9 +8,11 @@ html, body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100vh;   /* respaldo para navegadores sin soporte de dvh */
-  height: 100dvh;  /* alto real visible: se ajusta cuando la barra
-                       de direcciones del celular aparece u oculta */
+  height: 100vh;               /* respaldo general */
+  height: -webkit-fill-available; /* iOS Safari en modo standalone: 100dvh
+                                      a veces no llega al borde real ahi */
+  height: 100dvh;              /* alto real visible: se ajusta cuando la
+                                   barra de direcciones aparece u oculta */
   overflow: hidden;
   background: #090C14;
   font-family: Manrope, system-ui, sans-serif;
@@ -39,6 +41,7 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
 #screen {
   width: 100%;
   height: 100vh;
+  height: -webkit-fill-available;
   height: 100dvh;
 }
 
