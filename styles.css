@@ -8,12 +8,7 @@ html, body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100vh;                    /* respaldo mas basico */
-  height: -webkit-fill-available;   /* respaldo iOS antiguo */
-  height: 100dvh;                   /* respaldo moderno */
-  height: var(--app-vh, 100dvh);    /* alto real medido por JS: gana
-                                        sobre los anteriores en cuanto
-                                        el script de index.html corre */
+  height: 100%;
   overflow: hidden;
   background: #090C14;
   font-family: Manrope, system-ui, sans-serif;
@@ -38,21 +33,19 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
 @keyframes checkBounce { 0% { transform: scale(1); } 40% { transform: scale(1.28); } 100% { transform: scale(1); } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 
-/* En el telefono la app ocupa toda la pantalla, tal como fue disenada. */
+/* La app se ancla a los cuatro bordes del viewport en vez de calcular
+   un alto. Asi no depende de 100vh / 100dvh / -webkit-fill-available,
+   que es justo lo que falla en iOS cuando la pagina esta agregada a la
+   pantalla de inicio y deja un margen sin cubrir abajo. */
 #screen {
-  width: 100%;
-  height: 100vh;
-  height: -webkit-fill-available;
-  height: 100dvh;
-  height: var(--app-vh, 100dvh);
+  position: fixed;
+  inset: 0;
 }
 
-/* La plantilla del diseno trae su propio div raiz con height:100dvh
-   en linea. En movil forzamos ese mismo alto medido por JS para que
-   no quede un margen sin cubrir en modo standalone (agregado a la
-   pantalla de inicio). En escritorio la regla de abajo lo reemplaza. */
+/* La plantilla del diseno trae height:100dvh en linea en su div raiz;
+   dentro del contenedor anclado debe ser simplemente el alto de este. */
 #screen > div {
-  height: var(--app-vh, 100dvh) !important;
+  height: 100% !important;
 }
 
 /* En escritorio se centra con la proporcion del diseno (390 x 844). */
@@ -65,16 +58,14 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
   }
 
   #screen {
+    position: relative;
+    inset: auto;
     width: 390px;
     height: 844px;
     border-radius: 44px;
     overflow: hidden;
     box-shadow: 0 40px 80px rgba(0, 0, 0, .5), 0 0 0 1px rgba(255, 255, 255, .06);
   }
-
-  /* El contenedor del diseno mide 100dvh; dentro del marco debe medir
-     el alto del marco. */
-  #screen > div { height: 100% !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

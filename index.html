@@ -21,22 +21,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Newsreader:ital,opsz,wght@1,6..72,200..400&amp;display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
-<script>
-  // 100dvh no es fiable en Safari cuando la pagina esta agregada a la
-  // pantalla de inicio (modo standalone): en ese modo no hay ninguna
-  // barra que mostrar u ocultar, pero algunas versiones de iOS igual
-  // calculan mal el alto real disponible y dejan un margen inferior.
-  // Medimos con JS y lo exponemos como variable CSS; se recalcula en
-  // cada cambio real de tamano, nunca durante el scroll.
-  (function () {
-    function setAppHeight() {
-      document.documentElement.style.setProperty('--app-vh', window.innerHeight + 'px');
-    }
-    setAppHeight();
-    window.addEventListener('resize', setAppHeight);
-    window.addEventListener('orientationchange', setAppHeight);
-  })();
-</script>
 </head>
 <body>
 
