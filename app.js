@@ -173,6 +173,7 @@ class Component extends DCLogic {
       ],
       showHist: false,
       profile: { nombre: 'Santiago', altura: '178', peso: '74', sexo: 'Hombre' },
+      correo: props.correo || '',
     };
     try {
       const raw = localStorage.getItem('pilares.v1');
@@ -636,6 +637,9 @@ class Component extends DCLogic {
       switchJustify: s.edit ? 'flex-end' : 'flex-start',
       switchKnob: s.edit ? '#090C14' : '#8E9AAE',
 
+      correoSesion: s.correo ? ('Conectado como ' + s.correo) : 'Sesión activa',
+      cerrarSesion: () => { if (window.PilaresAuth) window.PilaresAuth.cerrarSesion(); },
+
       tabs: tabDefs.map(([label, key, hs]) => {
         const on = s.tab === key;
         return {
@@ -651,14 +655,19 @@ class Component extends DCLogic {
 
 
 /* ── Arranque ──────────────────────────────────────────────────────── */
-Pilares.mount({
-  template: 'dc-template',
-  root: 'screen',
-  Component: Component,
-  props: {
-    acento: 'Naranja',          // 'Naranja' | 'Menta'
-    pantallaInicial: 'Home',    // 'Home' | 'Ejercicio' | 'Estudio' | 'Finanzas'
-    modoEdicion: false,
-    ocultarCompletados: true,
-  },
-});
+/* No se monta solo: auth.js llama a PilaresBoot() cuando confirma que
+   hay sesion abierta. Asi la app nunca se dibuja para un desconocido. */
+window.PilaresBoot = function (correo) {
+  return Pilares.mount({
+    template: 'dc-template',
+    root: 'screen',
+    Component: Component,
+    props: {
+      acento: 'Naranja',          // 'Naranja' | 'Menta'
+      pantallaInicial: 'Home',    // 'Home' | 'Ejercicio' | 'Estudio' | 'Finanzas'
+      modoEdicion: false,
+      ocultarCompletados: true,
+      correo: correo || '',
+    },
+  });
+};

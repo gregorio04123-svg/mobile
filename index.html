@@ -26,6 +26,24 @@
 
 <div id="screen"></div>
 
+<!-- Pantalla de acceso: vive fuera de la plantilla porque se muestra
+     antes de que el runtime monte nada. -->
+<div id="acceso">
+  <div class="acceso-caja">
+    <div class="acceso-kicker">EJERCICIO · ESTUDIO · FINANZAS</div>
+    <div class="acceso-titulo">Pilares</div>
+    <p class="acceso-texto">Entra con tu correo. Te enviamos un enlace de acceso y listo, sin contrase&ntilde;a.</p>
+
+    <form id="acceso-form" novalidate>
+      <input id="acceso-correo" type="email" inputmode="email" autocomplete="email"
+             placeholder="tu@correo.com" aria-label="Correo electr&oacute;nico">
+      <button id="acceso-enviar" type="submit">Enviarme el enlace</button>
+    </form>
+
+    <div id="acceso-aviso" role="status" aria-live="polite"></div>
+  </div>
+</div>
+
 <!-- Plantilla del diseno: la interpreta assets/runtime.js -->
 <template id="dc-template">
 <div style="height:100dvh;display:flex;flex-direction:column;position:relative;background:#090C14;color:#fff;overflow:hidden">
@@ -605,7 +623,7 @@
 
 <sc-if value="{{ panelOn }}">
   <div style="position:absolute;inset:0;z-index:95;background:rgba(9,12,20,.94);display:flex;align-items:flex-start;backdrop-filter:blur(6px)">
-    <div style="width:100%;max-height:100%;overflow:auto;background:#0E131F;border-bottom:1px solid rgba(255,255,255,.1);border-radius:0 0 28px 28px;padding:calc(env(safe-area-inset-top,0px) + 14px) 22px 26px">
+    <div style="width:100%;max-height:100%;overflow:auto;background:#0E131F;border-bottom:1px solid rgba(255,255,255,.1);border-radius:0 0 28px 28px;padding:calc(env(safe-area-inset-top,0px) + 14px) 22px calc(env(safe-area-inset-bottom,0px) + 26px)">
       <div style="display:flex;align-items:flex-start;justify-content:space-between">
         <div>
           <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">PANEL DE CUSTOMIZACIÓN</div>
@@ -658,6 +676,12 @@
       </div>
 
       <div style="margin-top:12px;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);font:500 11.5px/1.5 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">En Finanzas la edición está siempre habilitada: los campos de la libretica se editan directamente en la tarjeta.</div>
+
+      <div style="margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,.07)">
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">SESIÓN</div>
+        <div style="font:500 11.5px/1.5 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">{{ correoSesion }}</div>
+        <div sc-camel-on-click="{{ cerrarSesion }}" style="margin-top:12px;padding:14px;border-radius:12px;text-align:center;cursor:pointer;background:rgba(196,100,97,.08);border:1px solid rgba(196,100,97,.26);font:700 11px/1 Manrope,sans-serif;letter-spacing:.1em;color:#C46461" style-hover="background:rgba(196,100,97,.15)" style-active="transform:translateY(1px)">CERRAR SESIÓN</div>
+      </div>
     </div>
   </div>
 </sc-if>
@@ -665,8 +689,10 @@
 </div>
 </template>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <script src="viewport.js"></script>
 <script src="runtime.js"></script>
 <script src="app.js"></script>
+<script src="auth.js"></script>
 </body>
 </html>

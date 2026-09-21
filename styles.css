@@ -91,3 +91,91 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* =====================================================================
+   Pantalla de acceso
+   Vive fuera de #screen porque se dibuja antes de que el runtime monte
+   la plantilla. Arranca oculta: auth.js decide si mostrarla o saltarsela
+   segun haya sesion, y asi no parpadea el formulario cuando ya entraste.
+   ================================================================== */
+#acceso {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: #090C14;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 26px
+           calc(env(safe-area-inset-bottom, 0px) + 24px);
+  overflow: auto;
+}
+
+.acceso-caja {
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.acceso-kicker {
+  font: 700 9.5px/1 Manrope, sans-serif;
+  letter-spacing: .16em;
+  color: #4A566B;
+}
+
+.acceso-titulo {
+  font: italic 300 38px/1.12 Newsreader, Georgia, serif;
+  letter-spacing: .005em;
+  color: #EDF1F7;
+  margin-top: 8px;
+}
+
+.acceso-texto {
+  font: 500 13px/1.5 Manrope, sans-serif;
+  color: #8E9AAE;
+  margin: 12px 0 26px;
+  text-wrap: pretty;
+}
+
+#acceso-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#acceso-correo {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 15px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .1);
+  color: #fff;
+  font: 600 14px Manrope, sans-serif;
+  text-align: center;
+}
+
+#acceso-correo::placeholder { color: #4A566B; }
+
+#acceso-enviar {
+  padding: 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #CE7F55;
+  color: #0A0E1A;
+  font: 800 13.5px/1 Manrope, sans-serif;
+  letter-spacing: .01em;
+  cursor: pointer;
+}
+
+#acceso-enviar:disabled { opacity: .55; cursor: default; }
+#acceso-enviar:not(:disabled):hover { background: #FF9264; }
+#acceso-enviar:not(:disabled):active { transform: translateY(1px); }
+
+#acceso-aviso {
+  min-height: 34px;
+  margin-top: 16px;
+  font: 500 12px/1.45 Manrope, sans-serif;
+  color: #8E9AAE;
+  text-wrap: pretty;
+}
