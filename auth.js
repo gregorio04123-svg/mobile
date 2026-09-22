@@ -1,14 +1,19 @@
 /* =====================================================================
  * Pilares · sesion
  * ---------------------------------------------------------------------
- * Puerta de entrada de la app. Antes de montar nada comprueba si hay
- * sesion de Supabase: si la hay arranca Pilares, si no muestra la
- * pantalla de acceso por enlace magico.
+ * Puerta de entrada. Antes de montar nada comprueba si hay sesion de
+ * Supabase: si la hay arranca Pilares, si no muestra el acceso por
+ * enlace magico.
  *
- * El enlace del correo devuelve al usuario a esta misma pagina con el
- * token en el fragmento de la URL; supabase-js lo detecta solo
- * (detectSessionInUrl) y dispara onAuthStateChange, asi que aqui no hay
- * que leer la URL a mano.
+ * Flujo implicito, no PKCE. PKCE guarda un "code_verifier" en el
+ * localStorage del navegador que pide el enlace y lo exige de vuelta
+ * para canjear el codigo por una sesion. En un telefono el correo casi
+ * nunca se abre en ese mismo navegador -- Outlook, Gmail y compania
+ * abren los enlaces en su propio navegador embebido, que es otro
+ * almacenamiento -- asi que el canje fallaba, no habia sesion y la app
+ * volvia a pedir el correo: un bucle. Con el flujo implicito el token
+ * viaja en el fragmento de la URL y se puede canjear desde cualquier
+ * navegador.
  * ================================================================== */
 (function (global) {
   'use strict';
@@ -23,41 +28,85 @@
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      flowType: 'pkce',
+      flowType: 'implicit',
     },
   });
 
   var pantalla = document.getElementById('acceso');
+  var caja     = document.getElementById('acceso-caja');
   var form     = document.getElementById('acceso-form');
   var campo    = document.getElementById('acceso-correo');
   var boton    = document.getElementById('acceso-enviar');
   var aviso    = document.getElementById('acceso-aviso');
+  var estado   = document.getElementById('acceso-estado');
   var montado  = false;
 
   function mostrarAviso(texto, tono) {
-    aviso.textContent = texto;
+    aviso.textContent = texto || '';
     aviso.style.color = tono === 'error' ? '#C46461'
                       : tono === 'ok'    ? '#57B9A0'
                       : '#8E9AAE';
   }
 
-  function mostrarAcceso() {
-    pantalla.style.display = 'flex';
-    document.getElementById('screen').style.display = 'none';
+  /* Traduce los errores que vienen del servidor a algo entendible. */
+  function traducir(err) {
+    var m = (err && (err.message || err)) || '';
+    var c = (err && err.code) || '';
+    if (/rate limit/i.test(m) || c === 'over_email_send_rate_limit') {
+      return 'Supabase limita cuantos correos se envian por hora y ya se alcanzo el tope. Espera un rato y vuelve a intentar.';
+    }
+    if (/expired/i.test(m) || c === 'otp_expired') {
+      return 'Ese enlace ya se uso o vencio. Pide uno nuevo.';
+    }
+    if (/invalid/i.test(m)) {
+      return 'El enlace no es valido. Pide uno nuevo.';
+    }
+    return m || 'No se pudo completar el acceso.';
   }
 
-  function ocultarAcceso() {
-    pantalla.style.display = 'none';
-    document.getElementById('screen').style.display = '';
+  function verFormulario(mensaje, tono) {
+    estado.style.display = 'none';
+    caja.style.display = '';
+    pantalla.style.display = 'flex';
+    document.getElementById('screen').style.display = 'none';
+    if (mensaje) mostrarAviso(mensaje, tono || 'error');
+  }
+
+  function verVerificando() {
+    caja.style.display = 'none';
+    estado.style.display = '';
+    pantalla.style.display = 'flex';
+    document.getElementById('screen').style.display = 'none';
   }
 
   /* La app se monta una sola vez por carga: el runtime no sabe
      desmontarse, asi que al cerrar sesion se recarga la pagina. */
   function arrancarApp(sesion) {
-    ocultarAcceso();
+    pantalla.style.display = 'none';
+    document.getElementById('screen').style.display = '';
     if (montado) return;
     montado = true;
     global.PilaresBoot(sesion && sesion.user ? sesion.user.email : '');
+  }
+
+  /* Si el enlace vino con error, Supabase lo deja en el fragmento.
+     Sin esto el usuario solo veria el formulario otra vez, sin pista
+     de que fallo. */
+  function errorEnUrl() {
+    var crudo = (global.location.hash || '').replace(/^#/, '') ||
+                (global.location.search || '').replace(/^\?/, '');
+    if (!crudo || crudo.indexOf('error') === -1) return null;
+    var p = new URLSearchParams(crudo);
+    var desc = p.get('error_description') || p.get('error');
+    if (!desc) return null;
+    return traducir({ message: decodeURIComponent(desc.replace(/\+/g, ' ')),
+                      code: p.get('error_code') || '' });
+  }
+
+  function limpiarUrl() {
+    if (global.history && global.history.replaceState) {
+      global.history.replaceState({}, document.title, global.location.pathname);
+    }
   }
 
   form.addEventListener('submit', function (ev) {
@@ -73,11 +122,8 @@
       email: correo,
       options: { emailRedirectTo: global.location.origin },
     }).then(function (res) {
-      if (res.error) {
-        mostrarAviso(res.error.message || 'No se pudo enviar el enlace.', 'error');
-      } else {
-        mostrarAviso('Listo. Te llego un enlace a ' + correo + '. Abrelo desde este mismo telefono.', 'ok');
-      }
+      if (res.error) mostrarAviso(traducir(res.error), 'error');
+      else mostrarAviso('Listo, revisa ' + correo + '. Si el enlace no te deja entrar, copialo y abrelo en Safari o Chrome.', 'ok');
     }).catch(function () {
       mostrarAviso('Sin conexion con el servidor.', 'error');
     }).then(function () {
@@ -87,17 +133,42 @@
   });
 
   db.auth.onAuthStateChange(function (evento, sesion) {
-    if (sesion) arrancarApp(sesion);
-    else if (evento === 'SIGNED_OUT') global.location.reload();
+    if (sesion) { arrancarApp(sesion); return; }
+    // Solo recargar si veniamos de una sesion viva. Si nunca se monto la
+    // app, un SIGNED_OUT es el estado normal de "aun no has entrado":
+    // recargar ahi crearia un bucle infinito cuando la URL trae un token
+    // que no sirve.
+    if (evento === 'SIGNED_OUT' && montado) global.location.reload();
   });
 
-  db.auth.getSession().then(function (res) {
-    if (res.data && res.data.session) arrancarApp(res.data.session);
-    else mostrarAcceso();
-  }).catch(function () {
-    mostrarAcceso();
-    mostrarAviso('No se pudo contactar al servidor.', 'error');
-  });
+  /* Arranque. Si la URL trae un token, supabase-js lo procesa dentro de
+     getSession(), asi que mientras tanto se ve "verificando" en vez del
+     formulario parpadeando. */
+  var fallo = errorEnUrl();
+  if (fallo) {
+    limpiarUrl();
+    verFormulario(fallo, 'error');
+  } else {
+    var traeToken = /access_token|refresh_token|[?&#]code=/.test(
+      global.location.hash + global.location.search);
+    if (traeToken) verVerificando();
+
+    // La URL se limpia despues de getSession(), nunca antes: getSession
+    // espera a que el cliente termine de leer el token del fragmento, y
+    // borrarlo en ese intervalo dejaria fuera a un enlace valido.
+    db.auth.getSession().then(function (res) {
+      if (traeToken) limpiarUrl();
+      if (res.data && res.data.session) {
+        arrancarApp(res.data.session);
+      } else {
+        verFormulario(traeToken
+          ? 'El enlace no pudo abrir la sesion. Pide uno nuevo y abrelo en Safari o Chrome.'
+          : '', 'error');
+      }
+    }).catch(function () {
+      verFormulario('No se pudo contactar al servidor.', 'error');
+    });
+  }
 
   global.PilaresAuth = {
     db: db,
