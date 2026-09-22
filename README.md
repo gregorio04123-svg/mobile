@@ -14,7 +14,8 @@ pilares-app/
 ├── assets/
 │   ├── app.js              ← lógica: rutinas, agenda, finanzas, persistencia
 │   ├── runtime.js          ← motor que interpreta la plantilla del diseño
-│   └── styles.css          ← estilos base + marco de teléfono en escritorio
+│   ├── styles.css          ← estilos base + marco de teléfono en escritorio
+│   └── viewport.js         ← corrige el alto de pantalla en la PWA instalada
 ├── icon.svg                ← ícono vectorial (favicon)
 ├── icon-192.png            ← ícono PWA / apple-touch-icon
 ├── icon-512.png            ← ícono PWA (incluye versión "maskable")

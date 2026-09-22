@@ -33,13 +33,33 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
 @keyframes checkBounce { 0% { transform: scale(1); } 40% { transform: scale(1.28); } 100% { transform: scale(1); } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 
-/* La app se ancla a los cuatro bordes del viewport en vez de calcular
-   un alto. Asi no depende de 100vh / 100dvh / -webkit-fill-available,
-   que es justo lo que falla en iOS cuando la pagina esta agregada a la
-   pantalla de inicio y deja un margen sin cubrir abajo. */
+/* Alto del marco de la app.
+
+   Anclarlo con inset:0 no bastaba: position:fixed se resuelve contra el
+   mismo viewport de maquetacion que en una PWA de iOS llega corto (le
+   falta la franja de la barra de estado), mientras la pagina se sigue
+   pintando desde el borde superior de la pantalla. La barra de pestanas
+   quedaba entonces flotando sobre una banda muerta abajo.
+
+   Ahora el alto es una variable: el valor base es el que publica el
+   sistema y viewport.js lo sustituye por el alto real de la pantalla
+   cuando detecta esa diferencia. */
+:root {
+  --app-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
+  }
+}
+
 #screen {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--app-height);
 }
 
 /* La plantilla del diseno trae height:100dvh en linea en su div raiz;
