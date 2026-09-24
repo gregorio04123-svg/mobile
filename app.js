@@ -113,17 +113,6 @@ function fmtMoney(v) {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
-// Las fechas se siembran relativas a hoy para que la agenda siempre tenga sentido.
-const SEED_ACTS = [
-  { id: 'a1', c: 'c4', tipo: 'Quiz', en: 2, asunto: ['Interpolación de Lagrange', 'Splines cúbicos'] },
-  { id: 'a2', c: 'c4', tipo: 'Tarea', en: 4, asunto: ['Taller 3: métodos iterativos'] },
-  { id: 'a3', c: 'c4', tipo: 'Seguimiento', en: 8, asunto: ['Newton-Raphson', 'Bisección'] },
-  { id: 'a4', c: 'c4', tipo: 'Parcial', en: 17, asunto: ['Errores de redondeo', 'Raíces de ecuaciones', 'Sistemas lineales'] },
-  { id: 'a5', c: 'c1', tipo: 'Quiz', en: 3, asunto: ['Bayes', 'Variables discretas'] },
-  { id: 'a6', c: 'c3', tipo: 'Final', en: 12, asunto: ['Ruta crítica', 'Gestión de riesgos'] },
-  { id: 'a7', c: 'c6', tipo: 'Tarea', en: 1, asunto: ['Flujo de caja libre'] },
-].map(a => ({ id: a.id, c: a.c, tipo: a.tipo, fecha: isoOf(addDays(NOW, a.en)), asunto: a.asunto }));
-
 /** Sesión en blanco para un día de la tira semanal. */
 function freshDay(w) {
   const r = ROUTINES[w.r];
@@ -139,87 +128,371 @@ function freshDay(w) {
   };
 }
 
+// Partes del estado que son datos del usuario (lo demás es interfaz).
+const DATA_KEYS = ['logs', 'days', 'cuadernos', 'files', 'acts', 'libs', 'profile'];
+const FRESH_JSON = WEEK.map(w => JSON.stringify(freshDay(w)));
+const USUARIO_OK = /^[a-z0-9._-]{3,24}$/;
+const NUBE_TXT = {
+  ok: ['Guardado', MINT], guardando: ['Guardando…', AMBER],
+  pendiente: ['Sin conexión · se guardará', AMBER], error: ['Un cambio no se guardó', RED],
+};
+
+function vacio() {
+  return {
+    logs: {}, days: WEEK.map(freshDay), cuadernos: [], files: {}, acts: [], libs: [],
+    profile: { nombre: '', altura: '', peso: '', sexo: '' },
+  };
+}
+function norm(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+function leerCache(uid) { try { return JSON.parse(localStorage.getItem('pilares.nube.' + uid)); } catch (e) { return null; } }
+
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    const days = WEEK.map(freshDay);
+    this.uid = null;
+    this.base = null;       // lo que el servidor ya tiene (filas en texto)
 
-    this.state = {
-      logs: {},
+    this.state = Object.assign(vacio(), {
+      auth: 'cargando', cargaError: '',
+      authMode: 'entrar', aUsuario: '', aNombre: '', aClave: '', authErr: '', authBusy: false,
+      me: null, codigo: '', amigos: [], cuadAmigos: {},
+      amigoCodigo: '', amigoMsg: '', amigoBusy: false, copiado: false, importMsg: '',
+      nube: 'ok',
       tab: (props.pantallaInicial || 'Home').toLowerCase(),
       edit: !!props.modoEdicion,
       panel: false,
-      days, activeDay: 1, expanded: null, showDone: false,
+      activeDay: 1, expanded: null, showDone: false,
       rest: 0, restTotal: 0, restName: '', restOn: false,
-      cuadernos: [
-        { id: 'c1', nombre: 'Probabilidad' }, { id: 'c2', nombre: 'Negocios y ventas' },
-        { id: 'c3', nombre: 'Gerencia de proyectos' }, { id: 'c4', nombre: 'Análisis numérico' },
-        { id: 'c5', nombre: 'Gestión humana' }, { id: 'c6', nombre: 'Administración financiera' },
-      ],
       openCuaderno: null, estudioTab: 'agenda',
       month: NOW.getMonth(), year: NOW.getFullYear(), selDay: NOW.getDate(),
-      files: {
-        c4: [{ n: 'Cap3-interpolacion.pdf', s: '2.4 MB' }, { n: 'Taller2-resuelto.xlsx', s: '380 KB' }],
-        c1: [{ n: 'Formulario-distribuciones.pdf', s: '1.1 MB' }],
-      },
-      acts: SEED_ACTS,
       modal: null,
-      libs: [
-        { id: 'l1', deudor: 'Andrés Villalba', prestamista: 'Yo · Santiago', monto: '320000', mine: true, paid: false },
-        { id: 'l2', deudor: 'Yo · Santiago', prestamista: 'Mamá', monto: '1250000', mine: false, paid: false },
-        { id: 'l3', deudor: 'Laura Restrepo', prestamista: 'Yo · Santiago', monto: '85000', mine: true, paid: false },
-        { id: 'l4', deudor: 'Yo · Santiago', prestamista: 'Juan D. Mesa', monto: '40000', mine: false, paid: false },
-        { id: 'l5', deudor: 'Camilo Ruiz', prestamista: 'Yo · Santiago', monto: '150000', mine: true, paid: true },
-      ],
-      showHist: false,
-      profile: { nombre: 'Santiago', altura: '178', peso: '74', sexo: 'Hombre' },
-    };
-    try {
-      const raw = localStorage.getItem('pilares.v1');
-      if (raw) {
-        const saved = JSON.parse(raw);
-        ['cuadernos', 'files', 'acts', 'libs', 'profile'].forEach(k => {
-          if (saved && saved[k] != null) this.state[k] = saved[k];
-        });
-        // Las sesiones se guardan por fecha, no por posición: así la semana
-        // puede correrse un día sin arrastrar el entrenamiento anterior.
-        const logs = (saved && saved.logs) || {};
-        this.state.logs = logs;
-        this.state.days = WEEK.map(w => {
-          const prev = logs[w.fecha];
-          return (prev && Array.isArray(prev.ex) && prev.ex.length) ? prev : freshDay(w);
-        });
-      }
-    } catch (e) {}
+      showHist: false, openLib: null, abonoMonto: '',
+    });
   }
 
-  persist() {
+  /* ── Datos del servidor → estado ─────────────────────────────────── */
+  desdeDatos(d) {
+    // Las sesiones se guardan por fecha, no por posición: así la semana
+    // puede correrse un día sin arrastrar el entrenamiento anterior.
+    const logs = d.logs || {};
+    return {
+      logs,
+      days: WEEK.map(w => {
+        const prev = logs[w.fecha];
+        return (prev && Array.isArray(prev.ex) && prev.ex.length) ? prev : freshDay(w);
+      }),
+      cuadernos: d.cuadernos || [], files: d.files || {}, acts: d.acts || [], libs: d.libs || [],
+      profile: Object.assign({ nombre: '', altura: '', peso: '', sexo: '' }, d.profile),
+    };
+  }
+
+  /** Estado → forma que entiende Nube.filas. Un día de la semana se guarda
+   *  solo si ya existía o si se tocó (no se suben sesiones en blanco). */
+  snapshot() {
+    const s = this.state;
+    const sesiones = Object.assign({}, s.logs);
+    WEEK.forEach((w, i) => {
+      const d = s.days[i];
+      if (d && (s.logs[w.fecha] || JSON.stringify(d) !== FRESH_JSON[i])) sesiones[w.fecha] = d;
+    });
+    return { profile: s.profile, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, sesiones };
+  }
+  huella() { return this.uid ? JSON.stringify(Nube.filas(this.snapshot(), this.uid)) : ''; }
+  hayPendientes() {
+    return !!(this.uid && this.base) && Nube.pendientes(this.base, Nube.filas(this.snapshot(), this.uid)).length > 0;
+  }
+
+  /** Copia local para abrir al instante y seguir funcionando sin señal. */
+  guardarCache() {
+    if (!this.uid || !this.base) return;
+    const s = this.state;
     try {
-      const s = this.state;
-      const logs = Object.assign({}, s.logs);
-      WEEK.forEach((w, i) => { if (s.days[i]) logs[w.fecha] = s.days[i]; });
-
-      const limite = isoOf(addDays(NOW, -120));       // poda el historial antiguo
-      Object.keys(logs).forEach(k => { if (k < limite) delete logs[k]; });
-
-      localStorage.setItem('pilares.v1', JSON.stringify({
-        logs, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, profile: s.profile,
+      localStorage.setItem('pilares.nube.' + this.uid, JSON.stringify({
+        data: { profile: s.profile, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, logs: this.snapshot().sesiones },
+        base: this.base, codigo: s.codigo, amigos: s.amigos, cuadAmigos: s.cuadAmigos,
       }));
     } catch (e) {}
   }
 
-  componentDidUpdate() {
-    const s = this.state;
-    const sig = ['days', 'cuadernos', 'files', 'acts', 'libs', 'profile'].map(k => s[k]);
-    if (!this.__sig || sig.some((v, i) => v !== this.__sig[i])) { this.__sig = sig; this.persist(); }
-  }
-
+  /* ── Ciclo de vida ───────────────────────────────────────────────── */
   componentDidMount() {
     this.timer = setInterval(() => {
       if (this.state.restOn && this.state.rest > 0) this.setState(s => ({ rest: s.rest - 1, restOn: s.rest - 1 > 0 }));
     }, 1000);
+
+    // Lo que hagan los amigos (asignar actividades, abonar) llega al volver
+    // a la app y cada minuto mientras está abierta.
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refrescar(); });
+    window.addEventListener('online', () => this.subir());
+    this.poll = setInterval(() => {
+      if (document.visibilityState === 'visible' && !this.state.modal) this.refrescar();
+    }, 60000);
+
+    Nube.sesion().then(
+      ses => { if (ses && ses.user) this.abrirCuenta(ses.user); else this.setState({ auth: 'fuera' }); },
+      () => this.setState({ auth: 'fuera' })
+    );
   }
-  componentWillUnmount() { clearInterval(this.timer); }
+  componentWillUnmount() { clearInterval(this.timer); clearInterval(this.poll); }
+
+  componentDidUpdate() {
+    if (this.state.auth !== 'dentro' || !this.base) return;
+    const sig = DATA_KEYS.map(k => this.state[k]);
+    if (this.__sig && sig.every((v, i) => v === this.__sig[i])) return;
+    this.__sig = sig;
+    this.guardarCache();
+    clearTimeout(this.tSubir);
+    this.tSubir = setTimeout(() => this.subir(), 700);   // agrupa lo que se escribe seguido
+  }
+
+  /* ── Sesión ──────────────────────────────────────────────────────── */
+  abrirCuenta(user) {
+    this.uid = user.id;
+    this.__sig = null;
+    const me = { id: user.id, usuario: Nube.usuarioDe(user.email) };
+    const cache = leerCache(user.id);
+    if (cache && cache.data && cache.base) {
+      this.base = cache.base;
+      this.setState(Object.assign(this.desdeDatos(cache.data), {
+        auth: 'dentro', me, codigo: cache.codigo || '', amigos: cache.amigos || [], cuadAmigos: cache.cuadAmigos || {},
+      }));
+    } else {
+      this.base = null;
+      this.setState(Object.assign(vacio(), { auth: 'cargando', cargaError: '', me }));
+    }
+    this.refrescar();
+  }
+
+  async autenticar() {
+    const s = this.state;
+    if (s.authBusy) return;
+    const crear = s.authMode === 'crear';
+    const usuario = s.aUsuario.trim(), nombre = s.aNombre.trim(), clave = s.aClave;
+    let err = '';
+    if (!usuario) err = 'Escribe tu usuario.';
+    else if (crear && !USUARIO_OK.test(usuario.toLowerCase())) err = 'El usuario debe tener de 3 a 24 caracteres: letras sin tilde, números, punto, guion o guion bajo.';
+    else if (crear && !nombre) err = 'Escribe tu nombre.';
+    else if (!clave) err = 'Escribe tu contraseña.';
+    else if (crear && clave.length < 6) err = 'La contraseña debe tener al menos 6 caracteres.';
+    if (err) { this.setState({ authErr: err }); return; }
+
+    this.setState({ authBusy: true, authErr: '' });
+    try {
+      const ses = crear ? await Nube.crear(usuario.toLowerCase(), nombre, clave) : await Nube.entrar(usuario, clave);
+      this.setState({ authBusy: false, aClave: '', aNombre: '' });
+      this.abrirCuenta(ses.user);
+    } catch (e) {
+      this.setState({ authBusy: false, authErr: e.message || 'Algo salió mal. Intenta de nuevo.' });
+    }
+  }
+
+  async salir() {
+    if (this.hayPendientes() &&
+        !window.confirm('Hay cambios que aún no llegan a la nube (sin conexión). Si cierras sesión se pierden. ¿Cerrar de todos modos?')) return;
+    const uid = this.uid;
+    this.uid = null; this.base = null; this.__sig = null;
+    try { localStorage.removeItem('pilares.nube.' + uid); } catch (e) {}
+    await Nube.salir();
+    this.setState(Object.assign(vacio(), {
+      auth: 'fuera', authMode: 'entrar', aUsuario: '', aNombre: '', aClave: '', authErr: '',
+      me: null, codigo: '', amigos: [], cuadAmigos: {}, amigoCodigo: '', amigoMsg: '', importMsg: '',
+      nube: 'ok', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null,
+      activeDay: 1, expanded: null,
+    }));
+  }
+
+  /* ── Nube: subir cambios y leer lo nuevo ─────────────────────────── */
+  async subir() {
+    if (!this.uid || !this.base) return;
+    if (this.subiendo) { this.resubir = true; return; }
+    const uid = this.uid;
+    const actual = Nube.filas(this.snapshot(), uid);
+    if (!Nube.pendientes(this.base, actual).length) {
+      if (this.state.nube !== 'ok') this.setState({ nube: 'ok' });
+      return;
+    }
+    this.subiendo = true;
+    this.setState({ nube: 'guardando' });
+    try {
+      const r = await Nube.sincronizar(this.base, actual, uid);
+      if (uid !== this.uid) return;
+      this.base = r.base;
+      this.guardarCache();
+      if (r.red) {
+        this.setState({ nube: 'pendiente' });
+        clearTimeout(this.tReintento);
+        this.tReintento = setTimeout(() => this.subir(), 15000);
+      } else {
+        this.setState({ nube: r.rechazados ? 'error' : 'ok' });
+        if (r.rechazados) setTimeout(() => this.refrescar(), 500);   // realinear con el servidor
+      }
+    } finally {
+      this.subiendo = false;
+      if (this.resubir) { this.resubir = false; this.subir(); }
+    }
+  }
+
+  async refrescar() {
+    if (!this.uid) return;
+    if (this.leyendo) { this.releer = true; return; }
+    this.leyendo = true;
+    const uid = this.uid;
+    try {
+      if (this.base) {
+        await this.subir();
+        if (this.hayPendientes()) return;           // sin red: no pisar lo local
+      }
+      const antes = this.huella();
+      const d = await Nube.cargar(uid);
+      if (uid !== this.uid) return;                 // cerró sesión mientras tanto
+      if (this.base && this.huella() !== antes) { this.releer = true; return; }   // editaron mientras llegaba
+      this.setState(Object.assign(this.desdeDatos(d), {
+        auth: 'dentro', cargaError: '', codigo: d.codigo, amigos: d.amigos, cuadAmigos: d.cuadAmigos, nube: 'ok',
+      }));
+      this.base = Nube.filas(this.snapshot(), uid);
+      this.__sig = DATA_KEYS.map(k => this.state[k]);
+      this.guardarCache();
+    } catch (e) {
+      console.warn('[pilares] no se pudo leer', e);
+      if (this.state.auth === 'cargando') this.setState({ cargaError: 'No pudimos conectar con el servidor. Revisa tu internet.' });
+      else this.setState({ nube: 'pendiente' });
+    } finally {
+      this.leyendo = false;
+      if (this.releer) { this.releer = false; setTimeout(() => this.refrescar(), 1500); }
+    }
+  }
+
+  /* ── Amigos ──────────────────────────────────────────────────────── */
+  async agregarAmigo() {
+    const cod = this.state.amigoCodigo.trim().toUpperCase();
+    if (!cod || this.state.amigoBusy) return;
+    this.setState({ amigoBusy: true, amigoMsg: '' });
+    try {
+      const p = await Nube.buscarCodigo(cod);
+      if (!p) throw new Error('No encontramos a nadie con ese código.');
+      const ya = this.state.amigos.find(a => a.id === p.id);
+      if (ya) throw new Error(ya.estado === 'aceptada' ? p.nombre + ' ya es tu amigo.' : 'Ya hay una solicitud pendiente con ' + p.nombre + '.');
+      await Nube.invitar(this.uid, p.id);
+      this.setState({ amigoCodigo: '', amigoMsg: 'Solicitud enviada a ' + p.nombre + '. Aparecerá como amigo cuando la acepte.' });
+      this.refrescar();
+    } catch (e) {
+      this.setState({ amigoMsg: e.message || 'No se pudo enviar la solicitud.' });
+    } finally {
+      this.setState({ amigoBusy: false });
+    }
+  }
+
+  async conexion(accion, c) {
+    try {
+      if (accion === 'aceptar') await Nube.aceptar(c.conexion);
+      else await Nube.borrarConexion(c.conexion);
+      this.setState({ amigoMsg: accion === 'aceptar' ? 'Ahora tú y ' + c.nombre + ' son amigos.' : '' });
+    } catch (e) {
+      this.setState({ amigoMsg: e.message });
+    }
+    this.refrescar();
+  }
+
+  copiarCodigo() {
+    const c = this.state.codigo;
+    if (!c || !navigator.clipboard) return;
+    navigator.clipboard.writeText(c).then(() => {
+      this.setState({ copiado: true });
+      setTimeout(() => this.setState({ copiado: false }), 1600);
+    }, () => {});
+  }
+
+  /* ── Datos que la app guardaba en el dispositivo antes de las cuentas ── */
+  hayDatosLocales() {
+    if (!this.uid) return false;
+    try { return !!localStorage.getItem('pilares.v1') && !localStorage.getItem('pilares.importado.' + this.uid); } catch (e) { return false; }
+  }
+
+  importarLocal() {
+    let v = null;
+    try { v = JSON.parse(localStorage.getItem('pilares.v1')); } catch (e) {}
+    if (!v) return;
+    if (!window.confirm('Se subirán a tu cuenta los datos guardados en este dispositivo (rutinas, agenda, cuadernos y libreticas). Hazlo una sola vez. ¿Continuar?')) return;
+
+    const uid = this.uid, s = this.state;
+    const mapa = {};
+    const cuadernos = s.cuadernos.slice();
+    (v.cuadernos || []).forEach(c => {
+      const igual = cuadernos.find(x => norm(x.nombre) === norm(c.nombre));
+      if (igual) mapa[c.id] = igual.id;
+      else { const id = Nube.uuid(); mapa[c.id] = id; cuadernos.push({ id, nombre: c.nombre }); }
+    });
+
+    const files = Object.assign({}, s.files);
+    Object.keys(v.files || {}).forEach(k => {
+      const cid = mapa[k];
+      if (!cid) return;
+      files[cid] = (files[cid] || []).concat((v.files[k] || []).map(f => ({ id: Nube.uuid(), n: f.n, s: f.s })));
+    });
+
+    const nuevasActs = (v.acts || [])
+      .filter(a => TIPOS.includes(a.tipo) && /^\d{4}-\d{2}-\d{2}$/.test(a.fecha))
+      .map(a => ({ id: Nube.uuid(), c: mapa[a.c] || null, tipo: a.tipo, fecha: a.fecha,
+                   asunto: a.asunto || [], owner: uid, por: null, nota: '' }));
+
+    const nuevasLibs = (v.libs || []).map(l => ({
+      id: Nube.uuid(), owner: uid, contra: null, deudor: l.deudor || '', prestamista: l.prestamista || '',
+      monto: String(l.monto || '').replace(/\D/g, '') || '0', mine: !!l.mine, paid: !!l.paid,
+      nota: '', vence: '', abonos: [],
+    }));
+
+    // Lo que ya está en la nube manda; del dispositivo solo entra lo que falta.
+    const limite = isoOf(addDays(NOW, -120));
+    const actuales = this.snapshot().sesiones;
+    const logs = Object.assign({}, s.logs);
+    let dias = 0;
+    Object.keys(v.logs || {}).forEach(f => {
+      const d = v.logs[f];
+      if (f >= limite && !actuales[f] && d && Array.isArray(d.ex) && d.ex.length) { logs[f] = d; dias++; }
+    });
+    const days = WEEK.map((w, i) => (!actuales[w.fecha] && logs[w.fecha]) ? logs[w.fecha] : s.days[i]);
+
+    const p = v.profile || {};
+    const profile = {
+      nombre: s.profile.nombre || p.nombre || '', altura: s.profile.altura || p.altura || '',
+      peso: s.profile.peso || p.peso || '', sexo: s.profile.sexo || p.sexo || '',
+    };
+
+    try { localStorage.setItem('pilares.importado.' + uid, '1'); } catch (e) {}
+    this.setState({
+      cuadernos, files, acts: s.acts.concat(nuevasActs), libs: nuevasLibs.concat(s.libs), logs, days, profile,
+      importMsg: 'Importado: ' + nuevasActs.length + ' actividades, ' + nuevasLibs.length + ' libreticas y ' + dias + ' días de gimnasio.',
+    });
+  }
+
+  /* ── Pantallas de acceso (sin sesión) ────────────────────────────── */
+  valsAcceso() {
+    const s = this.state, self = this, crear = s.authMode === 'crear';
+    return {
+      appOn: false, authOn: s.auth === 'fuera', loadOn: s.auth === 'cargando',
+      loadErr: s.cargaError, loadSpin: !s.cargaError,
+      reintentar: () => { self.setState({ cargaError: '' }); self.refrescar(); },
+      salir: () => self.salir(),
+      authTabs: [['Entrar', 'entrar'], ['Crear cuenta', 'crear']].map(([t, k]) => ({
+        t, bg: s.authMode === k ? '#CE7F55' : 'transparent', fg: s.authMode === k ? '#0A0E1A' : '#8E9AAE',
+        go: () => self.setState({ authMode: k, authErr: '' }),
+      })),
+      authCrearOn: crear,
+      authSub: crear ? 'Crea tu cuenta con un usuario y una contraseña. No necesitas correo.' : 'Entra con tu usuario y contraseña.',
+      aUsuario: s.aUsuario, aNombre: s.aNombre, aClave: s.aClave,
+      onAUsuario: ev => { const v = ev.target.value; self.setState({ aUsuario: v }); },
+      onANombre: ev => { const v = ev.target.value; self.setState({ aNombre: v }); },
+      onAClave: ev => { const v = ev.target.value; self.setState({ aClave: v }); },
+      authAuto: crear ? 'new-password' : 'current-password',
+      authErr: s.authErr,
+      authCta: s.authBusy ? (crear ? 'Creando cuenta…' : 'Entrando…') : (crear ? 'Crear cuenta' : 'Entrar'),
+      authBtnBg: s.authBusy ? 'rgba(206,127,85,.55)' : '#CE7F55',
+      authGo: () => self.autenticar(),
+      authNota: crear
+        ? 'Guarda bien tu usuario y tu contraseña: como no hay correo, no hay forma automática de recuperarlos.'
+        : 'Cada persona tiene su propia cuenta y sus datos. Con el código de amigo pueden compartir agenda y libreticas.',
+    };
+  }
 
   gcolor(g) { return (g === 'TRÍCEP' || g === 'BÍCEP' || g === 'ABDOMEN') ? AMBER : MINT; }
   accent() { return (this.props.acento === 'Menta') ? MINT : AMBER; }
@@ -261,7 +534,19 @@ class Component extends DCLogic {
 
   renderVals() {
     const s = this.state, self = this;
+    if (s.auth !== 'dentro') return this.valsAcceso();
+    const me = this.uid;
     const ac = this.accent();
+
+    const amigosOk = s.amigos.filter(a => a.estado === 'aceptada');
+    const nombreDe = id => (s.amigos.find(a => a.id === id) || {}).nombre || 'un amigo';
+    const miNombre = s.profile.nombre || (s.me && s.me.usuario) || 'Yo';
+    // Mis actividades cuentan en todo; las que asigné a amigos solo se listan.
+    const misActs = s.acts.filter(a => !a.owner || a.owner === me);
+    const cuadNombre = a => {
+      const lista = (!a.owner || a.owner === me) ? s.cuadernos : (s.cuadAmigos[a.owner] || []);
+      return (lista.find(c => c.id === a.c) || {}).nombre || '';
+    };
     const day = s.days[s.activeDay];
     const w = WEEK[s.activeDay];
     const totalSets = day.ex.reduce((t, e) => t + e.sets, 0);
@@ -348,7 +633,9 @@ class Component extends DCLogic {
       };
     });
     const openC = s.cuadernos.find(c => c.id === s.openCuaderno);
-    const monthActs = s.acts.filter(a => a.fecha.slice(0, 7) === iso(s.year, s.month, 1).slice(0, 7));
+    const mesKey = iso(s.year, s.month, 1).slice(0, 7);
+    const monthActs = misActs.filter(a => a.fecha.slice(0, 7) === mesKey);
+    const monthAll = s.acts.filter(a => a.fecha.slice(0, 7) === mesKey);
     const first = new Date(s.year, s.month, 1).getDay();
     const lead = (first + 6) % 7;
     const dim = new Date(s.year, s.month + 1, 0).getDate();
@@ -367,19 +654,24 @@ class Component extends DCLogic {
         select: () => self.setState({ selDay: d }),
       });
     }
-    const acts = monthActs.slice().sort((a, b) => a.fecha < b.fecha ? -1 : 1).map(a => {
+    const acts = monthAll.slice().sort((a, b) => a.fecha < b.fecha ? -1 : 1).map(a => {
       const u = self.urg(a.tipo, a.fecha);
+      const ajena = a.owner && a.owner !== me;
       return {
         tipo: a.tipo.toUpperCase(), color: u.color, tint: u.tint,
         plazo: a.tipo === 'Tarea' ? 'TAREA' : self.plazo(a.fecha),
         fechaTxt: self.fechaTxt(a.fecha) + ' · ' + s.year,
         asuntos: a.asunto.map(t => ({ t })),
-        cuad: (s.cuadernos.find(c => c.id === a.c) || {}).nombre || '',
-        edit: () => self.setState({ modal: { id: a.id, c: a.c, tipo: a.tipo, fecha: a.fecha, asunto: a.asunto.slice(), tema: '' } }),
+        cuad: cuadNombre(a),
+        tag: ajena ? 'PARA ' + nombreDe(a.owner).toUpperCase() : (a.por ? 'DE ' + nombreDe(a.por).toUpperCase() : ''),
+        op: ajena ? 0.6 : 1,
+        edit: () => self.setState({ modal: { id: a.id, c: a.c, tipo: a.tipo, fecha: a.fecha, asunto: a.asunto.slice(), tema: '', para: a.owner || me, por: a.por } }),
       };
     });
 
     const m = s.modal;
+    const mPara = m ? (m.para || me) : me;
+    const mCuads = mPara === me ? s.cuadernos : (s.cuadAmigos[mPara] || []);
     let mCells = [], mUrg = { color: GREY, tint: 'rgba(142,154,174,.14)', label: 'TAREA' };
     if (m) {
       const mp = m.fecha.split('-'), my = +mp[0], mm = +mp[1] - 1;
@@ -404,9 +696,29 @@ class Component extends DCLogic {
     };
 
     // ── Finanzas
+    // `mine` se guarda desde el punto de vista de quien creó la libretica;
+    // la otra parte la ve al revés. El saldo descuenta los abonos.
+    const libView = l => {
+      const mia = !l.owner || l.owner === me;
+      const abonado = (l.abonos || []).reduce((t, a) => t + (+a.monto || 0), 0);
+      return { mia, meDeben: mia ? l.mine : !l.mine, abonado, saldo: Math.max(0, (+l.monto || 0) - abonado) };
+    };
+    const setLib = (id, fn) => self.setState(st => ({ libs: st.libs.map(x => x.id === id ? fn(x) : x) }));
+    // Igual que en la base de datos: queda saldada cuando los abonos cubren el monto.
+    const conAbonos = (x, abonos) => {
+      const ab = abonos.reduce((t, a) => t + (+a.monto || 0), 0);
+      return { ...x, abonos, paid: ab >= (+x.monto || 0) };
+    };
     const mkLib = l => {
-      const green = l.mine;
+      const v = libView(l);
+      const green = v.meDeben;
       const col = green ? MINT : RED;
+      const otro = v.mia ? l.contra : l.owner;
+      const otroNombre = otro
+        ? ((s.amigos.find(a => a.id === otro) || {}).nombre || ((v.mia ? l.mine : !l.mine) ? l.deudor : l.prestamista))
+        : '';
+      const open = s.openLib === l.id;
+      const n = (l.abonos || []).length;
       return {
         deudor: l.deudor, prestamista: l.prestamista, monto: fmtMoney(l.monto),
         montoTxt: '$ ' + fmtMoney(l.monto), color: col,
@@ -419,20 +731,59 @@ class Component extends DCLogic {
         checkBg: l.paid ? MINT : 'transparent',
         checkBorder: l.paid ? MINT : 'rgba(255,255,255,.18)',
         tick: l.paid ? '#0A0E1A' : 'rgba(255,255,255,.18)',
-        togglePaid: () => self.setState(st => ({ libs: st.libs.map(x => x.id === l.id ? { ...x, paid: !x.paid } : x) })),
-        flip: () => self.setState(st => ({ libs: st.libs.map(x => x.id === l.id ? { ...x, mine: !x.mine } : x) })),
-        remove: () => self.setState(st => ({ libs: st.libs.filter(x => x.id !== l.id) })),
-        onDeudor: ev => { const v = ev.target.value; self.setState(st => ({ libs: st.libs.map(x => x.id === l.id ? { ...x, deudor: v } : x) })); },
-        onPrestamista: ev => { const v = ev.target.value; self.setState(st => ({ libs: st.libs.map(x => x.id === l.id ? { ...x, prestamista: v } : x) })); },
-        onMonto: ev => { const v = ev.target.value.replace(/\D/g, ''); self.setState(st => ({ libs: st.libs.map(x => x.id === l.id ? { ...x, monto: v } : x) })); },
+        editable: v.mia, readonly: !v.mia,
+        shared: !!otro,
+        sharedLabel: otro ? (v.mia ? 'COMPARTIDA CON ' : 'CREADA POR ') + String(otroNombre).toUpperCase() : '',
+        hasChips: v.mia && amigosOk.length > 0,
+        chips: [{ t: 'Solo yo', id: null }].concat(amigosOk.map(a => ({ t: a.nombre, id: a.id }))).map(c => {
+          const on = (l.contra || null) === c.id;
+          return {
+            t: c.t, bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE',
+            pick: () => setLib(l.id, x => {
+              if (!c.id) return { ...x, contra: null };
+              return x.mine ? { ...x, contra: c.id, deudor: c.t, prestamista: miNombre }
+                            : { ...x, contra: c.id, deudor: miNombre, prestamista: c.t };
+            }),
+          };
+        }),
+        togglePaid: () => setLib(l.id, x => ({ ...x, paid: !x.paid })),
+        flip: () => { if (v.mia) setLib(l.id, x => x.contra ? { ...x, mine: !x.mine, deudor: x.prestamista, prestamista: x.deudor } : { ...x, mine: !x.mine }); },
+        remove: () => { if (v.mia) self.setState(st => ({ libs: st.libs.filter(x => x.id !== l.id) })); },
+        onDeudor: ev => { const val = ev.target.value; setLib(l.id, x => ({ ...x, deudor: val })); },
+        onPrestamista: ev => { const val = ev.target.value; setLib(l.id, x => ({ ...x, prestamista: val })); },
+        onMonto: ev => { const val = ev.target.value.replace(/\D/g, ''); setLib(l.id, x => ({ ...x, monto: val })); },
+
+        resumen: n ? 'ABONADO $' + fmtMoney(v.abonado) + ' · SALDO $' + fmtMoney(v.saldo)
+                   : (l.vence ? 'VENCE ' + self.fechaTxt(l.vence).toUpperCase() : 'SIN ABONOS'),
+        openTxt: open ? 'CERRAR' : 'ABONOS ›',
+        hasBar: n > 0,
+        barW: Math.min(100, Math.round(v.abonado / Math.max(1, +l.monto || 0) * 100)) + '%',
+        open, toggleOpen: () => self.setState({ openLib: open ? null : l.id, abonoMonto: '' }),
+        abonos: (l.abonos || []).map(a => ({
+          txt: '$ ' + fmtMoney(a.monto),
+          meta: self.fechaTxt(a.fecha).toUpperCase() + ' · ' + (a.por === me ? 'TÚ' : nombreDe(a.por).toUpperCase()),
+          mio: a.por === me,
+          remove: () => setLib(l.id, x => conAbonos(x, x.abonos.filter(y => y.id !== a.id))),
+        })),
+        noAbonos: n === 0,
+        abonoMonto: fmtMoney(s.abonoMonto),
+        onAbono: ev => { const val = ev.target.value.replace(/\D/g, ''); self.setState({ abonoMonto: val }); },
+        addAbono: () => {
+          const val = +s.abonoMonto || 0;
+          if (!val) return;
+          setLib(l.id, x => conAbonos(x, (x.abonos || []).concat([{ id: Nube.uuid(), monto: String(val), nota: '', por: me, fecha: TODAY }])));
+          self.setState({ abonoMonto: '' });
+        },
+        nota: l.nota || '', onNota: ev => { const val = ev.target.value; setLib(l.id, x => ({ ...x, nota: val })); },
+        vence: l.vence || '', onVence: ev => { const val = ev.target.value; setLib(l.id, x => ({ ...x, vence: val })); },
       };
     };
     const activeLibs = s.libs.filter(l => !l.paid), paidL = s.libs.filter(l => l.paid);
 
-    const cobrar = activeLibs.filter(l => l.mine), pagar = activeLibs.filter(l => !l.mine);
-    const sumMine = cobrar.reduce((t, l) => t + (+l.monto || 0), 0);
-    const sumOwe = pagar.reduce((t, l) => t + (+l.monto || 0), 0);
-    const pendAll = s.acts.filter(a => dayDiff(TODAY, a.fecha) >= 0);
+    const cobrar = activeLibs.filter(l => libView(l).meDeben), pagar = activeLibs.filter(l => !libView(l).meDeben);
+    const sumMine = cobrar.reduce((t, l) => t + libView(l).saldo, 0);
+    const sumOwe = pagar.reduce((t, l) => t + libView(l).saldo, 0);
+    const pendAll = misActs.filter(a => dayDiff(TODAY, a.fecha) >= 0);
     const impRank = { ALTA: 0, MEDIA: 1, BAJA: 2 };
     const urgentAcad = pendAll.slice()
       .sort((a, b) => (dayDiff(TODAY, a.fecha) - dayDiff(TODAY, b.fecha)) || (impRank[self.impor(a.tipo)] - impRank[self.impor(b.tipo)]))
@@ -448,18 +799,18 @@ class Component extends DCLogic {
       })
       ;
     const urgent = urgentAcad
-      .concat(pagar.slice().sort((a, b) => (+b.monto) - (+a.monto)).slice(0, 2).map(l => ({
+      .concat(pagar.slice().sort((a, b) => libView(b).saldo - libView(a).saldo).slice(0, 2).map(l => ({
         badge: 'DEUDA', color: RED, tint: 'rgba(196,100,97,.14)',
-        imp: (+l.monto >= 500000) ? 'IMP. ALTA' : 'IMP. MEDIA',
+        imp: (libView(l).saldo >= 500000) ? 'IMP. ALTA' : 'IMP. MEDIA',
         title: l.prestamista, meta: 'YO DEBO · LIBRETICA',
-        right: '$' + fmtMoney(l.monto), plazo: 'POR PAGAR',
+        right: '$' + fmtMoney(libView(l).saldo), plazo: 'POR PAGAR',
         go: () => self.setState({ tab: 'finanzas' }),
       })));
     const bars = Array.from({ length: 6 }, (_, i) => {
       const st0 = addDays(NOW, i * 7);
       const st1 = addDays(NOW, i * 7 + 7);
       const a = iso(st0.getFullYear(), st0.getMonth(), st0.getDate()), b = iso(st1.getFullYear(), st1.getMonth(), st1.getDate());
-      const n = s.acts.filter(x => x.fecha >= a && x.fecha < b).length;
+      const n = misActs.filter(x => x.fecha >= a && x.fecha < b).length;
       return { n: String(n), raw: n, label: st0.getDate() + ' ' + MONTHS_SH[st0.getMonth()], i };
     });
     const maxBar = Math.max(1, ...bars.map(b => b.raw));
@@ -470,7 +821,7 @@ class Component extends DCLogic {
     });
     const nextUp = pendAll.slice().sort((a, b) => dayDiff(TODAY, a.fecha) - dayDiff(TODAY, b.fecha))[0];
     const nUrg = nextUp ? self.urg(nextUp.tipo, nextUp.fecha) : { color: GREY, tint: 'rgba(142,154,174,.14)' };
-    const nextA = s.acts.filter(a => a.tipo !== 'Tarea' && dayDiff(TODAY, a.fecha) >= 0)
+    const nextA = misActs.filter(a => a.tipo !== 'Tarea' && dayDiff(TODAY, a.fecha) >= 0)
       .sort((a, b) => dayDiff(TODAY, a.fecha) - dayDiff(TODAY, b.fecha))[0];
     const nu = nextA ? self.urg(nextA.tipo, nextA.fecha) : { color: GREY, tint: 'rgba(142,154,174,.14)' };
     const nc = nextA ? s.cuadernos.find(c => c.id === nextA.c) : null;
@@ -479,6 +830,7 @@ class Component extends DCLogic {
 
     return {
       yes: true,
+      appOn: true, authOn: false, loadOn: false,
       isHome: s.tab === 'home', isEjercicio: s.tab === 'ejercicio', isEstudio: s.tab === 'estudio', isFinanzas: s.tab === 'finanzas',
       editOn: s.edit, panelOn: s.panel, modalOn: !!m, restOn: s.restOn,
       goEjercicio: () => self.setState({ tab: 'ejercicio' }),
@@ -515,7 +867,7 @@ class Component extends DCLogic {
       agendaOn: !s.openCuaderno && s.estudioTab === 'agenda',
       cuadListOn: !s.openCuaderno && s.estudioTab === 'cuadernos',
       fileOn: !!s.openCuaderno, segOn: !s.openCuaderno,
-      estudioKicker: s.openCuaderno ? '‹ CUADERNOS' : 'ESTUDIO · ' + s.acts.length + ' ACTIVIDADES',
+      estudioKicker: s.openCuaderno ? '‹ CUADERNOS' : 'ESTUDIO · ' + misActs.length + ' ACTIVIDADES',
       estudioKickerColor: s.openCuaderno ? '#CE7F55' : '#8E9AAE',
       estudioTitle: openC ? openC.nombre : 'Estudio',
       backCuadernos: () => { if (s.openCuaderno) self.setState({ openCuaderno: null }); },
@@ -523,7 +875,7 @@ class Component extends DCLogic {
         const on = s.estudioTab === k;
         return { t, bg: on ? '#CE7F55' : 'rgba(255,255,255,.06)', border: on ? '#CE7F55' : 'rgba(255,255,255,.12)', fg: on ? '#0A0E1A' : '#8E9AAE', go: () => self.setState({ estudioTab: k, openCuaderno: null }) };
       }),
-      addCuaderno: () => self.setState(st => ({ cuadernos: st.cuadernos.concat([{ id: 'c' + Date.now(), nombre: 'Cuaderno nuevo' }]), edit: true })),
+      addCuaderno: () => self.setState(st => ({ cuadernos: st.cuadernos.concat([{ id: Nube.uuid(), nombre: 'Cuaderno nuevo' }]), edit: true })),
       files: (s.files[s.openCuaderno] || []).map((fl, i) => {
         const ext = (fl.n.split('.').pop() || 'file').toUpperCase();
         return { n: fl.n, s: fl.s, ext, color: /PDF/.test(ext) ? RED : (/XLS|CSV/.test(ext) ? MINT : AMBER),
@@ -532,7 +884,7 @@ class Component extends DCLogic {
       noFiles: (s.files[s.openCuaderno] || []).length === 0,
       filesLabel: (s.files[s.openCuaderno] || []).length + ' ARCHIVOS DEL CUADERNO',
       onFiles: ev => {
-        const list = Array.from(ev.target.files || []).map(x => ({ n: x.name, s: x.size > 1048576 ? (x.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(x.size / 1024)) + ' KB' }));
+        const list = Array.from(ev.target.files || []).map(x => ({ id: Nube.uuid(), n: x.name, s: x.size > 1048576 ? (x.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(x.size / 1024)) + ' KB' }));
         if (!list.length) return;
         self.setState(st => ({ files: { ...st.files, [st.openCuaderno]: (st.files[st.openCuaderno] || []).concat(list) } }));
       },
@@ -543,16 +895,34 @@ class Component extends DCLogic {
       nextMonth: () => self.setState(st => ({ month: st.month === 11 ? 0 : st.month + 1, year: st.month === 11 ? st.year + 1 : st.year })),
       legend: [{ c: '#7FD3BC', t: '+1.5 sem' }, { c: MINT_D, t: '1 sem' }, { c: AMBER, t: '4 días' }, { c: RED, t: '≤2 días' }, { c: GREY, t: 'Tarea' }].map(x => x),
 
-      openModal: () => self.setState({ modal: { id: null, c: s.cuadernos[0].id, tipo: 'Quiz', fecha: iso(s.year, s.month, s.selDay), asunto: [], tema: '' } }),
-      modalCuads: s.cuadernos.map(c => ({
+      openModal: () => self.setState({ modal: { id: null, c: s.cuadernos[0] ? s.cuadernos[0].id : null, tipo: 'Quiz', fecha: iso(s.year, s.month, s.selDay), asunto: [], tema: '', para: me, por: null } }),
+      modalCuads: mCuads.map(c => ({
         t: c.nombre, pick: () => self.setState(st => ({ modal: { ...st.modal, c: c.id } })),
         bg: m && m.c === c.id ? '#fff' : 'rgba(255,255,255,.05)',
         border: m && m.c === c.id ? '#fff' : 'rgba(255,255,255,.09)',
         fg: m && m.c === c.id ? '#090C14' : '#8E9AAE',
       })),
+      modalSinCuads: !!m && mCuads.length === 0,
+      modalSinCuadsTxt: mPara === me
+        ? 'Aún no tienes cuadernos. Puedes crearla así o crear uno en Estudio › Cuadernos.'
+        : nombreDe(mPara) + ' no tiene cuadernos; la actividad quedará sin cuaderno.',
+      modalParaOn: !!(m && !m.id && amigosOk.length),
+      modalPara: [{ t: 'Mí', id: me }].concat(amigosOk.map(a => ({ t: a.nombre, id: a.id }))).map(p => {
+        const on = mPara === p.id;
+        return {
+          t: p.t, bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE',
+          pick: () => self.setState(st => {
+            const lista = p.id === me ? st.cuadernos : (st.cuadAmigos[p.id] || []);
+            return { modal: { ...st.modal, para: p.id, c: lista[0] ? lista[0].id : null } };
+          }),
+        };
+      }),
+      modalDe: !m ? '' : (m.id
+        ? (mPara !== me ? 'En la agenda de ' + nombreDe(mPara) + '.' : (m.por ? 'Te la asignó ' + nombreDe(m.por) + '.' : ''))
+        : (mPara !== me ? 'Aparecerá en la agenda de ' + nombreDe(mPara) + '.' : '')),
       closeModal: () => self.setState({ modal: null }),
       modalTitle: m && m.id ? 'Editar actividad' : 'Nueva actividad',
-      modalCuaderno: m ? ((s.cuadernos.find(c => c.id === m.c) || {}).nombre || '') : '',
+      modalCuaderno: m ? ((mCuads.find(c => c.id === m.c) || {}).nombre || '') : '',
       modalCta: m && m.id ? 'Guardar' : 'Crear actividad',
       modalEditing: !!(m && m.id),
       modalMonth: m ? MONTHS[+m.fecha.split('-')[1] - 1] + ' ' + m.fecha.split('-')[0] : '',
@@ -569,8 +939,10 @@ class Component extends DCLogic {
       })),
       saveAct: () => self.setState(st => {
         const mm = st.modal;
-        if (mm.id) return { acts: st.acts.map(a => a.id === mm.id ? { ...a, tipo: mm.tipo, fecha: mm.fecha, asunto: mm.asunto } : a), modal: null };
-        return { acts: st.acts.concat([{ id: 'a' + Date.now(), c: mm.c, tipo: mm.tipo, fecha: mm.fecha, asunto: mm.asunto.length ? mm.asunto : ['Sin temas'] }]), modal: null };
+        if (mm.id) return { acts: st.acts.map(a => a.id === mm.id ? { ...a, c: mm.c, tipo: mm.tipo, fecha: mm.fecha, asunto: mm.asunto } : a), modal: null };
+        const para = mm.para || me;
+        return { acts: st.acts.concat([{ id: Nube.uuid(), c: mm.c, tipo: mm.tipo, fecha: mm.fecha, asunto: mm.asunto.length ? mm.asunto : ['Sin temas'],
+                                          owner: para, por: para === me ? null : me, nota: '' }]), modal: null };
       }),
       deleteAct: () => self.setState(st => ({ acts: st.acts.filter(a => a.id !== st.modal.id), modal: null })),
 
@@ -579,13 +951,15 @@ class Component extends DCLogic {
       histLabel: '✓ ' + paidL.length + ' saldada' + (paidL.length === 1 ? '' : 's'),
       histAction: s.showHist ? 'OCULTAR' : 'MOSTRAR',
       toggleHist: () => self.setState(st => ({ showHist: !st.showHist })),
-      clearHistLabel: 'Eliminar historial · ' + paidL.length,
-      clearHist: () => self.setState(st => ({ libs: st.libs.filter(l => !l.paid), showHist: false })),
-      addLib: () => self.setState(st => ({ libs: [{ id: 'l' + Date.now(), deudor: 'Nombre del deudor', prestamista: 'Nombre del prestamista', monto: '0', mine: true, paid: false }].concat(st.libs) })),
+      // Solo se borran las mías; las que otra persona compartió siguen siendo suyas.
+      clearHistLabel: 'Eliminar historial · ' + paidL.filter(l => libView(l).mia).length,
+      clearHist: () => self.setState(st => ({ libs: st.libs.filter(l => !l.paid || (l.owner && l.owner !== me)), showHist: false })),
+      addLib: () => self.setState(st => ({ libs: [{ id: Nube.uuid(), owner: me, contra: null, deudor: 'Nombre del deudor', prestamista: miNombre,
+                                                     monto: '0', mine: true, paid: false, nota: '', vence: '', abonos: [] }].concat(st.libs) })),
 
       ringOffsetSm: 226.2 * (1 - pct / 100),
       todayLine: DOW_SH[NOW.getDay()] + ' ' + NOW.getDate() + ' ' + MONTHS_SH[NOW.getMonth()] + ' · ' + NOW.getFullYear(),
-      greeting: 'Hola, ' + s.profile.nombre.split(' ')[0],
+      greeting: 'Hola, ' + miNombre.split(' ')[0],
       homeSub: pendAll.length + ' pendientes académicos' + (nextUp ? ' · próxima ' + self.plazo(nextUp.fecha).toLowerCase() : ''),
       gymLine: day.group === 'Descanso' ? 'Descanso' : (day.group + ' · día ' + day.dia),
       finLine: '$' + fmtMoney(sumMine) + ' por cobrar · $' + fmtMoney(sumOwe) + ' por pagar',
@@ -628,7 +1002,45 @@ class Component extends DCLogic {
         border: s.profile.sexo === t ? '#fff' : 'rgba(255,255,255,.09)',
         fg: s.profile.sexo === t ? '#090C14' : '#8E9AAE',
       })),
-      profileNote: s.profile.nombre + ', ' + s.profile.altura + ' cm · ' + s.profile.peso + ' kg. Volumen sugerido: 12–18 series por grupo a la semana, compuestos primero y 2:00–2:30 de descanso en multiarticulares.',
+      profileNote: (s.profile.altura && s.profile.peso
+        ? miNombre + ', ' + s.profile.altura + ' cm · ' + s.profile.peso + ' kg. '
+        : 'Completa tu altura y peso. ') + 'Volumen sugerido: 12–18 series por grupo a la semana, compuestos primero y 2:00–2:30 de descanso en multiarticulares.',
+
+      meUsuario: s.me ? '@' + s.me.usuario : '',
+      meCodigo: s.codigo || '—',
+      copiarTxt: s.copiado ? 'COPIADO ✓' : 'COPIAR',
+      copiarCodigo: () => self.copiarCodigo(),
+      nubeTxt: (NUBE_TXT[s.nube] || NUBE_TXT.ok)[0], nubeColor: (NUBE_TXT[s.nube] || NUBE_TXT.ok)[1],
+      amigoCodigo: s.amigoCodigo,
+      onAmigoCodigo: ev => { const v = ev.target.value.toUpperCase(); self.setState({ amigoCodigo: v }); },
+      agregarAmigo: () => self.agregarAmigo(),
+      agregarTxt: s.amigoBusy ? '…' : 'Agregar',
+      amigoMsg: s.amigoMsg,
+      solicitudes: s.amigos.filter(a => a.estado === 'pendiente' && !a.yo).map(a => ({
+        nombre: a.nombre, codigo: a.codigo,
+        aceptar: () => self.conexion('aceptar', a),
+        rechazar: () => self.conexion('rechazar', a),
+      })),
+      amigosList: s.amigos.filter(a => a.estado === 'aceptada' || a.yo).map((a, i) => {
+        const ok = a.estado === 'aceptada';
+        return {
+          nombre: a.nombre, codigo: a.codigo, inicial: (a.nombre || '?').charAt(0).toUpperCase(),
+          bg: i % 2 ? MINT : AMBER, estado: ok ? 'AMIGO' : 'ESPERANDO RESPUESTA', estadoColor: ok ? MINT : '#8E9AAE',
+          quitarTxt: ok ? 'QUITAR' : 'CANCELAR',
+          quitar: () => {
+            if (ok && !window.confirm('¿Quitar a ' + a.nombre + ' de tus amigos? Las libreticas que ya comparten se conservan.')) return;
+            self.conexion('quitar', a);
+          },
+        };
+      }),
+      sinAmigos: s.amigos.length === 0,
+      amigosCount: amigosOk.length ? amigosOk.length + (amigosOk.length === 1 ? ' AMIGO' : ' AMIGOS') : '',
+      hasSolicitudes: s.amigos.some(a => a.estado === 'pendiente' && !a.yo),
+      importarOn: !!s.importMsg || self.hayDatosLocales(),
+      importarTxt: s.importMsg || 'Importar datos de este dispositivo',
+      importarSub: s.importMsg ? 'Ya quedaron en tu cuenta.' : 'Sube a tu cuenta lo que esta app tenía guardado aquí antes de las cuentas. Hazlo una sola vez.',
+      importar: () => { if (!s.importMsg) self.importarLocal(); },
+      salir: () => self.salir(),
       editCardBg: s.edit ? 'rgba(206,127,85,.1)' : '#121724',
       editCardBorder: s.edit ? 'rgba(206,127,85,.34)' : 'rgba(255,255,255,.07)',
       editTitleColor: s.edit ? AMBER : '#fff',

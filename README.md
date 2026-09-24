@@ -2,20 +2,20 @@
 
 App web para el día a día: **rutina de gimnasio**, **agenda académica** y **libreticas de dinero**, en una sola pantalla de móvil.
 
-Es un sitio **100 % estático**: HTML, CSS y JavaScript sin dependencias, sin `npm install` y **sin paso de compilación**. Eso significa que en Vercel no hay build que pueda fallar.
+Es un sitio **100 % estático**: HTML, CSS y JavaScript sin `npm install` y **sin paso de compilación**. Eso significa que en Vercel no hay build que pueda fallar. Los datos viven en **Supabase** (plan gratuito).
 
 ---
 
 ## 1. Qué incluye
 
 ```
-pilares-app/
+pilares/
 ├── index.html              ← punto de entrada (DEBE quedar en la raíz del repo)
-├── assets/
-│   ├── app.js              ← lógica: rutinas, agenda, finanzas, persistencia
-│   ├── runtime.js          ← motor que interpreta la plantilla del diseño
-│   ├── styles.css          ← estilos base + marco de teléfono en escritorio
-│   └── viewport.js         ← corrige el alto de pantalla en la PWA instalada
+├── app.js                  ← lógica: rutinas, agenda, finanzas, amigos
+├── nube.js                 ← cuentas y guardado en Supabase
+├── runtime.js              ← motor que interpreta la plantilla del diseño
+├── styles.css              ← estilos base + marco de teléfono en escritorio
+├── viewport.js             ← corrige el alto de pantalla en la PWA instalada
 ├── icon.svg                ← ícono vectorial (favicon)
 ├── icon-192.png            ← ícono PWA / apple-touch-icon
 ├── icon-512.png            ← ícono PWA (incluye versión "maskable")
@@ -32,7 +32,12 @@ pilares-app/
 - **Ejercicio**: la semana se genera desde la fecha real del dispositivo; el ciclo de rutinas (espalda → pecho → pierna → hombro) queda anclado al calendario. Marcar series, anotar pesos y descensos, cronómetro de descanso, renombrar ejercicios y cambiar series/repeticiones desde *Modo edición*.
 - **Estudio**: calendario del mes con código de urgencia por color, crear/editar/eliminar actividades, cuadernos y archivos por materia.
 - **Finanzas**: libreticas de quién debe a quién, marcar como saldada, historial y totales.
-- **Persistencia**: todo se guarda en `localStorage` del navegador. **No hay servidor ni base de datos**: los datos nunca salen del dispositivo. El historial de entrenamiento se conserva 120 días.
+- **Cuentas**: cada persona entra con **usuario y contraseña, sin correo**. La cuenta se crea desde la función `registro` de Supabase ya confirmada, así que nunca se envía un correo (no hay costo de dominio ni de envío). Sin correo no hay "olvidé mi contraseña": hay que guardarla bien.
+- **Amigos**: cada cuenta tiene un código (ej. `ANDRE-4F2A`, en el panel ⚙). Con él se envía una solicitud; al aceptarla:
+  - **Agenda compartida**: al crear una actividad eliges *Para: Mí* o un amigo, y le aparece en su agenda marcada "DE …".
+  - **Libreticas compartidas**: en la tarjeta, *Compartir con* un amigo. Los dos la ven, los dos registran **abonos** y pueden marcarla saldada; solo quien la creó cambia el monto o la borra. Se salda sola cuando los abonos cubren el total.
+- **Persistencia**: todo se guarda en Supabase y además queda una copia en el teléfono, así abre al instante y funciona sin señal (lo pendiente se sube al volver la conexión). Lo que hagan tus amigos aparece al volver a la app y cada minuto mientras está abierta. Seguridad por fila: nadie ve datos de otra cuenta salvo lo compartido.
+- **Datos de antes de las cuentas**: si en un teléfono ya usabas la app, en el panel ⚙ aparece *Importar datos de este dispositivo* (una sola vez por dispositivo).
 
 ---
 
@@ -103,7 +108,7 @@ Git en Windows tiende a convertir a CRLF. El `.gitattributes` incluido fuerza `e
 
 ### 3.6 Rutas siempre relativas
 
-En el HTML las rutas son `assets/app.js`, `icon-192.png`, etc. Nunca uses `C:\Users\...`, `file:///...` ni rutas que empiecen por `/` si algún día mueves el sitio a un subdirectorio.
+En el HTML las rutas son `app.js`, `icon-192.png`, etc. Nunca uses `C:\Users\...`, `file:///...` ni rutas que empiecen por `/` si algún día mueves el sitio a un subdirectorio.
 
 ### 3.7 Qué **no** subir
 
@@ -208,7 +213,7 @@ Para ver el error exacto: en Vercel, pestaña **Deployments** → el despliegue 
 
 ## 6. Personalizarla
 
-**Pantalla inicial, color de acento y modo edición** — final de `assets/app.js`:
+**Pantalla inicial, color de acento y modo edición** — final de `app.js`:
 
 ```js
 props: {
@@ -219,15 +224,11 @@ props: {
 }
 ```
 
-**Rutinas de gimnasio** — constante `ROUTINES` al inicio de `assets/app.js`. Cada ejercicio define `sets`, `reps`, `rest` (descanso) y `drops` (descensos). Si agregas un ejercicio nuevo y quieres que tenga ícono, añade su trazado en `ICONS` con la misma clave del nombre.
+**Rutinas de gimnasio** — constante `ROUTINES` al inicio de `app.js`. Cada ejercicio define `sets`, `reps`, `rest` (descanso) y `drops` (descensos). Si agregas un ejercicio nuevo y quieres que tenga ícono, añade su trazado en `ICONS` con la misma clave del nombre.
 
-**Datos de ejemplo** (materias, actividades, libreticas, perfil) — constantes `SEED_*` en `assets/app.js`. Se usan **solo la primera vez**; después manda lo que haya en `localStorage`.
+**Supabase** — la URL del proyecto y la clave pública están al inicio de `nube.js`. La clave pública (`sb_publishable_…`) está hecha para ir en el navegador; lo que protege los datos son las políticas de seguridad por fila de la base de datos. **Nunca** pongas en este repo la clave `service_role` / `secret`.
 
-**Empezar de cero**: abre la consola del navegador (F12) y ejecuta
-
-```js
-localStorage.removeItem('pilares.v1'); location.reload();
-```
+**Plan gratuito de Supabase** — si nadie usa la app durante 7 días seguidos, Supabase pausa el proyecto; se reactiva desde su panel (los datos no se pierden).
 
 ---
 
@@ -238,4 +239,4 @@ Abre la URL de Vercel en el móvil:
 - **Android / Chrome**: menú ⋮ → *Instalar aplicación*.
 - **iPhone / Safari**: botón Compartir → *Añadir a pantalla de inicio*.
 
-Queda a pantalla completa, con su ícono, y funciona igual porque todos los datos son locales.
+Queda a pantalla completa, con su ícono. Cada persona entra con su propio usuario.
