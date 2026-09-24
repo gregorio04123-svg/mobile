@@ -36,7 +36,9 @@ pilares/
 - **Amigos**: cada cuenta tiene un código (ej. `ANDRE-4F2A`, en el panel ⚙). Con él se envía una solicitud; al aceptarla:
   - **Agenda compartida**: al crear una actividad eliges *Para: Mí* o un amigo, y le aparece en su agenda marcada "DE …".
   - **Libreticas compartidas**: en la tarjeta, *Compartir con* un amigo. Los dos la ven, los dos registran **abonos** y pueden marcarla saldada; solo quien la creó cambia el monto o la borra. Se salda sola cuando los abonos cubren el total.
-- **Persistencia**: todo se guarda en Supabase y además queda una copia en el teléfono, así abre al instante y funciona sin señal (lo pendiente se sube al volver la conexión). Lo que hagan tus amigos aparece al volver a la app y cada minuto mientras está abierta. Seguridad por fila: nadie ve datos de otra cuenta salvo lo compartido.
+- **Persistencia**: todo se guarda en Supabase y además queda una copia en el teléfono, así abre al instante y funciona sin señal (lo pendiente se sube al volver la conexión). Seguridad por fila: nadie ve datos de otra cuenta salvo lo compartido.
+- **Tiempo real**: lo que haga un amigo (solicitud de amistad, actividad asignada, libretica compartida, abono) aparece en uno o dos segundos mientras la app está en pantalla. En segundo plano la conexión se suelta y al volver se lee lo que pasó. Plan gratis de Supabase: 200 conexiones simultáneas y 2 millones de mensajes al mes; un círculo de amigos queda muy por debajo.
+- **Respaldo**: panel ⚙ → *Exportar mis datos* → *Guardar respaldo*. Descarga un `.json` con todo lo tuyo (perfil, amigos, cuadernos, actividades, todo el historial del gimnasio, libreticas y abonos). En iPhone se abre la hoja de compartir: elige *Guardar en Archivos*. El plan gratis no hace copias automáticas, así que conviene exportar de vez en cuando.
 - **Datos de antes de las cuentas**: si en un teléfono ya usabas la app, en el panel ⚙ aparece *Importar datos de este dispositivo* (una sola vez por dispositivo).
 
 ---

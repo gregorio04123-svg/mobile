@@ -145,6 +145,13 @@ function vacio() {
 }
 function norm(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
 function leerCache(uid) { try { return JSON.parse(localStorage.getItem('pilares.nube.' + uid)); } catch (e) { return null; } }
+// Valor local vs. valor que manda la base (los números pueden llegar como texto).
+function mismoValor(a, b) {
+  if (a === null || a === undefined) return b === null || b === undefined;
+  if (typeof a === 'number') return Number(b) === a;
+  if (typeof a === 'object') return JSON.stringify(a) === JSON.stringify(b);
+  return a === b;
+}
 
 class Component extends DCLogic {
   constructor(props) {
@@ -157,7 +164,7 @@ class Component extends DCLogic {
       authMode: 'entrar', aUsuario: '', aNombre: '', aClave: '', authErr: '', authBusy: false,
       me: null, codigo: '', amigos: [], cuadAmigos: {},
       amigoCodigo: '', amigoMsg: '', amigoBusy: false, copiado: false, importMsg: '',
-      nube: 'ok',
+      nube: 'ok', respaldo: '', respaldoMsg: '',
       tab: (props.pantallaInicial || 'Home').toLowerCase(),
       edit: !!props.modoEdicion,
       panel: false,
@@ -220,20 +227,26 @@ class Component extends DCLogic {
       if (this.state.restOn && this.state.rest > 0) this.setState(s => ({ rest: s.rest - 1, restOn: s.rest - 1 > 0 }));
     }, 1000);
 
-    // Lo que hagan los amigos (asignar actividades, abonar) llega al volver
-    // a la app y cada minuto mientras está abierta.
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refrescar(); });
+    // Lo que hagan los amigos llega al instante mientras la app está en
+    // pantalla. En segundo plano se suelta la conexión (no gasta cuota del
+    // plan) y al volver se lee lo que pasó mientras tanto.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') { this.refrescar(); this.conectarTiempoReal(); }
+      else this.desconectarTiempoReal();
+    });
     window.addEventListener('online', () => this.subir());
+    // Respaldo por si el tiempo real se cae sin avisar.
     this.poll = setInterval(() => {
       if (document.visibilityState === 'visible' && !this.state.modal) this.refrescar();
-    }, 60000);
+    }, 300000);
 
+    Nube.alPerderSesion(() => this.sesionPerdida());
     Nube.sesion().then(
       ses => { if (ses && ses.user) this.abrirCuenta(ses.user); else this.setState({ auth: 'fuera' }); },
       () => this.setState({ auth: 'fuera' })
     );
   }
-  componentWillUnmount() { clearInterval(this.timer); clearInterval(this.poll); }
+  componentWillUnmount() { clearInterval(this.timer); clearInterval(this.poll); this.desconectarTiempoReal(); }
 
   componentDidUpdate() {
     if (this.state.auth !== 'dentro' || !this.base) return;
@@ -261,6 +274,7 @@ class Component extends DCLogic {
       this.setState(Object.assign(vacio(), { auth: 'cargando', cargaError: '', me }));
     }
     this.refrescar();
+    this.conectarTiempoReal();
   }
 
   async autenticar() {
@@ -290,15 +304,61 @@ class Component extends DCLogic {
     if (this.hayPendientes() &&
         !window.confirm('Hay cambios que aún no llegan a la nube (sin conexión). Si cierras sesión se pierden. ¿Cerrar de todos modos?')) return;
     const uid = this.uid;
-    this.uid = null; this.base = null; this.__sig = null;
+    this.cerrarLocal();
     try { localStorage.removeItem('pilares.nube.' + uid); } catch (e) {}
     await Nube.salir();
-    this.setState(Object.assign(vacio(), {
-      auth: 'fuera', authMode: 'entrar', aUsuario: '', aNombre: '', aClave: '', authErr: '',
+    this.setState(Object.assign(this.estadoFuera(), { aUsuario: '' }));
+  }
+
+  /** La sesión dejó de valer sin que la persona saliera. Vuelve a la
+   *  entrada y conserva la copia local: lo pendiente se sube al reentrar. */
+  sesionPerdida() {
+    if (!this.uid) return;            // salida voluntaria: ya se limpió
+    this.cerrarLocal();
+    this.setState(Object.assign(this.estadoFuera(), { authErr: 'Tu sesión se cerró. Vuelve a entrar.' }));
+  }
+
+  cerrarLocal() {
+    this.desconectarTiempoReal();
+    this.uid = null; this.base = null; this.__sig = null; this.respaldoArchivo = null;
+  }
+
+  estadoFuera() {
+    return Object.assign(vacio(), {
+      auth: 'fuera', authMode: 'entrar', aNombre: '', aClave: '', authErr: '', authBusy: false,
       me: null, codigo: '', amigos: [], cuadAmigos: {}, amigoCodigo: '', amigoMsg: '', importMsg: '',
-      nube: 'ok', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null,
+      nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null,
       activeDay: 1, expanded: null,
-    }));
+    });
+  }
+
+  /* ── Tiempo real ─────────────────────────────────────────────────── */
+  conectarTiempoReal() {
+    if (!this.uid || this.canal || document.visibilityState === 'hidden') return;
+    this.canal = Nube.escuchar(this.uid, (tabla, tipo, nuevo, viejo) => this.cambioRemoto(tabla, tipo, nuevo, viejo));
+  }
+
+  desconectarTiempoReal() {
+    if (this.canal) { Nube.dejarDeEscuchar(this.canal); this.canal = null; }
+  }
+
+  /** Llega un aviso de la base de datos. Si ya muestro exactamente eso
+   *  (por ejemplo, el eco de un cambio mío) no hago nada; si no, releo. */
+  cambioRemoto(tabla, tipo, nuevo, viejo) {
+    if (!this.uid) return;
+    if (tabla === 'conexiones') {
+      if (tipo === 'DELETE' && !this.state.amigos.some(a => a.conexion === viejo.id)) return;
+    } else {
+      const mias = Nube.filas(this.snapshot(), this.uid)[tabla] || {};
+      if (tipo === 'DELETE') {
+        if (!(viejo.id in mias)) return;               // ya no lo tengo: nada que hacer
+      } else if (mias[nuevo.id]) {
+        const local = JSON.parse(mias[nuevo.id]);
+        if (Object.keys(local).every(k => mismoValor(local[k], nuevo[k]))) return;
+      }
+    }
+    clearTimeout(this.tRemoto);
+    this.tRemoto = setTimeout(() => this.refrescar(), 300);   // agrupa avisos seguidos
   }
 
   /* ── Nube: subir cambios y leer lo nuevo ─────────────────────────── */
@@ -309,6 +369,7 @@ class Component extends DCLogic {
     const actual = Nube.filas(this.snapshot(), uid);
     if (!Nube.pendientes(this.base, actual).length) {
       if (this.state.nube !== 'ok') this.setState({ nube: 'ok' });
+      this.trasSubir();
       return;
     }
     this.subiendo = true;
@@ -329,6 +390,15 @@ class Component extends DCLogic {
     } finally {
       this.subiendo = false;
       if (this.resubir) { this.resubir = false; this.subir(); }
+      else this.trasSubir();
+    }
+  }
+
+  /** Si una lectura se aplazó porque había cambios sin subir, se hace ahora. */
+  trasSubir() {
+    if (this.releerTrasSubir && !this.hayPendientes()) {
+      this.releerTrasSubir = false;
+      this.refrescar();
     }
   }
 
@@ -340,7 +410,7 @@ class Component extends DCLogic {
     try {
       if (this.base) {
         await this.subir();
-        if (this.hayPendientes()) return;           // sin red: no pisar lo local
+        if (this.hayPendientes()) { this.releerTrasSubir = true; return; }   // no pisar lo local
       }
       const antes = this.huella();
       const d = await Nube.cargar(uid);
@@ -400,6 +470,71 @@ class Component extends DCLogic {
       this.setState({ copiado: true });
       setTimeout(() => this.setState({ copiado: false }), 1600);
     }, () => {});
+  }
+
+  /* ── Respaldo ────────────────────────────────────────────────────── */
+  // Dos pasos (preparar, luego descargar) porque el navegador solo deja
+  // descargar o compartir justo después de un toque del usuario.
+  async prepararRespaldo() {
+    if (this.state.respaldo === 'preparando' || !this.uid) return;
+    const uid = this.uid, usuario = this.state.me ? this.state.me.usuario : '';
+    this.respaldoArchivo = null;
+    this.setState({ respaldo: 'preparando', respaldoMsg: '' });
+    try {
+      // Que el respaldo incluya lo último que se escribió.
+      for (let i = 0; i < 6 && this.hayPendientes(); i++) {
+        await this.subir();
+        if (this.hayPendientes()) await new Promise(r => setTimeout(r, 700));
+      }
+      if (this.hayPendientes()) throw new Error('pendiente');
+      const datos = await Nube.exportar(uid, usuario);
+      if (uid !== this.uid) return;
+      const texto = JSON.stringify(datos, null, 2);
+      const nombre = 'pilares-respaldo-' + (usuario.replace(/[^a-z0-9._-]/gi, '') || 'cuenta') + '-' + TODAY + '.json';
+      this.respaldoArchivo = { nombre, texto };
+      const kb = Math.max(1, Math.round(new Blob([texto]).size / 1024));
+      const cuenta = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
+      this.setState({
+        respaldo: 'listo',
+        respaldoMsg: 'Listo (' + kb + ' KB): ' + cuenta(datos.actividades.length, 'actividad', 'actividades') + ', ' +
+                     cuenta(datos.libreticas.length, 'libretica', 'libreticas') + ' y ' +
+                     cuenta(datos.sesiones_gimnasio.length, 'día de gimnasio', 'días de gimnasio') + '. Toca para guardarlo.',
+      });
+    } catch (e) {
+      console.warn('[pilares] respaldo', e);
+      this.setState({
+        respaldo: 'error',
+        respaldoMsg: navigator.onLine === false
+          ? 'Necesitas conexión a internet para exportar.'
+          : 'No se pudo preparar el respaldo. Intenta de nuevo.',
+      });
+    }
+  }
+
+  descargarRespaldo() {
+    const r = this.respaldoArchivo;
+    if (!r) return;
+    const archivo = new File([r.texto], r.nombre, { type: 'application/json' });
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    // En iPhone se usa la hoja de compartir: desde ahí se elige "Guardar en Archivos".
+    if (ios && navigator.canShare && navigator.canShare({ files: [archivo] })) {
+      navigator.share({ files: [archivo], title: r.nombre }).catch(err => {
+        if (!err || err.name !== 'AbortError') this.bajarArchivo(archivo);
+      });
+      return;
+    }
+    this.bajarArchivo(archivo);
+  }
+
+  bajarArchivo(archivo) {
+    const url = URL.createObjectURL(archivo);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = archivo.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 
   /* ── Datos que la app guardaba en el dispositivo antes de las cuentas ── */
@@ -836,7 +971,8 @@ class Component extends DCLogic {
       goEjercicio: () => self.setState({ tab: 'ejercicio' }),
       goEstudio: () => self.setState({ tab: 'estudio', estudioTab: 'agenda', openCuaderno: null }),
       goFinanzas: () => self.setState({ tab: 'finanzas' }),
-      openPanel: () => self.setState({ panel: true }), closePanel: () => self.setState({ panel: false }),
+      openPanel: () => self.setState({ panel: true }),
+      closePanel: () => self.setState({ panel: false, respaldo: s.respaldo === 'preparando' ? 'preparando' : '', respaldoMsg: s.respaldo === 'preparando' ? s.respaldoMsg : '' }),
       toggleEdit: () => self.setState(st => ({ edit: !st.edit })),
 
       ringColor: pct >= 100 ? GREEN : ac, ringOffset: 188.5 * (1 - pct / 100), pctText: pct + '%',
@@ -1040,6 +1176,10 @@ class Component extends DCLogic {
       importarTxt: s.importMsg || 'Importar datos de este dispositivo',
       importarSub: s.importMsg ? 'Ya quedaron en tu cuenta.' : 'Sube a tu cuenta lo que esta app tenía guardado aquí antes de las cuentas. Hazlo una sola vez.',
       importar: () => { if (!s.importMsg) self.importarLocal(); },
+      respaldoBtn: s.respaldo === 'preparando' ? 'Preparando respaldo…' : (s.respaldo === 'listo' ? 'Guardar respaldo' : 'Exportar mis datos'),
+      respaldoColor: s.respaldo === 'error' ? RED : (s.respaldo === 'listo' ? MINT : '#fff'),
+      respaldoSub: s.respaldoMsg || 'Descarga un archivo con todo lo tuyo (gimnasio, agenda, cuadernos, libreticas con abonos y perfil). Guárdalo como respaldo.',
+      respaldoGo: () => { if (s.respaldo === 'listo') self.descargarRespaldo(); else self.prepararRespaldo(); },
       salir: () => self.salir(),
       editCardBg: s.edit ? 'rgba(206,127,85,.1)' : '#121724',
       editCardBorder: s.edit ? 'rgba(206,127,85,.34)' : 'rgba(255,255,255,.07)',

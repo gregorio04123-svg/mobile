@@ -889,6 +889,14 @@
         </div>
       </sc-if>
 
+      <div sc-camel-on-click="{{ respaldoGo }}" style="margin-top:20px;padding:15px 16px;border-radius:12px;cursor:pointer;background:#121724;border:1px solid rgba(255,255,255,.09)" style-active="transform:translateY(1px)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="font:700 13.5px/1.3 Manrope,sans-serif;color:{{ respaldoColor }}">{{ respaldoBtn }}</div>
+          <div style="flex:none;font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE">RESPALDO</div>
+        </div>
+        <div style="font:500 11px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:6px;text-wrap:pretty">{{ respaldoSub }}</div>
+      </div>
+
       <div sc-camel-on-click="{{ salir }}" style="margin-top:20px;padding:15px;border-radius:12px;text-align:center;cursor:pointer;background:rgba(196,100,97,.07);border:1px solid rgba(196,100,97,.26);font:700 11.5px/1 Manrope,sans-serif;letter-spacing:.1em;color:#C46461" style-active="transform:translateY(1px)">CERRAR SESIÓN</div>
     </div>
   </div>

@@ -44,6 +44,11 @@
   }
 
   function pad(n) { return String(n).padStart(2, '0'); }
+  // Fecha del dispositivo (no la de UTC del servidor, que en Colombia va 5 h adelante).
+  function fechaLocal(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
   function haceDias(n) {
     var d = new Date(); d.setDate(d.getDate() - n);
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
@@ -89,6 +94,12 @@
 
   async function salir() {
     try { await sb.auth.signOut(); } catch (e) {}
+  }
+
+  /** Avisa si la sesion deja de valer (p. ej. la cuenta se borro). Los
+   *  fallos de red no cierran la sesion: solo un rechazo del servidor. */
+  function alPerderSesion(fn) {
+    sb.auth.onAuthStateChange(function (evento) { if (evento === 'SIGNED_OUT') fn(); });
   }
 
   /* ------------------------------------------------------------------
@@ -137,7 +148,7 @@
     q[6].data.forEach(function (a) {
       (abonos[a.libreta_id] = abonos[a.libreta_id] || []).push({
         id: a.id, monto: String(Math.round(+a.monto)), nota: a.nota || '',
-        por: a.registrado_por, fecha: String(a.creado_en).slice(0, 10),
+        por: a.registrado_por, fecha: fechaLocal(a.creado_en),
       });
     });
 
@@ -317,10 +328,80 @@
     if (r.error) throw new Error(mensajeDe(r.error));
   }
 
+  /* ------------------------------------------------------------------
+   * Tiempo real: aviso inmediato cuando un amigo cambia algo tuyo
+   * ---------------------------------------------------------------- */
+  // Solo lo que otra persona puede tocar. Los filtros hacen que cada quien
+  // reciba lo suyo (y gaste menos mensajes del plan); insert/update pasan
+  // ademas por la seguridad por fila. Los delete no admiten filtro: llegan
+  // solo con el id y la app decide si le importan.
+  function escuchar(uid, alCambiar) {
+    var de = function (col) { return col + '=eq.' + uid; };
+    var enlaces = [
+      ['conexiones', 'INSERT', de('destinatario_id')],   // me invitan
+      ['conexiones', 'UPDATE', de('solicitante_id')],    // aceptan mi solicitud
+      ['conexiones', 'DELETE'],
+      ['actividades', 'INSERT', de('user_id')],          // me asignan algo
+      ['actividades', 'UPDATE', de('user_id')],
+      ['actividades', 'UPDATE', de('asignado_por')],     // editan lo que asigne
+      ['actividades', 'DELETE'],
+      ['libretas', 'INSERT', de('contraparte_id')],      // me comparten una
+      ['libretas', 'UPDATE', de('contraparte_id')],
+      ['libretas', 'UPDATE', de('user_id')],             // saldan una mia
+      ['libretas', 'DELETE'],
+      ['abonos', 'INSERT'],
+      ['abonos', 'DELETE'],
+    ];
+    var canal = sb.channel('pilares-' + uid);
+    enlaces.forEach(function (e) {
+      var cfg = { event: e[1], schema: 'public', table: e[0] };
+      if (e[2]) cfg.filter = e[2];
+      canal.on('postgres_changes', cfg, function (p) {
+        alCambiar(e[0], p.eventType, p.new || {}, p.old || {});
+      });
+    });
+    canal.subscribe();
+    return canal;
+  }
+
+  function dejarDeEscuchar(canal) {
+    if (canal) sb.removeChannel(canal);
+  }
+
+  /* ------------------------------------------------------------------
+   * Respaldo: todo lo tuyo, tal como esta en la base de datos
+   * ---------------------------------------------------------------- */
+  async function exportar(uid, usuario) {
+    var q = await Promise.all([
+      sb.from('perfiles').select('nombre,altura,peso,sexo,codigo,creado_en').eq('id', uid).single(),
+      sb.from('cuadernos').select('id,nombre,orden,creado_en').eq('user_id', uid).order('orden'),
+      sb.from('archivos').select('id,cuaderno_id,nombre,tamano,creado_en').eq('user_id', uid).order('creado_en'),
+      sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,creado_en').order('fecha'),
+      // Todo el historial del gimnasio, no solo los ultimos 120 dias.
+      sb.from('sesiones').select('fecha,grupo,abbr,dia,ejercicios,actualizado_en').eq('user_id', uid).order('fecha'),
+      sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,pagado_en,nota,vence_el,creado_en,actualizado_en').order('creado_en'),
+      sb.from('abonos').select('id,libreta_id,monto,nota,registrado_por,creado_en').order('creado_en'),
+      sb.rpc('mis_conexiones'),
+    ]);
+    for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
+
+    return {
+      app: 'Pilares', formato: 1, exportado_en: new Date().toISOString(),
+      usuario: usuario, id: uid,
+      perfil: q[0].data,
+      amigos: (q[7].data || []).map(function (c) {
+        return { id: c.otro_id, nombre: c.nombre, codigo: c.codigo, estado: c.estado };
+      }),
+      cuadernos: q[1].data, archivos: q[2].data, actividades: q[3].data,
+      sesiones_gimnasio: q[4].data, libreticas: q[5].data, abonos: q[6].data,
+    };
+  }
+
   global.Nube = {
     cliente: sb, uuid: uuid, usuarioDe: usuarioDe,
-    sesion: sesion, entrar: entrar, crear: crear, salir: salir,
+    sesion: sesion, entrar: entrar, crear: crear, salir: salir, alPerderSesion: alPerderSesion,
     cargar: cargar, filas: filas, pendientes: pendientes, sincronizar: sincronizar,
     buscarCodigo: buscarCodigo, invitar: invitar, aceptar: aceptar, borrarConexion: borrarConexion,
+    escuchar: escuchar, dejarDeEscuchar: dejarDeEscuchar, exportar: exportar,
   };
 })(window);
