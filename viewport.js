@@ -71,6 +71,7 @@
     if (!viewport) return;
 
     var alto = viewport;
+    var oculto = 0;
 
     if (esInstalada()) {
       var pantalla = altoPantalla();
@@ -80,10 +81,15 @@
       // estado: esa es la firma del fallo y nada mas.
       if (faltante > 0 && franja > 0 && Math.abs(faltante - franja) <= TOLERANCIA) {
         alto = pantalla;
+        oculto = faltante;
       }
     }
 
     root.style.setProperty('--app-height', alto + 'px');
+    // Con el fallo, iOS no pinta nada por debajo del viewport corto: esa
+    // franja de abajo solo sirve de fondo. Lo que se toca (la barra de
+    // escribir del chat) se apoya por encima de ella.
+    root.style.setProperty('--app-oculto', oculto + 'px');
   }
 
   function programar() {

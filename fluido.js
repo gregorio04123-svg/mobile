@@ -227,11 +227,14 @@
 
   function colocarAviso() {
     var pantalla = doc.getElementById('screen');
-    var barra = doc.querySelector('[data-vidrio="barra"]');
+    // Encima de la barra de pestañas o, en el chat, de la barra de escribir;
+    // nunca por debajo de lo que se ve (en iOS instalada el fondo puede quedar sin pintar).
+    var pie = doc.querySelector('[data-vidrio="barra"]') || doc.querySelector('[data-chat-redactar]');
     var r = pantalla.getBoundingClientRect();
+    var base = Math.min(pie ? pie.getBoundingClientRect().top : r.bottom, global.innerHeight);
     aviso.style.left = (r.left + 14) + 'px';
     aviso.style.width = (r.width - 28) + 'px';
-    aviso.style.bottom = (global.innerHeight - r.bottom + (barra ? barra.offsetHeight : 0) + 12) + 'px';
+    aviso.style.bottom = (global.innerHeight - base + 12) + 'px';
   }
 
   function ponerAviso(p) {
