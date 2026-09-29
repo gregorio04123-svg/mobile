@@ -148,16 +148,58 @@ function recorte(v, max, def) { const x = typeof v === 'string' ? v.trim() : '';
 function leerDestino(url) {
   try {
     const u = new URL(url, location.href), ir = u.searchParams.get('ir');
-    if (!['estudio', 'finanzas', 'ejercicio', 'chat'].includes(ir)) return null;
-    return { ir, fecha: u.searchParams.get('fecha'), libreta: u.searchParams.get('libreta'), inv: u.searchParams.get('inv'), con: u.searchParams.get('con') };
+    if (!['estudio', 'finanzas', 'ejercicio', 'chat', 'grupo'].includes(ir)) return null;
+    return { ir, fecha: u.searchParams.get('fecha'), libreta: u.searchParams.get('libreta'), inv: u.searchParams.get('inv'), con: u.searchParams.get('con'),
+             g: u.searchParams.get('g'), lg: u.searchParams.get('lg') };
   } catch (e) { return null; }
 }
 function destinoDe(a) {
   if (a.tipo === 'actividad' || a.tipo === 'recordatorio') return { ir: 'estudio', fecha: a.fecha };
   if (a.tipo === 'libreta' || a.tipo === 'abono') return { ir: 'finanzas', libreta: a.ref };
+  if (a.tipo === 'libreta_grupo' || a.tipo === 'abono_grupo') return { ir: 'finanzas', lg: a.ref };
   if (a.tipo === 'rutina') return { ir: 'ejercicio', inv: a.ref, quien: a.titulo };
+  if (a.tipo === 'grupo') return { ir: 'grupo', g: a.ref };
   return null;
 }
+/** «A», «A y B», «A, B y C». */
+function listaNombres(ns) {
+  const x = ns.filter(Boolean);
+  return x.length <= 1 ? (x[0] || '') : x.slice(0, -1).join(', ') + ' y ' + x[x.length - 1];
+}
+/** Texto de un mensaje del sistema en un grupo (creó, agregó, salió, nombre, borró). */
+function textoSistema(m, me) {
+  const d = m.datos || {}, yo = m.de === me, quien = primerNombre(m.deNombre || 'Alguien');
+  if (d.accion === 'crear') return (yo ? 'Creaste' : quien + ' creó') + ' el grupo «' + (d.nombre || '') + '»';
+  if (d.accion === 'agregar') {
+    const otros = Array.isArray(d.otros) ? d.otros : [], nombres = Array.isArray(d.nombres) ? d.nombres : [];
+    if (!yo && otros.includes(me)) return quien + ' te agregó al grupo';
+    return (yo ? 'Agregaste a ' : quien + ' agregó a ') + listaNombres(nombres.map(primerNombre));
+  }
+  if (d.accion === 'salir') return (yo ? 'Saliste' : quien + ' salió') + ' del grupo';
+  if (d.accion === 'nombre') return (yo ? 'Cambiaste' : quien + ' cambió') + ' el nombre a «' + (d.nombre || '') + '»';
+  if (d.accion === 'borrar_libreta') {
+    return (yo ? 'Borraste' : quien + ' borró') + ' la libretica ' + (d.nota ? '«' + d.nota + '»' : 'de ' + pesosTxt(d.total));
+  }
+  return '';
+}
+/** Vista previa del último mensaje de un grupo en la lista de chats. */
+function previewGrupo(u, me) {
+  if (!u) return 'Toca para escribirle al grupo';
+  if (u.tipo === 'sistema') return textoSistema(u, me);
+  const quien = u.de === me ? 'Tú: ' : primerNombre(u.deNombre || 'Alguien') + ': ', d = u.datos || {};
+  if (u.tipo === 'texto') return quien + u.texto;
+  if (u.tipo === 'libreta') return quien + 'Libretica · ' + pesosTxt(d.total) + (d.nota ? ' · ' + d.nota : '');
+  return quien + 'Actividad';
+}
+/** Iniciales de un grupo: «Viernes de pizza» → «VP». */
+const PALABRAS_VACIAS = ['de', 'del', 'la', 'las', 'los', 'el', 'y', 'e', 'en', 'a', 'al', 'con', 'para', 'por'];
+function inicialesDe(nombre) {
+  const todas = String(nombre || '').trim().split(/\s+/).filter(Boolean);
+  const utiles = todas.filter(w => !PALABRAS_VACIAS.includes(w.toLowerCase()));
+  return (utiles.length ? utiles : todas).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('') || '?';
+}
+/** Lo que falta de cada parte de una libretica de grupo. */
+function saldoParte(p) { return Math.max(0, (p.monto || 0) - (p.abonos || []).reduce((t, a) => t + (a.monto || 0), 0)); }
 const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const DIAS_LARGO = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 function fechaLarga(f) {
@@ -200,7 +242,8 @@ function previewChat(c, me) {
   if (c.tipo === 'rutina') return yo + (d.tipo === 'semana' ? 'Rutina · semana completa' : 'Rutina · «' + (d.nombre || 'grupo') + '»');
   return '';
 }
-const SECCION_AVISO = { actividad: 'ESTUDIO', recordatorio: 'ESTUDIO', libreta: 'FINANZAS', abono: 'FINANZAS', rutina: 'AMIGOS' };
+const SECCION_AVISO = { actividad: 'ESTUDIO', recordatorio: 'ESTUDIO', libreta: 'FINANZAS', abono: 'FINANZAS', rutina: 'AMIGOS',
+                        grupo: 'AMIGOS', libreta_grupo: 'FINANZAS', abono_grupo: 'FINANZAS' };
 function hace(ts) {
   const d = new Date(ts), min = Math.round((Date.now() - d.getTime()) / 60000);
   if (!(min >= 0)) return '';
@@ -286,9 +329,15 @@ class Component extends DCLogic {
       push: '', pushBusy: false, pushMsg: '',
       tipoEd: null,   // editor de un tipo de actividad (Modo edición)
       chats: [],      // un renglón por conversación (último mensaje, sin leer)
-      chatCon: null,  // amigo con el chat abierto
-      chatMsgs: {},   // mensajes cargados por amigo: { lista, hayMas, cargando, error }
+      chatCon: null,  // amigo con el chat abierto (o chatG: grupo)
+      chatMsgs: {},   // mensajes cargados por amigo (o 'g:' + grupo): { lista, hayMas, cargando, error }
       chatTexto: '', chatHoja: null,
+      gAmigos: [],    // mis grupos de amigos (nombre, miembros, último mensaje, sin leer)
+      chatG: null,    // grupo con el chat abierto
+      libsG: [],      // libreticas de grupo en las que estoy (las creé o debo)
+      lgVer: null,    // libretica de grupo abierta en su hoja de detalle
+      lgExtra: {},    // libreticas de grupo vistas por id (en las que no participo)
+      lgAbono: '', lgBusy: false, lgMsg: '',
     });
     this.invPorBorrar = new Set();
     // Si la app se abrió desde una notificación, a dónde hay que ir.
@@ -343,7 +392,7 @@ class Component extends DCLogic {
         data: { profile: s.profile, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, logs: this.snapshot().sesiones,
                 grupos: s.grupos, plan: s.plan },
         base: this.base, codigo: s.codigo, amigos: s.amigos, cuadAmigos: s.cuadAmigos, invRutinas: s.invRutinas,
-        avisos: s.avisos, avisosLeidos: s.avisosLeidos, chats: s.chats,
+        avisos: s.avisos, avisosLeidos: s.avisosLeidos, chats: s.chats, gAmigos: s.gAmigos, libsG: s.libsG,
       }));
     } catch (e) {}
   }
@@ -424,7 +473,7 @@ class Component extends DCLogic {
       this.setState(Object.assign(this.desdeDatos(cache.data), {
         auth: 'dentro', me, codigo: cache.codigo || '', amigos: cache.amigos || [], cuadAmigos: cache.cuadAmigos || {},
         invRutinas: cache.invRutinas || [], avisos: cache.avisos || [], avisosLeidos: cache.avisosLeidos || null,
-        chats: cache.chats || [],
+        chats: cache.chats || [], gAmigos: cache.gAmigos || [], libsG: cache.libsG || [],
       }));
       this.aplicarDestino(false);
     } else {
@@ -494,6 +543,7 @@ class Component extends DCLogic {
       invRutinas: [], verRutina: null,
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false, pushMsg: '',
       chats: [], chatCon: null, chatMsgs: {}, chatTexto: '', chatHoja: null,
+      gAmigos: [], chatG: null, libsG: [], lgVer: null, lgExtra: {}, lgAbono: '', lgBusy: false, lgMsg: '',
     });
   }
 
@@ -788,6 +838,7 @@ class Component extends DCLogic {
       : tipo === 'rutina' ? { rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null }
       : tipo === 'ver' ? { verRutina: null }
       : tipo === 'chat' ? { chatHoja: null }
+      : tipo === 'lg' ? { lgVer: null, lgAbono: '', lgMsg: '', lgBusy: false }
       : {
         panel: false,
         respaldo: st.respaldo === 'preparando' ? 'preparando' : '',
@@ -819,6 +870,19 @@ class Component extends DCLogic {
   cambioRemoto(tabla, tipo, nuevo, viejo) {
     if (!this.uid) return;
     if (tabla === 'mensajes') { if (tipo === 'INSERT') this.recibirMensaje(nuevo); return; }
+    if (tabla === 'mensajes_grupo') { if (tipo === 'INSERT') this.recibirMensajeGrupo(nuevo); return; }
+    if (tabla === 'abonos_grupo' || tabla === 'libretas_grupo') {
+      // Un borrado llega solo con el id (a todos): importa si es algo que tengo.
+      if (tipo === 'DELETE') {
+        const s = this.state, todas = s.libsG.concat(Object.values(s.lgExtra).filter(Boolean));
+        const conozco = tabla === 'libretas_grupo'
+          ? todas.some(l => l.id === viejo.id)
+          : todas.some(l => l.partes.some(p => p.abonos.some(a => a.id === viejo.id)));
+        if (!conozco) return;
+      }
+      this.cargarLibsG();
+      return;
+    }
     if (tabla === 'rutinas_compartidas') {
       if (tipo === 'DELETE' && !this.state.invRutinas.some(x => x.id === viejo.id)) return;
     } else if (tabla === 'conexiones') {
@@ -904,7 +968,7 @@ class Component extends DCLogic {
       this.setState(Object.assign(this.desdeDatos(d), {
         auth: 'dentro', cargaError: '', codigo: d.codigo, amigos: d.amigos, cuadAmigos: d.cuadAmigos, nube: 'ok',
         invRutinas: d.invRutinas.filter(x => !this.invPorBorrar.has(x.id)),
-        avisos: d.avisos, avisosLeidos: d.avisosLeidos, chats: d.chats,
+        avisos: d.avisos, avisosLeidos: d.avisosLeidos, chats: d.chats, gAmigos: d.gAmigos, libsG: d.libsG,
       }));
       this.base = Nube.filas(this.snapshot(), uid);
       this.__sig = DATA_KEYS.map(k => this.state[k]);
@@ -1105,6 +1169,13 @@ class Component extends DCLogic {
     if (s.chatCon) {
       this.cargarChat(s.chatCon);
       if (document.visibilityState === 'visible') this.marcarLeido(s.chatCon);
+    } else if (s.chatG) {
+      // Salí del grupo desde otro dispositivo: se cierra su chat.
+      if (!s.gAmigos.some(g => g.id === s.chatG)) this.cerrarChat();
+      else {
+        this.cargarChat('g:' + s.chatG);
+        if (document.visibilityState === 'visible') this.marcarLeidoGrupo(s.chatG);
+      }
     }
     let zona = '';
     try { zona = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
@@ -1128,7 +1199,7 @@ class Component extends DCLogic {
   irA(d, cerrarTodo) {
     if (!d) return true;
     const s = this.state;
-    const cambios = cerrarTodo ? { panel: false, modal: null, rutinaOn: false, verRutina: null, menuDia: null } : {};
+    const cambios = cerrarTodo ? { panel: false, modal: null, rutinaOn: false, verRutina: null, menuDia: null, chatHoja: null, lgVer: null } : {};
     let hallado = true, libreta = null;
     if (d.ir === 'estudio') {
       Object.assign(cambios, { tab: 'estudio', estudioTab: 'agenda', openCuaderno: null });
@@ -1136,6 +1207,20 @@ class Component extends DCLogic {
         const p = d.fecha.split('-').map(Number);
         Object.assign(cambios, { year: p[0], month: p[1] - 1, selDay: p[2] });
       }
+    } else if (d.ir === 'finanzas' && d.lg) {
+      // Libretica de grupo: Finanzas con su detalle abierto (si ya no existe, la hoja lo dice).
+      cambios.tab = 'finanzas';
+      this.setState(cambios);
+      this.abrirLibretaGrupo(d.lg);
+      return true;
+    } else if (d.ir === 'grupo') {
+      cambios.tab = 'amigos';
+      if (d.g && s.gAmigos.some(g => g.id === d.g)) {
+        this.setState(cambios);
+        this.abrirGrupo(d.g);
+        return true;
+      }
+      hallado = !d.g;
     } else if (d.ir === 'finanzas') {
       cambios.tab = 'finanzas';
       const l = d.libreta && s.libs.find(x => x.id === d.libreta);
@@ -1257,70 +1342,90 @@ class Component extends DCLogic {
     };
   }
 
-  /* ── Chat entre amigos ───────────────────────────────────────────── */
+  /* ── Chat entre amigos y chat de grupos ──────────────────────────── */
+  // Cada conversación se guarda en chatMsgs con su clave: el id del amigo,
+  // o 'g:' + el id del grupo.
 
-  textoSinLeer() { return this.state.chats.reduce((t, c) => t + (c.sinLeerTexto || 0), 0); }
+  textoSinLeer() {
+    return this.state.chats.reduce((t, c) => t + (c.sinLeerTexto || 0), 0)
+         + this.state.gAmigos.reduce((t, g) => t + (g.sinLeerTexto || 0), 0);
+  }
   /** Número del ícono de la app: avisos sin ver + mensajes sin leer. */
   actualizarGlobo() { Nube.ponerGlobo(this.avisosNuevos(this.state.avisosLeidos) + this.textoSinLeer()); }
 
+  /** Clave de la conversación abierta (o null). */
+  hiloAbierto(s) { s = s || this.state; return s.chatG ? 'g:' + s.chatG : s.chatCon; }
+
   abrirChat(otro) {
     if (!this.state.amigos.some(a => a.id === otro && a.estado === 'aceptada')) return false;
-    this.setState(st => ({ tab: 'amigos', chatCon: otro, chatHoja: null, chatTexto: st.chatCon === otro ? st.chatTexto : '' }));
+    this.setState(st => ({ tab: 'amigos', chatCon: otro, chatG: null, chatHoja: null, chatTexto: st.chatCon === otro ? st.chatTexto : '' }));
     this.cargarChat(otro, true);
     this.marcarLeido(otro);
     return true;
   }
 
+  abrirGrupo(g) {
+    if (!this.state.gAmigos.some(x => x.id === g)) return false;
+    this.setState(st => ({ tab: 'amigos', chatG: g, chatCon: null, chatHoja: null, chatTexto: st.chatG === g ? st.chatTexto : '' }));
+    this.cargarChat('g:' + g, true);
+    this.marcarLeidoGrupo(g);
+    return true;
+  }
+
   cerrarChat() {
     this.soltarTeclado();
-    this.setState({ chatCon: null, chatHoja: null, chatTexto: '' });
+    this.setState({ chatCon: null, chatG: null, chatHoja: null, chatTexto: '' });
+  }
+
+  traerMensajes(clave, antesDe) {
+    return clave.startsWith('g:') ? Nube.mensajesGrupo(clave.slice(2), antesDe) : Nube.mensajes(this.uid, clave, antesDe);
   }
 
   /** Trae los mensajes más recientes; conserva los viejos ya cargados y los míos pendientes. */
-  async cargarChat(otro, abajo) {
+  async cargarChat(clave, abajo) {
     const uid = this.uid;
     if (!uid) return;
-    const previo = this.state.chatMsgs[otro];
-    this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [otro]: { lista: [], hayMas: false, ...(st.chatMsgs[otro] || {}), cargando: true, error: '' } } }));
+    const previo = this.state.chatMsgs[clave];
+    this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [clave]: { lista: [], hayMas: false, ...(st.chatMsgs[clave] || {}), cargando: true, error: '' } } }));
     try {
-      const r = await Nube.mensajes(uid, otro, null);
+      const r = await this.traerMensajes(clave, null);
       if (uid !== this.uid) return;
       const cerca = this.chatAbajo();
       this.setState(st => {
-        const prev = st.chatMsgs[otro] || { lista: [], hayMas: false };
+        const prev = st.chatMsgs[clave] || { lista: [], hayMas: false };
         const ids = new Set(r.lista.map(m => m.id));
         const primero = r.lista[0];
         const viejos = primero ? prev.lista.filter(m => !m.estado && m.en < primero.en && !ids.has(m.id)) : [];
         const pendientes = prev.lista.filter(m => m.estado && !ids.has(m.id));
-        return { chatMsgs: { ...st.chatMsgs, [otro]: {
+        return { chatMsgs: { ...st.chatMsgs, [clave]: {
           lista: viejos.concat(r.lista, pendientes), hayMas: viejos.length ? prev.hayMas : r.hayMas, cargando: false, error: '',
         } } };
       });
       if (abajo || !previo || cerca) this.bajarChat(true);
     } catch (e) {
-      this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [otro]: { lista: [], hayMas: false, ...(st.chatMsgs[otro] || {}), cargando: false,
+      this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [clave]: { lista: [], hayMas: false, ...(st.chatMsgs[clave] || {}), cargando: false,
         error: navigator.onLine === false ? 'Sin conexión: no se pudieron cargar los mensajes.' : 'No se pudieron cargar los mensajes.' } } }));
     }
   }
 
   async cargarAnteriores() {
-    const otro = this.state.chatCon, hilo = otro && this.state.chatMsgs[otro];
+    const clave = this.hiloAbierto(), hilo = clave && this.state.chatMsgs[clave];
     if (!hilo || !hilo.hayMas || hilo.cargando) return;
     const primero = hilo.lista.find(m => !m.estado);
     if (!primero) return;
     const el = document.querySelector('[data-chat-lista]');
     const alto0 = el ? el.scrollHeight : 0, arriba0 = el ? el.scrollTop : 0;
-    this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [otro]: { ...st.chatMsgs[otro], cargando: true } } }));
+    this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [clave]: { ...st.chatMsgs[clave], cargando: true } } }));
     try {
-      const r = await Nube.mensajes(this.uid, otro, primero.en);
+      const r = await this.traerMensajes(clave, primero.en);
       this.setState(st => {
-        const h = st.chatMsgs[otro], ids = new Set(h.lista.map(m => m.id));
-        return { chatMsgs: { ...st.chatMsgs, [otro]: { ...h, lista: r.lista.filter(m => !ids.has(m.id)).concat(h.lista), hayMas: r.hayMas, cargando: false } } };
+        const h = st.chatMsgs[clave], ids = new Set(h.lista.map(m => m.id));
+        return { chatMsgs: { ...st.chatMsgs, [clave]: { ...h, lista: r.lista.filter(m => !ids.has(m.id)).concat(h.lista), hayMas: r.hayMas, cargando: false } } };
       });
       // Que lo que se estaba leyendo no salte.
       setTimeout(() => { const e = document.querySelector('[data-chat-lista]'); if (e) e.scrollTop = arriba0 + (e.scrollHeight - alto0); }, 60);
     } catch (e) {
-      this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [otro]: { ...st.chatMsgs[otro], cargando: false } } }));
+      this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [clave]: { ...st.chatMsgs[clave], cargando: false } } }));
       if (window.Fluido) Fluido.aviso('No se pudieron cargar los mensajes anteriores');
     }
   }
@@ -1352,6 +1457,36 @@ class Component extends DCLogic {
     setTimeout(() => this.guardarCache(), 0);
   }
 
+  /** Mensaje nuevo en un grupo (texto, tarjeta o aviso del sistema). */
+  recibirMensajeGrupo(n) {
+    const me = this.uid;
+    if (!me || !n || !n.id) return;
+    const m = Nube.mensajeGrupoDe(n), d = m.datos || {};
+    const s0 = this.state, g0 = s0.gAmigos.find(x => x.id === m.g);
+    // Me agregaron a un grupo, o cambió quién está o su nombre: se relee la lista.
+    if (!g0 || m.tipo === 'sistema') this.cargarGrupos();
+    if (m.tipo === 'libreta' || d.accion === 'borrar_libreta') this.cargarLibsG();
+    if (!g0) return;
+    const clave = 'g:' + m.g;
+    const abierto = s0.tab === 'amigos' && s0.chatG === m.g && document.visibilityState === 'visible';
+    const cerca = abierto && this.chatAbajo();
+    this.setState(st => {
+      const hilo = st.chatMsgs[clave], ya = !!(hilo && hilo.lista.some(x => x.id === m.id));
+      const chatMsgs = !hilo ? st.chatMsgs : { ...st.chatMsgs, [clave]: { ...hilo,
+        lista: ya ? hilo.lista.map(x => x.id === m.id ? m : x) : hilo.lista.concat([m]) } };
+      const prev = st.gAmigos.find(x => x.id === m.g);
+      if (!prev) return { chatMsgs };
+      const suma = !ya && m.de !== me && m.tipo !== 'sistema' && !abierto ? 1 : 0;
+      const fila = { ...prev, ult: { tipo: m.tipo, texto: m.texto, datos: m.datos, de: m.de, deNombre: m.deNombre, en: m.en },
+                     sinLeer: prev.sinLeer + suma, sinLeerTexto: prev.sinLeerTexto + (m.tipo === 'texto' ? suma : 0) };
+      return { chatMsgs, gAmigos: [fila].concat(st.gAmigos.filter(x => x.id !== m.g)) };
+    });
+    if (abierto && m.de !== me) this.marcarLeidoGrupo(m.g);
+    if (abierto) this.bajarChat(cerca);
+    this.actualizarGlobo();
+    setTimeout(() => this.guardarCache(), 0);
+  }
+
   marcarLeido(otro) {
     this.setState(st => ({ chats: st.chats.map(c => c.otro === otro ? { ...c, sinLeer: 0, sinLeerTexto: 0 } : c) }));
     this.actualizarGlobo();
@@ -1359,20 +1494,70 @@ class Component extends DCLogic {
     this.tLeido = setTimeout(() => { Nube.marcarChatLeido(otro).catch(() => {}); }, 400);
   }
 
+  marcarLeidoGrupo(g) {
+    this.setState(st => ({ gAmigos: st.gAmigos.map(x => x.id === g ? { ...x, sinLeer: 0, sinLeerTexto: 0 } : x) }));
+    this.actualizarGlobo();
+    clearTimeout(this.tLeidoG);
+    this.tLeidoG = setTimeout(() => { Nube.marcarGrupoLeido(g).catch(() => {}); }, 400);
+  }
+
+  /** Relee mis grupos (nombre, miembros, último mensaje, sin leer). */
+  cargarGrupos() {
+    clearTimeout(this.tGrupos);
+    this.tGrupos = setTimeout(async () => {
+      const uid = this.uid;
+      if (!uid) return;
+      try {
+        const lista = await Nube.misGrupos();
+        if (uid !== this.uid) return;
+        const s = this.state, abierto = s.tab === 'amigos' && document.visibilityState === 'visible' ? s.chatG : null;
+        this.setState({ gAmigos: lista.map(g => g.id === abierto ? { ...g, sinLeer: 0, sinLeerTexto: 0 } : g) });
+        // Salí del grupo (desde otro dispositivo): se cierra su chat.
+        if (s.chatG && !lista.some(g => g.id === s.chatG)) this.cerrarChat();
+        this.actualizarGlobo();
+        this.guardarCache();
+      } catch (e) {}
+    }, 250);
+  }
+
+  /** Relee las libreticas de grupo en las que estoy (y la que esté abierta). */
+  cargarLibsG() {
+    clearTimeout(this.tLibsG);
+    this.tLibsG = setTimeout(async () => {
+      const uid = this.uid;
+      if (!uid) return;
+      try {
+        const libsG = await Nube.libretasGrupo(null);
+        if (uid !== this.uid) return;
+        this.setState({ libsG });
+        const v = this.state.lgVer;
+        if (v && !libsG.some(l => l.id === v)) this.traerLibretaGrupo(v);
+        this.guardarCache();
+      } catch (e) {}
+    }, 250);
+  }
+
   async enviarMensaje() {
-    const s = this.state, otro = s.chatCon, me = this.uid;
+    const s = this.state, clave = this.hiloAbierto(), me = this.uid;
     const texto = (s.chatTexto || '').trim();
-    if (!otro || !me || !texto) return;
+    if (!clave || !me || !texto) return;
     if (texto.length > 2000) { if (window.Fluido) Fluido.aviso('El mensaje es muy largo (máximo 2000 letras)'); return; }
-    const m = { id: Nube.uuid(), de: me, para: otro, tipo: 'texto', texto, ref: null, datos: null, en: new Date().toISOString(), estado: 'enviando' };
+    const en = new Date().toISOString();
+    const m = s.chatG
+      ? { id: Nube.uuid(), g: s.chatG, de: me, deNombre: s.profile.nombre || '', tipo: 'texto', texto, ref: null, datos: null, en, estado: 'enviando' }
+      : { id: Nube.uuid(), de: me, para: s.chatCon, tipo: 'texto', texto, ref: null, datos: null, en, estado: 'enviando' };
     this.setState(st => {
-      const hilo = st.chatMsgs[otro] || { lista: [], hayMas: false, cargando: false, error: '' };
-      const prev = st.chats.find(c => c.otro === otro) || { sinLeer: 0, sinLeerTexto: 0 };
-      return {
-        chatTexto: '',
-        chatMsgs: { ...st.chatMsgs, [otro]: { ...hilo, lista: hilo.lista.concat([m]) } },
-        chats: [{ ...prev, otro, tipo: 'texto', texto, datos: null, de: me, en: m.en }].concat(st.chats.filter(c => c.otro !== otro)),
-      };
+      const hilo = st.chatMsgs[clave] || { lista: [], hayMas: false, cargando: false, error: '' };
+      const cambios = { chatTexto: '', chatMsgs: { ...st.chatMsgs, [clave]: { ...hilo, lista: hilo.lista.concat([m]) } } };
+      if (m.g) {
+        const prev = st.gAmigos.find(x => x.id === m.g);
+        if (prev) cambios.gAmigos = [{ ...prev, ult: { tipo: 'texto', texto, datos: null, de: me, deNombre: m.deNombre, en } }]
+          .concat(st.gAmigos.filter(x => x.id !== m.g));
+      } else {
+        const prev = st.chats.find(c => c.otro === m.para) || { sinLeer: 0, sinLeerTexto: 0 };
+        cambios.chats = [{ ...prev, otro: m.para, tipo: 'texto', texto, datos: null, de: me, en }].concat(st.chats.filter(c => c.otro !== m.para));
+      }
+      return cambios;
     });
     // Que el teclado siga abierto para escribir el siguiente.
     const entrada = document.querySelector('[data-chat-entrada]');
@@ -1382,26 +1567,28 @@ class Component extends DCLogic {
   }
 
   async subirMensaje(m) {
+    const clave = m.g ? 'g:' + m.g : m.para;
     try {
-      await Nube.enviarMensaje(this.uid, m.id, m.para, m.texto);
-      this.estadoMensaje(m.para, m.id, null);
+      if (m.g) await Nube.enviarMensajeGrupo(this.uid, m.id, m.g, m.texto);
+      else await Nube.enviarMensaje(this.uid, m.id, m.para, m.texto);
+      this.estadoMensaje(clave, m.id, null);
     } catch (e) {
-      this.estadoMensaje(m.para, m.id, 'error');
+      this.estadoMensaje(clave, m.id, 'error');
     }
   }
 
-  reintentarMensaje(otro, id) {
-    const h = this.state.chatMsgs[otro], m = h && h.lista.find(x => x.id === id);
+  reintentarMensaje(clave, id) {
+    const h = this.state.chatMsgs[clave], m = h && h.lista.find(x => x.id === id);
     if (!m || m.estado !== 'error') return;
-    this.estadoMensaje(otro, id, 'enviando');
+    this.estadoMensaje(clave, id, 'enviando');
     this.subirMensaje(m);
   }
 
-  estadoMensaje(otro, id, estado) {
+  estadoMensaje(clave, id, estado) {
     this.setState(st => {
-      const h = st.chatMsgs[otro];
+      const h = st.chatMsgs[clave];
       if (!h) return null;
-      return { chatMsgs: { ...st.chatMsgs, [otro]: { ...h, lista: h.lista.map(x => {
+      return { chatMsgs: { ...st.chatMsgs, [clave]: { ...h, lista: h.lista.map(x => {
         if (x.id !== id) return x;
         const y = { ...x };
         if (estado) y.estado = estado; else delete y.estado;
@@ -1429,7 +1616,7 @@ class Component extends DCLogic {
     const vv = window.visualViewport, el = document.querySelector('[data-chat]');
     if (!vv || !el || !window.Fluido) return;
     const teclado = window.innerHeight - vv.height;
-    if (this.state.chatCon && teclado > 120 && window.innerWidth < 560) {
+    if ((this.state.chatCon || this.state.chatG) && teclado > 120 && window.innerWidth < 560) {
       const cerca = this.chatAbajo();
       Fluido.fijar(el, { top: Math.round(vv.offsetTop) + 'px', height: Math.round(vv.height) + 'px', bottom: 'auto', '--pie': '8px' });
       this.tecladoAbierto = true;
@@ -1487,61 +1674,86 @@ class Component extends DCLogic {
       modal: { id: null, c: cuads[0] ? cuads[0].id : null, tipo: t0.nombre, urg: t0.urgencia, fecha: TODAY, asunto: [], tema: '', para: otro, por: null } });
   }
 
-  /** Lista de amigos y chats (pestaña Amigos). */
+  /** Lista de amigos, grupos y chats (pestaña Amigos). */
   valsAmigos(s) {
     const self = this, me = this.uid;
     const acept = s.amigos.filter(a => a.estado === 'aceptada');
     const porId = {};
     s.chats.forEach(c => { porId[c.otro] = c; });
-    const filas = acept.map(a => ({ a, c: porId[a.id] || null })).sort((x, y) => {
-      if (x.c && y.c) return x.c.en < y.c.en ? 1 : -1;
-      if (x.c || y.c) return x.c ? -1 : 1;
-      return String(x.a.nombre).localeCompare(String(y.a.nombre), 'es');
+    // Amigos y grupos juntos, del último mensaje al más viejo.
+    const filas = acept.map(a => {
+      const c = porId[a.id] || null;
+      return { en: c ? c.en : '', nombre: a.nombre, v: {
+        nombre: a.nombre, inicial: (a.nombre || '?').charAt(0).toUpperCase(), color: colorDe(a.id), radio: '50%', letra: '17px',
+        preview: c ? previewChat(c, me) : 'Toca para escribirle', sinLeer: c ? c.sinLeer : 0,
+        abrir: () => self.abrirChat(a.id),
+      } };
+    }).concat(s.gAmigos.map(g => ({ en: g.ult ? g.ult.en : (g.unido || ''), nombre: g.nombre, v: {
+      nombre: g.nombre, inicial: inicialesDe(g.nombre), color: colorDe(g.id), radio: '15px', letra: '15px',
+      preview: previewGrupo(g.ult, me), sinLeer: g.sinLeer,
+      abrir: () => self.abrirGrupo(g.id),
+    } }))).sort((x, y) => {
+      if (x.en && y.en) return x.en < y.en ? 1 : (x.en > y.en ? -1 : 0);
+      if (x.en || y.en) return x.en ? -1 : 1;
+      return String(x.nombre).localeCompare(String(y.nombre), 'es');
     });
-    const sinLeer = acept.reduce((t, a) => t + ((porId[a.id] || {}).sinLeer || 0), 0);
+    const sinLeer = acept.reduce((t, a) => t + ((porId[a.id] || {}).sinLeer || 0), 0) + s.gAmigos.reduce((t, g) => t + (g.sinLeer || 0), 0);
     const solicitudes = s.amigos.filter(a => a.estado === 'pendiente' && !a.yo);
     const esperando = s.amigos.filter(a => a.estado === 'pendiente' && a.yo);
+    const partes = [acept.length ? cuenta(acept.length, 'AMIGO', 'AMIGOS') : '', s.gAmigos.length ? cuenta(s.gAmigos.length, 'GRUPO', 'GRUPOS') : ''].filter(Boolean);
     return {
       amigosTabBadge: sinLeer + solicitudes.length,
-      amigosKicker: acept.length ? cuenta(acept.length, 'AMIGO', 'AMIGOS') + (sinLeer ? ' · ' + sinLeer + ' SIN LEER' : '') : 'CHATS',
+      amigosKicker: partes.length ? partes.join(' · ') + (sinLeer ? ' · ' + sinLeer + ' SIN LEER' : '') : 'CHATS',
       solicitudes: solicitudes.map(a => ({
         nombre: a.nombre, codigo: a.codigo, inicial: (a.nombre || '?').charAt(0).toUpperCase(), color: colorDe(a.id),
         aceptar: () => self.conexion('aceptar', a),
         rechazar: () => self.conexion('rechazar', a),
       })),
-      chatsList: filas.map(({ a, c }) => ({
-        nombre: a.nombre, inicial: (a.nombre || '?').charAt(0).toUpperCase(), color: colorDe(a.id),
-        preview: c ? previewChat(c, me) : 'Toca para escribirle',
-        previewColor: c && c.sinLeer ? '#EDF1F7' : '#8E9AAE',
-        previewPeso: c && c.sinLeer ? '600' : '500',
-        cuando: c ? cuandoChat(c.en) : '',
-        cuandoColor: c && c.sinLeer ? MINT : '#4A566B',
-        badgeOn: !!(c && c.sinLeer), badge: c ? (c.sinLeer > 99 ? '99+' : String(c.sinLeer)) : '',
-        abrir: () => self.abrirChat(a.id),
-      })),
+      chatsList: filas.map(f => {
+        const n = f.v.sinLeer || 0;
+        return Object.assign({}, f.v, {
+          previewColor: n ? '#EDF1F7' : '#8E9AAE', previewPeso: n ? '600' : '500',
+          cuando: f.en ? cuandoChat(f.en) : '', cuandoColor: n ? MINT : '#4A566B',
+          badgeOn: n > 0, badge: n > 99 ? '99+' : String(n),
+        });
+      }),
+      nuevoGrupoOn: acept.length > 0,
+      nuevoGrupo: () => self.hojaChat('grupoNuevo', { nombre: '', sel: [] }),
       hayEsperando: esperando.length > 0,
       esperando: esperando.map(a => ({ nombre: a.nombre, codigo: a.codigo, cancelar: () => self.conexion('quitar', a) })),
-      sinAmigos: !acept.length && !solicitudes.length && !esperando.length,
+      sinAmigos: !acept.length && !solicitudes.length && !esperando.length && !s.gAmigos.length,
       abrirAgregar: () => { self.setState({ amigoMsg: '' }); self.hojaChat('agregar'); },
     };
   }
 
-  /** Conversación abierta. */
+  /** Conversación abierta: con un amigo o con un grupo. */
   valsChat(s) {
-    const self = this, me = this.uid, otro = s.chatCon;
+    const self = this, me = this.uid;
     const enAmigos = s.tab === 'amigos';
-    const a = otro && s.amigos.find(x => x.id === otro && x.estado === 'aceptada');
-    if (!enAmigos || !a) return { chatOn: false, listaAmigosOn: enAmigos };
-    const quien = primerNombre(a.nombre);
-    const hilo = s.chatMsgs[otro] || { lista: [], hayMas: false, cargando: true, error: '' };
+    const g = s.chatG ? s.gAmigos.find(x => x.id === s.chatG) : null;
+    const a = !g && s.chatCon ? s.amigos.find(x => x.id === s.chatCon && x.estado === 'aceptada') : null;
+    if (!enAmigos || (!g && !a)) return { chatOn: false, listaAmigosOn: enAmigos };
+    const clave = this.hiloAbierto(s);
+    const hilo = s.chatMsgs[clave] || { lista: [], hayMas: false, cargando: true, error: '' };
+    // Libreticas de grupo que ya se borraron (el mismo chat lo cuenta).
+    const borradas = new Set(hilo.lista.filter(m => m.tipo === 'sistema' && m.datos && m.datos.accion === 'borrar_libreta').map(m => m.datos.libreta));
     const items = [];
     let diaPrev = '', dePrev = null;
     hilo.lista.forEach(m => {
       const dia = diaChat(m.en);
       if (dia !== diaPrev) { items.push({ esDia: true, dia }); diaPrev = dia; dePrev = null; }
+      if (m.tipo === 'sistema') {
+        const t = textoSistema(m, me);
+        if (t) items.push({ esSistema: true, texto: t });
+        dePrev = null;
+        return;
+      }
       const mio = m.de === me, seguido = dePrev === m.de;
       dePrev = m.de;
-      const base = { lado: mio ? 'flex-end' : 'flex-start', sep: seguido ? '2px' : '8px', hora: horaCorta(m.en) };
+      // En un grupo, el nombre de quien escribe va sobre el primero de sus mensajes seguidos.
+      const autorOn = !!g && !mio && !seguido;
+      const base = { lado: mio ? 'flex-end' : 'flex-start', sep: seguido ? '2px' : '8px', hora: horaCorta(m.en),
+                     autorOn, autor: autorOn ? primerNombre(m.deNombre || 'Alguien') : '', autorColor: colorDe(m.de || '') };
       if (m.tipo === 'texto') {
         items.push(Object.assign(base, {
           esTexto: true, texto: m.texto,
@@ -1549,19 +1761,17 @@ class Component extends DCLogic {
           radio: mio ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
           pie: m.estado === 'enviando' ? 'Enviando…' : (m.estado === 'error' ? 'No se envió · toca para reintentar' : base.hora),
           pieColor: m.estado === 'error' ? '#E08A87' : '#6B778C',
-          tocar: m.estado === 'error' ? () => self.reintentarMensaje(otro, m.id) : () => {},
+          tocar: m.estado === 'error' ? () => self.reintentarMensaje(clave, m.id) : () => {},
         }));
         return;
       }
-      items.push(Object.assign(base, { esTarjeta: true }, self.tarjetaChat(m, mio, a, s)));
+      items.push(Object.assign(base, { esTarjeta: true }, g ? self.tarjetaGrupo(m, mio, s, borradas) : self.tarjetaChat(m, mio, a, s)));
     });
     const listo = !!(s.chatTexto || '').trim();
-    return {
+    const comun = {
       chatOn: true, listaAmigosOn: false,
-      chatNombre: a.nombre, chatInicial: (a.nombre || '?').charAt(0).toUpperCase(), chatColor: colorDe(a.id),
       chatItems: items,
-      chatVacio: !hilo.cargando && !hilo.error && !hilo.lista.length,
-      chatVacioTxt: 'Escríbele a ' + quien + ', o envíale una rutina, una libretica o una actividad con el +.',
+      chatVacio: !hilo.cargando && !hilo.error && !hilo.lista.some(m => m.tipo !== 'sistema'),
       chatCargando: !!hilo.cargando && !hilo.lista.length,
       chatError: hilo.error || '',
       chatHayMas: !!hilo.hayMas,
@@ -1572,10 +1782,28 @@ class Component extends DCLogic {
       chatEnviar: () => self.enviarMensaje(),
       chatEnviarBg: listo ? MINT : 'rgba(255,255,255,.08)',
       chatEnviarFg: listo ? '#0A0E1A' : '#6B778C',
-      chatAdjuntar: () => self.hojaChat('adjuntar'),
       chatVolver: () => self.cerrarChat(),
-      chatOpciones: () => self.hojaChat('opciones'),
     };
+    if (g) {
+      const otros = g.miembros.filter(x => x.id !== me);
+      return Object.assign(comun, {
+        chatNombre: g.nombre, chatInicial: inicialesDe(g.nombre), chatColor: colorDe(g.id), chatRadio: '9px', chatLetra: '11px',
+        chatSubOn: true,
+        chatSub: otros.length ? listaNombres(otros.map(x => primerNombre(x.nombre)).concat(['tú'])) : 'Solo tú en el grupo',
+        chatVacioTxt: 'Escríbanse aquí. Con el + repartes una cuenta entre los del grupo.',
+        chatAdjuntarTxt: 'Libretica de grupo',
+        chatAdjuntar: () => self.hojaChat('grupoLibreta', { total: '', nota: '', partes: {} }),
+        chatOpciones: () => self.hojaChat('grupoOpciones', { nombre: g.nombre }),
+      });
+    }
+    return Object.assign(comun, {
+      chatNombre: a.nombre, chatInicial: (a.nombre || '?').charAt(0).toUpperCase(), chatColor: colorDe(a.id), chatRadio: '50%', chatLetra: '13px',
+      chatSubOn: false, chatSub: '',
+      chatVacioTxt: 'Escríbele a ' + primerNombre(a.nombre) + ', o envíale una rutina, una libretica o una actividad con el +.',
+      chatAdjuntarTxt: 'Enviar rutina, libretica o actividad',
+      chatAdjuntar: () => self.hojaChat('adjuntar'),
+      chatOpciones: () => self.hojaChat('opciones'),
+    });
   }
 
   /** Tarjeta de una libretica, actividad o rutina dentro del chat. */
@@ -1621,22 +1849,68 @@ class Component extends DCLogic {
     };
   }
 
+  /** Tarjeta de una libretica de grupo: quien la creó ve lo que le deben;
+   *  quien debe, su parte; los demás del grupo, quiénes consumieron. */
+  tarjetaGrupo(m, mio, s, borradas) {
+    const self = this, me = this.uid, d = m.datos || {}, nada = () => {};
+    if (m.tipo !== 'libreta') {
+      return { kicker: 'ACTIVIDAD', color: AMBER, borde: 'rgba(206,127,85,.3)', titulo: 'Actividad', sub: '', extra: '', accion: '', tocar: nada };
+    }
+    const partes = Array.isArray(d.partes) ? d.partes : [];
+    const mia = partes.find(p => p.id === me);
+    const l = this.libretaGrupoVista(m.ref, s);
+    const borrada = borradas.has(m.ref) || l === null;
+    const pMia = l && mia ? l.partes.find(p => p.id === me) : null;
+    const nombres = listaNombres(partes.map(p => p.id === me ? 'tú' : primerNombre(p.nombre)));
+    let extra;
+    if (borrada) extra = 'Se borró';
+    else if (mio) {
+      if (l) {
+        const falta = l.partes.reduce((t, p) => t + saldoParte(p), 0), pagaron = l.partes.filter(p => p.pagado).length;
+        extra = falta ? 'Te falta cobrar ' + pesosTxt(falta) + ' · ' + pagaron + ' de ' + l.partes.length + ' pagaron' : 'Todos pagaron ✓';
+      } else extra = 'Entre ' + nombres;
+    } else if (mia) {
+      extra = 'Te toca ' + pesosTxt(mia.monto) +
+        (pMia ? (pMia.pagado ? ' · pagada ✓' : (saldoParte(pMia) < pMia.monto ? ' · te falta ' + pesosTxt(saldoParte(pMia)) : '')) : '');
+    } else extra = 'Entre ' + nombres;
+    const pagaste = !!(pMia && pMia.pagado), debo = !!mia && !pagaste;
+    const color = borrada ? GREY : (mio || pagaste ? MINT : (debo ? RED : '#9AA6BA'));
+    return {
+      kicker: 'LIBRETICA DE GRUPO' + (borrada ? '' : (mio ? ' · TE DEBEN' : (pagaste ? ' · PAGASTE' : (debo ? ' · TE TOCA' : '')))),
+      color,
+      borde: borrada ? 'rgba(255,255,255,.08)' : (mio || pagaste ? 'rgba(87,185,160,.32)' : (debo ? 'rgba(196,100,97,.3)' : 'rgba(255,255,255,.1)')),
+      titulo: pesosTxt(d.total), sub: d.nota || '', extra,
+      accion: borrada ? '' : (mia && !(pMia && pMia.pagado) ? 'Ver y pagar ›' : 'Ver detalle ›'),
+      tocar: borrada ? nada : () => self.abrirLibretaGrupo(m.ref),
+    };
+  }
+
   /** Hoja del chat. */
   valsChatHoja(s) {
-    const self = this, h = s.chatHoja;
+    const self = this, h = s.chatHoja, me = this.uid;
     if (!h) return { chatHojaOn: false };
     const a = s.chatCon ? s.amigos.find(x => x.id === s.chatCon) : null;
+    const g = s.chatG ? s.gAmigos.find(x => x.id === s.chatG) : null;
     const quien = a ? primerNombre(a.nombre) : '';
     const chip = on => ({ bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE' });
     const volver = () => self.hojaChat('adjuntar');
+    const sub = h.vista === 'rutina' || h.vista === 'libreta';
+    const cta = (on, txt) => ({ bg: on ? MINT : 'rgba(87,185,160,.14)', fg: on ? '#0A0E1A' : 'rgba(87,185,160,.55)', txt });
     const base = {
       chatHojaOn: true, cerrarChatHoja: () => self.cerrarHoja('chat'),
       hjAdjuntar: h.vista === 'adjuntar', hjRutina: h.vista === 'rutina', hjLibreta: h.vista === 'libreta',
       hjOpciones: h.vista === 'opciones', hjAgregar: h.vista === 'agregar',
-      hjKicker: h.vista === 'rutina' || h.vista === 'libreta' ? '‹ ENVIAR A ' + quien.toUpperCase() : (h.vista === 'agregar' ? 'AMIGOS' : (h.vista === 'opciones' ? 'CHAT' : 'ENVIAR A ' + quien.toUpperCase())),
-      hjKickerColor: h.vista === 'rutina' || h.vista === 'libreta' ? AMBER : '#8E9AAE',
-      hjVolver: h.vista === 'rutina' || h.vista === 'libreta' ? volver : () => {},
-      hjTitulo: { adjuntar: 'Adjuntar', rutina: 'Rutina', libreta: 'Libretica', opciones: a ? a.nombre : 'Amigo', agregar: 'Agregar amigo' }[h.vista] || '',
+      hjGrupoNuevo: h.vista === 'grupoNuevo', hjGrupoOpc: h.vista === 'grupoOpciones', hjGrupoLib: h.vista === 'grupoLibreta',
+      hjKicker: {
+        adjuntar: 'ENVIAR A ' + quien.toUpperCase(), rutina: '‹ ENVIAR A ' + quien.toUpperCase(), libreta: '‹ ENVIAR A ' + quien.toUpperCase(),
+        opciones: 'CHAT', agregar: 'AMIGOS', grupoNuevo: 'AMIGOS', grupoOpciones: 'GRUPO', grupoLibreta: 'ENVIAR AL GRUPO',
+      }[h.vista] || '',
+      hjKickerColor: sub ? AMBER : '#8E9AAE',
+      hjVolver: sub ? volver : () => {},
+      hjTitulo: {
+        adjuntar: 'Adjuntar', rutina: 'Rutina', libreta: 'Libretica', opciones: a ? a.nombre : 'Amigo', agregar: 'Agregar amigo',
+        grupoNuevo: 'Nuevo grupo', grupoOpciones: g ? g.nombre : 'Grupo', grupoLibreta: 'Libretica de grupo',
+      }[h.vista] || '',
       hjMsg: h.msg || '',
     };
     if (h.vista === 'adjuntar') {
@@ -1649,9 +1923,9 @@ class Component extends DCLogic {
       });
     }
     if (h.vista === 'rutina') {
-      const enSemana = s.grupos.filter(g => s.plan.includes(g.id));
+      const enSemana = s.grupos.filter(gr => s.plan.includes(gr.id));
       const filas = [{ gid: null, titulo: 'Tu semana completa', meta: cuenta(enSemana.length, 'grupo', 'grupos') + ' y tus días de descanso', color: MINT }]
-        .concat(s.grupos.map(g => ({ gid: g.id, titulo: g.nombre || 'Sin nombre', meta: cuenta(g.ejercicios.length, 'ejercicio', 'ejercicios'), color: g.color })));
+        .concat(s.grupos.map(gr => ({ gid: gr.id, titulo: gr.nombre || 'Sin nombre', meta: cuenta(gr.ejercicios.length, 'ejercicio', 'ejercicios'), color: gr.color })));
       return Object.assign(base, {
         hjRutinas: filas.map(f => {
           const clave = f.gid || 'semana', enviando = h.enviando === clave;
@@ -1661,7 +1935,7 @@ class Component extends DCLogic {
       });
     }
     if (h.vista === 'libreta') {
-      const monto = String(h.monto || '').replace(/\D/g, ''), listo = +monto > 0;
+      const monto = String(h.monto || '').replace(/\D/g, ''), listo = +monto > 0, c = cta(listo);
       return Object.assign(base, {
         hjDireccion: [['Me debe', true], ['Le debo', false]].map(([t2, v]) => Object.assign({
           t: t2, pick: () => self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, meDebe: v, msg: '' } } : null),
@@ -1671,7 +1945,7 @@ class Component extends DCLogic {
         hjNota: h.nota || '',
         onHjNota: ev => { const v = ev.target.value; self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, nota: v } } : null); },
         hjLibColor: h.meDebe ? MINT : RED,
-        hjEnviarBg: listo ? MINT : 'rgba(87,185,160,.14)', hjEnviarFg: listo ? '#0A0E1A' : 'rgba(87,185,160,.55)',
+        hjEnviarBg: c.bg, hjEnviarFg: c.fg,
         hjEnviarTxt: 'Enviar a ' + quien,
         hjEnviar: () => self.crearLibretaChat(),
         hjLibNota: listo
@@ -1690,7 +1964,372 @@ class Component extends DCLogic {
         },
       });
     }
+    if (h.vista === 'grupoNuevo') {
+      const sel = h.sel || [], nombre = String(h.nombre || '').trim();
+      const amigos = s.amigos.filter(x => x.estado === 'aceptada').slice().sort((x, y) => String(x.nombre).localeCompare(String(y.nombre), 'es'));
+      const elegidos = amigos.filter(x => sel.includes(x.id)), listo = !!nombre && sel.length > 0 && !h.enviando, c = cta(listo);
+      return Object.assign(base, {
+        hjGNombre: h.nombre || '',
+        onHjGNombre: ev => { const v = ev.target.value; self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, nombre: v, msg: '' } } : null); },
+        hjGAmigos: amigos.map(x => {
+          const on = sel.includes(x.id);
+          return {
+            nombre: x.nombre, inicial: (x.nombre || '?').charAt(0).toUpperCase(), color: colorDe(x.id),
+            marca: on ? MINT : 'transparent', marcaBorde: on ? MINT : 'rgba(255,255,255,.2)', tick: on ? '#0A0E1A' : 'transparent',
+            pick: () => self.setState(st => {
+              const hh = st.chatHoja;
+              if (!hh) return null;
+              const ss = hh.sel || [];
+              return { chatHoja: { ...hh, msg: '', sel: ss.includes(x.id) ? ss.filter(y => y !== x.id) : ss.concat([x.id]) } };
+            }),
+          };
+        }),
+        hjGCrear: () => self.crearGrupoNuevo(),
+        hjGCrearTxt: h.enviando ? 'Creando…' : 'Crear grupo', hjGCrearBg: c.bg, hjGCrearFg: c.fg,
+        hjGNota: elegidos.length
+          ? 'Con ' + listaNombres(elegidos.map(x => primerNombre(x.nombre)).concat(['tú'])) + '. Después cualquiera del grupo puede agregar a sus amigos.'
+          : 'Elige al menos un amigo. Después cualquiera del grupo puede agregar a sus amigos.',
+      });
+    }
+    if (h.vista === 'grupoOpciones') {
+      if (!g) return base;
+      const enGrupo = new Set(g.miembros.map(x => x.id));
+      const agregables = s.amigos.filter(x => x.estado === 'aceptada' && !enGrupo.has(x.id))
+        .sort((x, y) => String(x.nombre).localeCompare(String(y.nombre), 'es'));
+      const nombre = String(h.nombre || '').trim().replace(/\s+/g, ' ');
+      const cambiaNombre = !!nombre && nombre !== g.nombre;
+      const miembros = g.miembros.slice().sort((x, y) => (x.id === me ? -1 : (y.id === me ? 1 : 0)));
+      return Object.assign(base, {
+        hjGONombre: h.nombre || '',
+        onHjGONombre: ev => { const v = ev.target.value; self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, nombre: v, msg: '' } } : null); },
+        hjGOGuardarOn: cambiaNombre,
+        hjGOGuardarTxt: h.enviando === 'nombre' ? 'Guardando…' : 'Guardar',
+        hjGOGuardar: () => self.renombrarGrupoActual(),
+        hjGOCuantos: cuenta(g.miembros.length, 'PERSONA', 'PERSONAS'),
+        hjGOMiembros: miembros.map(x => ({
+          nombre: x.id === me ? 'Tú' : x.nombre, inicial: (x.nombre || '?').charAt(0).toUpperCase(), color: colorDe(x.id),
+          meta: x.unido ? 'Desde el ' + self.fechaTxt(isoOf(new Date(x.unido))).toLowerCase() : '',
+        })),
+        hjGOAgregarOn: agregables.length > 0,
+        hjGOAgregables: agregables.map(x => ({
+          nombre: x.nombre, inicial: (x.nombre || '?').charAt(0).toUpperCase(), color: colorDe(x.id),
+          accion: h.enviando === x.id ? 'Agregando…' : 'Agregar',
+          agregar: () => self.agregarAlGrupo(x.id),
+        })),
+        hjGOSalir: () => self.salirDelGrupo(),
+      });
+    }
+    if (h.vista === 'grupoLibreta') {
+      if (!g) return base;
+      const otros = g.miembros.filter(x => x.id !== me);
+      const partes = h.partes || {}, elegidos = otros.filter(x => partes[x.id] !== undefined);
+      const total = +String(h.total || '').replace(/\D/g, '') || 0;
+      const suma = elegidos.reduce((t, x) => t + (+partes[x.id] || 0), 0);
+      const sinMonto = elegidos.find(x => !(+partes[x.id] > 0));
+      let estado, estadoColor;
+      if (!total) { estado = 'Escribe el total y elige quiénes consumieron.'; estadoColor = '#8E9AAE'; }
+      else if (!elegidos.length) { estado = 'Elige quiénes consumieron.'; estadoColor = '#8E9AAE'; }
+      else if (suma > total) { estado = 'Te pasaste por ' + pesosTxt(suma - total) + ': la suma no puede ser mayor que el total.'; estadoColor = '#E08A87'; }
+      else if (sinMonto) { estado = 'Falta cuánto le toca a ' + primerNombre(sinMonto.nombre) + '.'; estadoColor = AMBER; }
+      else if (suma < total) { estado = 'Repartido ' + pesosTxt(suma) + ' de ' + pesosTxt(total) + ' · faltan ' + pesosTxt(total - suma); estadoColor = AMBER; }
+      else { estado = 'Cuadra exacto ✓'; estadoColor = MINT; }
+      const listo = total > 0 && elegidos.length > 0 && !sinMonto && suma === total && !h.enviando, c = cta(listo);
+      const iguales = total > 0 && elegidos.length > 0;
+      return Object.assign(base, {
+        hjLGTotal: fmtMoney(String(total || '')),
+        onHjLGTotal: ev => { const v = ev.target.value.replace(/\D/g, '').slice(0, 12); self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, total: v, msg: '' } } : null); },
+        hjLGNota: h.nota || '',
+        onHjLGNota: ev => { const v = ev.target.value; self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, nota: v } } : null); },
+        hjLGPersonas: otros.map(x => {
+          const on = partes[x.id] !== undefined;
+          return {
+            nombre: x.nombre, inicial: (x.nombre || '?').charAt(0).toUpperCase(), color: colorDe(x.id), on,
+            marca: on ? MINT : 'transparent', marcaBorde: on ? MINT : 'rgba(255,255,255,.2)', tick: on ? '#0A0E1A' : 'transparent',
+            monto: on ? fmtMoney(partes[x.id]) : '',
+            pick: () => self.setState(st => {
+              const hh = st.chatHoja;
+              if (!hh) return null;
+              const pp = { ...(hh.partes || {}) };
+              if (pp[x.id] !== undefined) delete pp[x.id]; else pp[x.id] = '';
+              return { chatHoja: { ...hh, partes: pp, msg: '' } };
+            }),
+            onMonto: ev => {
+              const v = ev.target.value.replace(/\D/g, '').slice(0, 12);
+              self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, partes: { ...(st.chatHoja.partes || {}), [x.id]: v }, msg: '' } } : null);
+            },
+          };
+        }),
+        hjLGSinOtros: !otros.length,
+        hjLGIgualesOn: iguales,
+        hjLGIgualesBg: iguales ? 'rgba(87,185,160,.12)' : 'rgba(255,255,255,.04)',
+        hjLGIgualesFg: iguales ? MINT : '#6B778C',
+        hjLGIgualesBorde: iguales ? 'rgba(87,185,160,.34)' : 'rgba(255,255,255,.08)',
+        hjLGIguales: () => self.partesIguales(),
+        hjLGEstado: estado, hjLGEstadoColor: estadoColor,
+        hjLGEnviar: () => self.crearLibretaGrupoChat(),
+        hjLGEnviarTxt: h.enviando ? 'Enviando…' : 'Enviar al grupo', hjLGEnviarBg: c.bg, hjLGEnviarFg: c.fg,
+      });
+    }
     return base; // agregar: usa los valores de siempre (código, campo y mensaje)
+  }
+
+  /* ── Grupos: crear, renombrar, agregar, salir ────────────────────── */
+
+  msgHoja(msg) { this.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, msg } } : null); }
+  hojaEnviando(v) { this.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, enviando: v, msg: '' } } : null); }
+  errorHoja(e, txt) { this.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, enviando: null, msg: (e && e.message) || txt } } : null); }
+
+  async crearGrupoNuevo() {
+    const h = this.state.chatHoja;
+    if (!h || h.vista !== 'grupoNuevo' || h.enviando) return;
+    const nombre = String(h.nombre || '').trim().replace(/\s+/g, ' ');
+    if (!nombre) return this.msgHoja('Escribe un nombre para el grupo.');
+    if (nombre.length > 40) return this.msgHoja('El nombre puede tener hasta 40 letras.');
+    if (!(h.sel || []).length) return this.msgHoja('Elige al menos un amigo.');
+    this.hojaEnviando(true);
+    try {
+      const id = await Nube.crearGrupo(nombre, h.sel);
+      const lista = await Nube.misGrupos();
+      this.setState({ gAmigos: lista });
+      if (window.Fluido) await Fluido.animarSalida('chat');
+      this.abrirGrupo(id);
+      this.guardarCache();
+    } catch (e) {
+      this.errorHoja(e, 'No se pudo crear el grupo.');
+    }
+  }
+
+  async renombrarGrupoActual() {
+    const s = this.state, h = s.chatHoja, g = s.gAmigos.find(x => x.id === s.chatG);
+    if (!h || !g || h.enviando) return;
+    const nombre = String(h.nombre || '').trim().replace(/\s+/g, ' ');
+    if (!nombre) return this.msgHoja('Escribe un nombre para el grupo.');
+    if (nombre.length > 40) return this.msgHoja('El nombre puede tener hasta 40 letras.');
+    if (nombre === g.nombre) return;
+    this.hojaEnviando('nombre');
+    try {
+      await Nube.renombrarGrupo(g.id, nombre);
+      this.setState(st => ({
+        gAmigos: st.gAmigos.map(x => x.id === g.id ? { ...x, nombre } : x),
+        chatHoja: st.chatHoja ? { ...st.chatHoja, enviando: null, nombre, msg: '' } : null,
+      }));
+      if (window.Fluido) Fluido.aviso('El grupo ahora se llama «' + nombre + '»');
+    } catch (e) {
+      this.errorHoja(e, 'No se pudo cambiar el nombre.');
+    }
+  }
+
+  async agregarAlGrupo(id) {
+    const s = this.state, h = s.chatHoja, g = s.gAmigos.find(x => x.id === s.chatG);
+    if (!h || !g || h.enviando) return;
+    const a = s.amigos.find(x => x.id === id);
+    this.hojaEnviando(id);
+    try {
+      await Nube.agregarAGrupo(g.id, [id]);
+      const lista = await Nube.misGrupos();
+      this.setState(st => ({ gAmigos: lista, chatHoja: st.chatHoja ? { ...st.chatHoja, enviando: null, msg: '' } : null }));
+      if (window.Fluido) Fluido.aviso(primerNombre(a ? a.nombre : '') + ' ahora está en el grupo');
+    } catch (e) {
+      this.errorHoja(e, 'No se pudo agregar.');
+    }
+  }
+
+  async salirDelGrupo() {
+    const s = this.state, g = s.gAmigos.find(x => x.id === s.chatG);
+    if (!g || (s.chatHoja && s.chatHoja.enviando)) return;
+    if (!window.confirm('¿Salir de «' + g.nombre + '»? Dejarás de ver sus mensajes. Lo que debas o te deban en sus libreticas se conserva en Finanzas.')) return;
+    this.hojaEnviando('salir');
+    try {
+      await Nube.salirDeGrupo(g.id);
+      if (window.Fluido) await Fluido.animarSalida('chat');
+      this.cerrarChat();
+      this.setState(st => ({ gAmigos: st.gAmigos.filter(x => x.id !== g.id) }));
+      this.actualizarGlobo();
+      this.guardarCache();
+      if (window.Fluido) Fluido.aviso('Saliste de «' + g.nombre + '»');
+    } catch (e) {
+      this.errorHoja(e, 'No se pudo salir del grupo.');
+    }
+  }
+
+  /* ── Libreticas de grupo ─────────────────────────────────────────── */
+
+  /** "Partes iguales": reparte el total entre los elegidos; los pesos que
+   *  sobran de la división van de a uno a los primeros, para que cuadre exacto. */
+  partesIguales() {
+    const s = this.state, h = s.chatHoja, g = s.gAmigos.find(x => x.id === s.chatG), me = this.uid;
+    if (!h || !g) return;
+    const total = +String(h.total || '').replace(/\D/g, '') || 0;
+    const ids = g.miembros.filter(x => x.id !== me && (h.partes || {})[x.id] !== undefined).map(x => x.id);
+    if (!total || !ids.length) return;
+    const base = Math.floor(total / ids.length), resto = total - base * ids.length;
+    const partes = {};
+    ids.forEach((id, i) => { partes[id] = String(base + (i < resto ? 1 : 0)); });
+    this.setState({ chatHoja: { ...h, partes, msg: '' } });
+  }
+
+  async crearLibretaGrupoChat() {
+    const s = this.state, h = s.chatHoja, g = s.gAmigos.find(x => x.id === s.chatG), me = this.uid;
+    if (!h || !g || h.enviando) return;
+    const total = +String(h.total || '').replace(/\D/g, '') || 0;
+    const partes = g.miembros.filter(x => x.id !== me && (h.partes || {})[x.id] !== undefined)
+      .map(x => ({ id: x.id, monto: +String(h.partes[x.id] || '').replace(/\D/g, '') || 0 }));
+    const suma = partes.reduce((t, p) => t + p.monto, 0);
+    if (!total) return this.msgHoja('Escribe el total.');
+    if (!partes.length) return this.msgHoja('Elige quiénes consumieron.');
+    if (partes.some(p => !(p.monto > 0))) return this.msgHoja('A cada persona elegida le toca un monto mayor que 0.');
+    if (suma !== total) return this.msgHoja(suma > total ? 'La suma no puede ser mayor que el total.' : 'Aún falta repartir ' + pesosTxt(total - suma) + '.');
+    this.hojaEnviando(true);
+    try {
+      await Nube.crearLibretaGrupo(g.id, total, String(h.nota || '').trim().slice(0, 80), partes);
+      this.setState({ libsG: await Nube.libretasGrupo(null) });
+      this.guardarCache();
+      if (window.Fluido) await Fluido.animarSalida('chat');
+      this.setState({ chatHoja: null });
+      this.bajarChat(true);
+      if (window.Fluido) Fluido.aviso('Libretica enviada al grupo');
+    } catch (e) {
+      this.errorHoja(e, 'No se pudo enviar.');
+    }
+  }
+
+  /** undefined: aún no la conozco; null: ya no existe (o no la puedo ver). */
+  libretaGrupoVista(id, s) {
+    s = s || this.state;
+    const mia = s.libsG.find(l => l.id === id);
+    return mia || s.lgExtra[id];
+  }
+
+  abrirLibretaGrupo(id) {
+    this.setState({ lgVer: id, lgAbono: '', lgMsg: '', lgBusy: false });
+    if (!this.state.libsG.some(l => l.id === id)) this.traerLibretaGrupo(id);
+  }
+
+  async traerLibretaGrupo(id) {
+    try {
+      const r = await Nube.libretasGrupo([id]);
+      this.setState(st => ({ lgExtra: { ...st.lgExtra, [id]: r[0] || null } }));
+    } catch (e) {
+      if (this.state.lgVer === id) this.setState({ lgMsg: navigator.onLine === false ? 'Sin conexión: no se pudo cargar.' : 'No se pudo cargar.' });
+    }
+  }
+
+  /** Solo quien debe registra lo que paga; nunca más de lo que le falta. */
+  async abonarLG(todo) {
+    const s = this.state, me = this.uid, l = this.libretaGrupoVista(s.lgVer);
+    if (!l || s.lgBusy) return;
+    const p = l.partes.find(x => x.id === me);
+    if (!p) return;
+    const saldo = saldoParte(p);
+    const monto = todo ? saldo : (+String(s.lgAbono || '').replace(/\D/g, '') || 0);
+    if (!(monto > 0)) { this.setState({ lgMsg: 'Escribe cuánto pagaste.' }); return; }
+    if (monto > saldo) { this.setState({ lgMsg: 'Es más de lo que te falta (' + pesosTxt(saldo) + ').' }); return; }
+    this.setState({ lgBusy: true, lgMsg: '' });
+    try {
+      const queda = +(await Nube.abonarLibretaGrupo(l.id, monto));
+      const libsG = await Nube.libretasGrupo(null);
+      this.setState({ libsG, lgBusy: false, lgAbono: '' });
+      this.guardarCache();
+      if (window.Fluido) Fluido.aviso(queda <= 0 ? 'Pagaste tu parte ✓' : 'Abono registrado · te falta ' + pesosTxt(queda));
+    } catch (e) {
+      this.setState({ lgBusy: false, lgMsg: e.message || 'No se pudo registrar.' });
+    }
+  }
+
+  async borrarAbonoLG(a) {
+    const s = this.state, l = this.libretaGrupoVista(s.lgVer);
+    if (!l || s.lgBusy) return;
+    if (!window.confirm('¿Borrar tu abono de ' + pesosTxt(a.monto) + '? ' + primerNombre(l.creadorNombre) + ' se enterará.')) return;
+    this.setState({ lgBusy: true, lgMsg: '' });
+    try {
+      await Nube.borrarAbonoGrupo(a.id);
+      const libsG = await Nube.libretasGrupo(null);
+      this.setState({ libsG, lgBusy: false });
+      this.guardarCache();
+      if (window.Fluido) Fluido.aviso('Abono borrado');
+    } catch (e) {
+      this.setState({ lgBusy: false, lgMsg: e.message || 'No se pudo borrar.' });
+    }
+  }
+
+  async borrarLG() {
+    const s = this.state, l = this.libretaGrupoVista(s.lgVer);
+    if (!l || s.lgBusy || l.creador !== this.uid) return;
+    if (!window.confirm('¿Borrar la libretica de ' + pesosTxt(l.total) + (l.nota ? ' «' + l.nota + '»' : '') + '? Desaparece para todos y quienes aún deben se enterarán.')) return;
+    this.setState({ lgBusy: true, lgMsg: '' });
+    try {
+      await Nube.borrarLibretaGrupo(l.id);
+      if (window.Fluido) await Fluido.animarSalida('lg');
+      this.setState(st => ({ libsG: st.libsG.filter(x => x.id !== l.id), lgExtra: { ...st.lgExtra, [l.id]: null },
+                             lgVer: null, lgBusy: false, lgAbono: '', lgMsg: '' }));
+      this.guardarCache();
+      if (window.Fluido) Fluido.aviso('Libretica borrada');
+    } catch (e) {
+      this.setState({ lgBusy: false, lgMsg: e.message || 'No se pudo borrar.' });
+    }
+  }
+
+  /** Hoja con el detalle de una libretica de grupo: todos ven todo. */
+  valsLG(s) {
+    const self = this, me = this.uid, id = s.lgVer;
+    if (!id) return { lgOn: false };
+    const l = this.libretaGrupoVista(id, s);
+    const base = { lgOn: true, lgCerrar: () => self.cerrarHoja('lg'), lgMsg: s.lgMsg || '' };
+    if (!l) {
+      return Object.assign(base, {
+        lgListo: false, lgKicker: 'LIBRETICA DE GRUPO', lgTitulo: l === null ? 'Ya no existe' : 'Cargando…',
+        lgVacio: l === null ? 'Quien la creó la borró.' : '',
+      });
+    }
+    const soyCreador = l.creador === me, mia = l.partes.find(p => p.id === me);
+    const falta = l.partes.reduce((t, p) => t + saldoParte(p), 0), pagado = l.total - falta;
+    const pagaron = l.partes.filter(p => saldoParte(p) <= 0).length;
+    const miSaldo = mia ? saldoParte(mia) : 0;
+    const orden = l.partes.slice().sort((x, y) => (x.id === me ? -1 : (y.id === me ? 1 : 0)));
+    const creador = soyCreador ? 'tú' : primerNombre(l.creadorNombre);
+    return Object.assign(base, {
+      lgListo: true,
+      lgKicker: 'LIBRETICA DE GRUPO · ' + String(l.grupoNombre).toUpperCase(),
+      lgTitulo: l.nota || 'Libretica de grupo',
+      lgTotal: pesosTxt(l.total),
+      lgMeta: (soyCreador ? 'La creaste tú' : 'La creó ' + creador) + ' · ' + self.fechaTxt(isoOf(new Date(l.en))).toLowerCase() + ' · ' + cuenta(l.partes.length, 'persona', 'personas'),
+      lgResumen: falta ? 'Pagado ' + pesosTxt(pagado) + ' de ' + pesosTxt(l.total) + ' · ' + pagaron + ' de ' + l.partes.length + ' pagaron' : 'Todos pagaron ✓',
+      lgResumenColor: falta ? '#B8C2D2' : MINT,
+      lgBarW: Math.round(pagado / Math.max(1, l.total) * 100) + '%',
+      lgPartes: orden.map(p => {
+        const saldo = saldoParte(p), abonado = p.monto - saldo, yo = p.id === me;
+        let estado;
+        if (saldo <= 0) estado = yo ? 'Pagaste ✓' : 'Pagó ✓';
+        else if (abonado > 0) estado = (yo ? 'Abonaste ' : 'Abonó ') + pesosTxt(abonado) + ' · ' + (yo ? 'te falta ' : 'debe ') + pesosTxt(saldo);
+        else estado = yo ? 'Te falta todo' : 'Debe todo';
+        return {
+          nombre: yo ? 'Tú' : p.nombre, inicial: (p.nombre || '?').charAt(0).toUpperCase(), color: colorDe(p.id),
+          monto: pesosTxt(p.monto), estado,
+          estadoColor: saldo <= 0 ? MINT : (abonado > 0 ? AMBER : '#8E9AAE'),
+          barW: Math.round(abonado / Math.max(1, p.monto) * 100) + '%', barColor: saldo <= 0 ? MINT : AMBER,
+          fondo: yo ? 'rgba(255,255,255,.045)' : 'rgba(255,255,255,.02)',
+          abonosOn: yo && p.abonos.length > 0,
+          abonos: yo ? p.abonos.map(a => ({
+            txt: pesosTxt(a.monto), meta: self.fechaTxt(isoOf(new Date(a.en))).toUpperCase(),
+            borrar: () => self.borrarAbonoLG(a),
+          })) : [],
+        };
+      }),
+      lgPagarOn: !!mia && miSaldo > 0,
+      lgAbono: fmtMoney(s.lgAbono),
+      onLgAbono: ev => { const v = ev.target.value.replace(/\D/g, '').slice(0, 12); self.setState({ lgAbono: v, lgMsg: '' }); },
+      lgAbonar: () => self.abonarLG(false),
+      lgAbonarTxt: s.lgBusy ? '…' : 'Abonar',
+      lgPagarTodo: () => self.abonarLG(true),
+      lgPagarTodoTxt: s.lgBusy ? 'Registrando…' : 'Pagar lo que falta · ' + pesosTxt(miSaldo),
+      lgBorrarOn: soyCreador,
+      lgBorrar: () => self.borrarLG(),
+      lgNota: soyCreador
+        ? 'Cada persona registra lo que te paga y te llega un aviso. Cuando todos paguen, queda saldada.'
+        : (mia ? 'Solo tú registras lo que pagas; ' + creador + ' recibe un aviso con cada abono.' : 'Cada persona registra lo que paga.'),
+      lgIrChatOn: s.gAmigos.some(x => x.id === l.grupo) && !(s.tab === 'amigos' && s.chatG === l.grupo),
+      lgIrChat: () => { self.cerrarHoja('lg', true); self.abrirGrupo(l.grupo); },
+    });
   }
 
   /* ── Libreticas: enviar al amigo ─────────────────────────────────── */
@@ -2285,8 +2924,38 @@ class Component extends DCLogic {
     const activeLibs = s.libs.filter(l => !l.paid), paidL = s.libs.filter(l => l.paid);
 
     const cobrar = activeLibs.filter(l => libView(l).meDeben), pagar = activeLibs.filter(l => !libView(l).meDeben);
-    const sumMine = cobrar.reduce((t, l) => t + libView(l).saldo, 0);
-    const sumOwe = pagar.reduce((t, l) => t + libView(l).saldo, 0);
+    // Libreticas de grupo: en las que creé cuenta lo que me falta cobrar; en las que debo, mi parte.
+    const lgMias = s.libsG.map(l => {
+      const soyCreador = l.creador === me, mia = l.partes.find(p => p.id === me) || null;
+      const falta = soyCreador ? l.partes.reduce((t, p) => t + saldoParte(p), 0) : (mia ? saldoParte(mia) : 0);
+      return { l, soyCreador, mia, falta };
+    }).filter(x => x.soyCreador || x.mia);
+    const lgCobrar = lgMias.filter(x => x.soyCreador && x.falta > 0), lgPagar = lgMias.filter(x => !x.soyCreador && x.falta > 0);
+    const lgSaldadas = lgMias.filter(x => x.falta <= 0);
+    const nCobrar = cobrar.length + lgCobrar.length, nPagar = pagar.length + lgPagar.length;
+    const sumMine = cobrar.reduce((t, l) => t + libView(l).saldo, 0) + lgCobrar.reduce((t, x) => t + x.falta, 0);
+    const sumOwe = pagar.reduce((t, l) => t + libView(l).saldo, 0) + lgPagar.reduce((t, x) => t + x.falta, 0);
+    const mkLG = x => {
+      const l = x.l, green = x.soyCreador, col = green ? MINT : RED;
+      const base = green ? l.total : x.mia.monto, pagado = base - x.falta;
+      const pagaron = l.partes.filter(p => saldoParte(p) <= 0).length;
+      return {
+        id: l.id, color: col,
+        bg: green ? 'rgba(46,204,113,.09)' : 'rgba(196,100,97,.08)',
+        border: green ? 'rgba(87,185,160,.32)' : 'rgba(196,100,97,.3)',
+        tint: green ? 'rgba(87,185,160,.14)' : 'rgba(196,100,97,.14)',
+        dirLabel: green ? 'ME DEBEN' : 'YO DEBO',
+        grupo: 'GRUPO · ' + String(l.grupoNombre).toUpperCase(),
+        titulo: l.nota || 'Libretica de grupo',
+        montoTxt: '$ ' + fmtMoney(String(x.falta)),
+        linea: green
+          ? 'De ' + pesosTxt(l.total) + ' · ' + pagaron + ' de ' + l.partes.length + ' pagaron'
+          : 'Tu parte: ' + pesosTxt(x.mia.monto) + ' de ' + pesosTxt(l.total) + ' · a ' + primerNombre(l.creadorNombre),
+        hasBar: pagado > 0, barW: Math.min(100, Math.round(pagado / Math.max(1, base) * 100)) + '%',
+        accion: green ? 'VER DETALLE ›' : 'VER Y PAGAR ›',
+        abrir: () => self.abrirLibretaGrupo(l.id),
+      };
+    };
     const pendAll = misActs.filter(a => dayDiff(TODAY, a.fecha) >= 0);
     const impRank = { ALTA: 0, MEDIA: 1, BAJA: 2 };
     const urgentAcad = pendAll.slice()
@@ -2302,13 +2971,16 @@ class Component extends DCLogic {
         };
       })
       ;
+    const deudas = pagar.map(l => ({ saldo: libView(l).saldo, title: l.prestamista, meta: 'YO DEBO · LIBRETICA', go: () => self.setState({ tab: 'finanzas' }) }))
+      .concat(lgPagar.map(x => ({ saldo: x.falta, title: x.l.creadorNombre, meta: 'YO DEBO · GRUPO ' + String(x.l.grupoNombre).toUpperCase(),
+                                   go: () => { self.setState({ tab: 'finanzas' }); self.abrirLibretaGrupo(x.l.id); } })));
     const urgent = urgentAcad
-      .concat(pagar.slice().sort((a, b) => libView(b).saldo - libView(a).saldo).slice(0, 2).map(l => ({
+      .concat(deudas.sort((a, b) => b.saldo - a.saldo).slice(0, 2).map(d => ({
         badge: 'DEUDA', color: RED, tint: 'rgba(196,100,97,.14)',
-        imp: (libView(l).saldo >= 500000) ? 'IMP. ALTA' : 'IMP. MEDIA',
-        title: l.prestamista, meta: 'YO DEBO · LIBRETICA',
-        right: '$' + fmtMoney(libView(l).saldo), plazo: 'POR PAGAR',
-        go: () => self.setState({ tab: 'finanzas' }),
+        imp: (d.saldo >= 500000) ? 'IMP. ALTA' : 'IMP. MEDIA',
+        title: d.title, meta: d.meta,
+        right: '$' + fmtMoney(String(d.saldo)), plazo: 'POR PAGAR',
+        go: d.go,
       })));
     const bars = Array.from({ length: 6 }, (_, i) => {
       const st0 = addDays(NOW, i * 7);
@@ -2332,14 +3004,15 @@ class Component extends DCLogic {
 
     const tabDefs = [[ 'Ejercicio', 'ejercicio', ['8px','14px','18px'] ], [ 'Estudio', 'estudio', ['16px','16px','16px'] ], [ 'Finanzas', 'finanzas', ['18px','10px','14px'] ], [ 'Amigos', 'amigos', ['11px','18px','11px'] ]];
 
+    const vChat = self.valsChat(s);
     return {
       yes: true,
       appOn: true, authOn: false, loadOn: false,
       ...self.valsRutina(s), ...self.valsMenu(s), ...self.valsVer(s), ...self.valsAvisos(s),
-      ...self.valsAmigos(s), ...self.valsChat(s), ...self.valsChatHoja(s),
+      ...self.valsAmigos(s), ...vChat, ...self.valsChatHoja(s), ...self.valsLG(s),
       isHome: s.tab === 'home', isEjercicio: s.tab === 'ejercicio', isEstudio: s.tab === 'estudio', isFinanzas: s.tab === 'finanzas',
       isAmigos: s.tab === 'amigos',
-      barraOn: !(s.tab === 'amigos' && s.chatCon),
+      barraOn: !vChat.chatOn,
       editOn: s.edit, panelOn: s.panel, modalOn: !!m, restOn: s.restOn,
       goEjercicio: () => self.setState({ tab: 'ejercicio' }),
       goEstudio: () => self.setState({ tab: 'estudio', estudioTab: 'agenda', openCuaderno: null }),
@@ -2355,7 +3028,7 @@ class Component extends DCLogic {
       esDescanso, grupoVacio, hayRutina: day.ex.length > 0,
       abrirRutina: () => self.abrirRutina(),
       dayStateTxt: pct >= 100 ? 'COMPLETO' : (doneSets > 0 ? pct + '% HECHO' : 'SIN EMPEZAR'),
-      finanzasSummary: cobrar.length + ' POR COBRAR · ' + pagar.length + ' POR PAGAR',
+      finanzasSummary: nCobrar + ' POR COBRAR · ' + nPagar + ' POR PAGAR',
       canReset: doneSets > 0,
       resetDay: () => self.mut(d => d[s.activeDay].ex.forEach(e => { e.done = e.done.map(() => false); })),
       dayGroup: day.group, dayHeader: w.dow + ' ' + w.n + ' ' + w.mes, dayNum: String(day.dia),
@@ -2464,8 +3137,16 @@ class Component extends DCLogic {
       },
 
       libs: activeLibs.map(mkLib), paidLibs: paidL.map(mkLib),
-      hasPaid: paidL.length > 0, showHist: s.showHist,
-      histLabel: '✓ ' + paidL.length + ' saldada' + (paidL.length === 1 ? '' : 's'),
+      libsGAct: lgCobrar.concat(lgPagar).sort((a, b) => (a.l.en < b.l.en ? 1 : -1)).map(mkLG),
+      libsGHist: lgSaldadas.map(x => ({
+        titulo: x.l.nota || 'Libretica de grupo',
+        meta: 'SALDADA · GRUPO ' + String(x.l.grupoNombre).toUpperCase(),
+        montoTxt: pesosTxt(x.soyCreador ? x.l.total : x.mia.monto),
+        abrir: () => self.abrirLibretaGrupo(x.l.id),
+      })),
+      hasPaid: paidL.length + lgSaldadas.length > 0, showHist: s.showHist,
+      histLabel: '✓ ' + (paidL.length + lgSaldadas.length) + ' saldada' + (paidL.length + lgSaldadas.length === 1 ? '' : 's'),
+      clearHistOn: paidL.some(l => libView(l).mia),
       histAction: s.showHist ? 'OCULTAR' : 'MOSTRAR',
       toggleHist: () => self.setState(st => ({ showHist: !st.showHist })),
       // Solo se borran las mías; las que otra persona compartió siguen siendo suyas.
@@ -2494,19 +3175,19 @@ class Component extends DCLogic {
         { label: 'CUADERNOS', value: String(s.cuadernos.length), color: MINT, go: () => self.setState({ tab: 'estudio', estudioTab: 'cuadernos', openCuaderno: null }) },
       ],
       urgentAcad,
-      dashSub: pendAll.length + ' pendientes académicos · ' + activeLibs.length + ' libreticas activas',
+      dashSub: pendAll.length + ' pendientes académicos · ' + (activeLibs.length + lgCobrar.length + lgPagar.length) + ' libreticas activas',
       kpis: [
         { label: 'SERIES HOY', value: doneSets + '/' + totalSets, color: AMBER, sub: day.abbr, border: 'rgba(206,127,85,.3)', go: () => self.setState({ tab: 'ejercicio' }) },
         { label: 'PENDIENTES', value: String(pendAll.length), color: '#fff', sub: nextA ? self.plazo(nextA.fecha) : 'AL DÍA', border: 'rgba(255,255,255,.07)', go: () => self.setState({ tab: 'estudio', estudioTab: 'agenda', openCuaderno: null }) },
-        { label: 'POR COBRAR', value: '$' + fmtMoney(sumMine), color: MINT, sub: cobrar.length + ' LIBRETICAS', border: 'rgba(87,185,160,.26)', go: () => self.setState({ tab: 'finanzas' }) },
-        { label: 'POR PAGAR', value: '$' + fmtMoney(sumOwe), color: RED, sub: pagar.length + ' LIBRETICAS', border: 'rgba(196,100,97,.26)', go: () => self.setState({ tab: 'finanzas' }) },
+        { label: 'POR COBRAR', value: '$' + fmtMoney(sumMine), color: MINT, sub: nCobrar + ' LIBRETICAS', border: 'rgba(87,185,160,.26)', go: () => self.setState({ tab: 'finanzas' }) },
+        { label: 'POR PAGAR', value: '$' + fmtMoney(sumOwe), color: RED, sub: nPagar + ' LIBRETICAS', border: 'rgba(196,100,97,.26)', go: () => self.setState({ tab: 'finanzas' }) },
       ],
       urgentCount: urgent.length + ' ITEMS',
       urgent,
       bars,
       debtRows: [
-        { label: 'Por cobrar', sub: cobrar.length + ' libreticas · me deben', total: '$' + fmtMoney(sumMine), color: MINT, bg: 'rgba(46,204,113,.09)', border: 'rgba(87,185,160,.28)' },
-        { label: 'Por pagar', sub: pagar.length + ' libreticas · yo debo', total: '$' + fmtMoney(sumOwe), color: RED, bg: 'rgba(196,100,97,.08)', border: 'rgba(196,100,97,.28)' },
+        { label: 'Por cobrar', sub: nCobrar + ' libreticas · me deben', total: '$' + fmtMoney(sumMine), color: MINT, bg: 'rgba(46,204,113,.09)', border: 'rgba(87,185,160,.28)' },
+        { label: 'Por pagar', sub: nPagar + ' libreticas · yo debo', total: '$' + fmtMoney(sumOwe), color: RED, bg: 'rgba(196,100,97,.08)', border: 'rgba(196,100,97,.28)' },
       ],
 
       pNombre: s.profile.nombre, pAltura: s.profile.altura, pPeso: s.profile.peso,

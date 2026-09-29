@@ -254,6 +254,9 @@
     avisoDeshacer = alDeshacer; avisoVencer = alVencer;
     aviso.style.display = 'flex';
     colocarAviso();
+    // Si el aviso acompaña un cambio de pantalla (salir de un chat), se recoloca
+    // tras ese redibujo: la barra de abajo pudo cambiar.
+    trasRedibujo(function () { if (aviso.style.display !== 'none') colocarAviso(); });
     animar(aviso, { desde: aviso.__p || 0, hasta: 1, amortiguamiento: 1, respuesta: 0.3, tolerancia: 0.002, paso: ponerAviso });
     avisoTimer = setTimeout(function () {
       var f = avisoVencer;

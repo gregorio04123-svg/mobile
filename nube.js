@@ -129,6 +129,9 @@
         .order('creado_en', { ascending: false }).limit(30),
       // Un renglón por conversación: último mensaje y cuántos no he leído.
       sb.rpc('mis_chats'),
+      // Mis grupos de amigos y las libreticas de grupo en las que estoy.
+      sb.rpc('mis_grupos'),
+      sb.rpc('libretas_grupo_de'),
     ]);
     for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
 
@@ -185,6 +188,8 @@
                  tipos: Array.isArray(perfil.tipos_actividad) ? perfil.tipos_actividad : null },
       avisosLeidos: perfil.avisos_leidos_hasta || null,
       chats: (q[12].data || []).map(chatDe),
+      gAmigos: (q[13].data || []).map(grupoDe),
+      libsG: (q[14].data || []).map(libretaGrupoDe),
       avisos: (q[11].data || []).map(function (a) {
         return { id: a.id, tipo: a.tipo, titulo: a.titulo, cuerpo: a.cuerpo || '', ref: a.ref, fecha: a.fecha, creado: a.creado_en };
       }),
@@ -200,6 +205,29 @@
   function chatDe(c) {
     return { otro: c.otro_id, tipo: c.tipo, texto: c.texto || '', datos: c.datos || null, de: c.de_id, en: c.creado_en,
              sinLeer: c.sin_leer || 0, sinLeerTexto: c.sin_leer_texto || 0 };
+  }
+
+  function grupoDe(g) {
+    var u = g.ult;
+    return {
+      id: g.id, nombre: g.nombre || '', unido: g.unido_en,
+      miembros: (g.miembros || []).map(function (m) { return { id: m.id, nombre: m.nombre || '', unido: m.unido }; }),
+      ult: u ? { tipo: u.tipo, texto: u.texto || '', datos: u.datos || null, de: u.de_id, deNombre: u.de_nombre || '', en: u.creado_en } : null,
+      sinLeer: g.sin_leer || 0, sinLeerTexto: g.sin_leer_texto || 0,
+    };
+  }
+
+  function libretaGrupoDe(l) {
+    return {
+      id: l.id, grupo: l.grupo_id, grupoNombre: l.grupo_nombre || '', creador: l.creado_por, creadorNombre: l.creador_nombre || '',
+      total: Math.round(+l.total), nota: l.nota || '', en: l.creado_en,
+      partes: (l.partes || []).map(function (p) {
+        return {
+          id: p.id, nombre: p.nombre || '', monto: Math.round(+p.monto), pagado: !!p.pagado_en,
+          abonos: (p.abonos || []).map(function (a) { return { id: a.id, monto: Math.round(+a.monto), en: a.creado_en }; }),
+        };
+      }),
+    };
   }
 
   /** Crea la rutina base si a la cuenta le falta (no hace nada si ya tiene). */
@@ -445,6 +473,72 @@
   }
 
   /* ------------------------------------------------------------------
+   * Grupos de amigos: chat y libreticas de grupo (todo pasa por el servidor)
+   * ---------------------------------------------------------------- */
+  var ERRORES_GRUPO = {
+    sin_sesion: 'Tu sesión se cerró. Vuelve a entrar.',
+    nombre_grupo: 'El nombre del grupo debe tener de 1 a 40 letras.',
+    sin_miembros: 'Elige al menos un amigo.',
+    muchos_miembros: 'Un grupo puede tener hasta 50 personas.',
+    no_amigo: 'Solo puedes agregar a tus amigos.',
+    no_miembro: 'Ya no estás en este grupo.',
+    total: 'Escribe el total.',
+    nota: 'El concepto es muy largo.',
+    partes: 'Revisa quiénes consumieron y cuánto le toca a cada uno.',
+    suma: 'Lo repartido debe dar exactamente el total.',
+    no_deudor: 'Solo quien debe registra lo que paga.',
+    monto: 'Escribe un monto válido.',
+    pagada: 'Tu parte ya está pagada.',
+    excede: 'Es más de lo que te falta por pagar.',
+    no_abono: 'Ese abono ya no existe.',
+    no_creador: 'Solo quien la creó puede borrarla.',
+  };
+  async function rpcGrupo(nombre, args) {
+    var r = await sb.rpc(nombre, args);
+    if (r.error) throw new Error(ERRORES_GRUPO[r.error.message] || mensajeDe(r.error));
+    return r.data;
+  }
+
+  function mensajeGrupoApp(m) {
+    return { id: m.id, g: m.grupo_id, de: m.de_id, deNombre: m.de_nombre || '', tipo: m.tipo, texto: m.texto || '',
+             ref: m.ref || null, datos: m.datos || null, en: m.creado_en };
+  }
+
+  /** Los últimos mensajes del grupo (o los anteriores a una fecha), del más viejo al más nuevo. */
+  async function mensajesGrupo(grupo, antesDe) {
+    var q = sb.from('mensajes_grupo').select('id,grupo_id,de_id,de_nombre,tipo,texto,ref,datos,creado_en')
+      .eq('grupo_id', grupo).order('creado_en', { ascending: false }).limit(POR_PAGINA);
+    if (antesDe) q = q.lt('creado_en', antesDe);
+    var r = await q;
+    if (r.error) throw new Error(mensajeDe(r.error));
+    return { lista: r.data.map(mensajeGrupoApp).reverse(), hayMas: r.data.length === POR_PAGINA };
+  }
+
+  async function enviarMensajeGrupo(uid, id, grupo, texto) {
+    var r = await sb.from('mensajes_grupo').insert({ id: id, grupo_id: grupo, de_id: uid, texto: texto });
+    if (r.error && r.error.code !== '23505') throw new Error(mensajeDe(r.error));
+  }
+
+  async function misGrupos() { return ((await rpcGrupo('mis_grupos', {})) || []).map(grupoDe); }
+  async function marcarGrupoLeido(grupo) { return rpcGrupo('marcar_grupo_leido', { p_grupo: grupo }); }
+  async function crearGrupo(nombre, ids) { return rpcGrupo('crear_grupo', { p_nombre: nombre, p_miembros: ids }); }
+  async function agregarAGrupo(grupo, ids) { return rpcGrupo('agregar_a_grupo', { p_grupo: grupo, p_miembros: ids }); }
+  async function salirDeGrupo(grupo) { return rpcGrupo('salir_de_grupo', { p_grupo: grupo }); }
+  async function renombrarGrupo(grupo, nombre) { return rpcGrupo('renombrar_grupo', { p_grupo: grupo, p_nombre: nombre }); }
+
+  /** partes: [{ id, monto }]; la suma debe ser exactamente el total. */
+  async function crearLibretaGrupo(grupo, total, nota, partes) {
+    return rpcGrupo('crear_libreta_grupo', { p_grupo: grupo, p_total: total, p_nota: nota, p_partes: partes });
+  }
+  async function abonarLibretaGrupo(libreta, monto) { return rpcGrupo('abonar_libreta_grupo', { p_libreta: libreta, p_monto: monto }); }
+  async function borrarAbonoGrupo(abono) { return rpcGrupo('borrar_abono_grupo', { p_abono: abono }); }
+  async function borrarLibretaGrupo(libreta) { return rpcGrupo('borrar_libreta_grupo', { p_libreta: libreta }); }
+  /** Sin ids: las mías (las que creé o en las que debo). Con ids: esas, si las puedo ver. */
+  async function libretasGrupo(ids) {
+    return ((await rpcGrupo('libretas_grupo_de', { p_ids: ids || null })) || []).map(libretaGrupoDe);
+  }
+
+  /* ------------------------------------------------------------------
    * Tiempo real: aviso inmediato cuando un amigo cambia algo tuyo
    * ---------------------------------------------------------------- */
   // Solo lo que otra persona puede tocar. Los filtros hacen que cada quien
@@ -472,6 +566,12 @@
       ['avisos', 'INSERT', de('user_id')],               // aviso nuevo para mí
       ['mensajes', 'INSERT', de('para_id')],             // me escriben
       ['mensajes', 'INSERT', de('de_id')],               // lo que escribo (o mi otro dispositivo)
+      // Grupos: la seguridad por fila deja pasar solo lo de mis grupos
+      // (desde que entré) y las libreticas de grupo que puedo ver.
+      ['mensajes_grupo', 'INSERT'],
+      ['abonos_grupo', 'INSERT'],
+      ['abonos_grupo', 'DELETE'],
+      ['libretas_grupo', 'DELETE'],
     ];
     var canal = sb.channel('pilares-' + uid);
     enlaces.forEach(function (e) {
@@ -619,6 +719,9 @@
       sb.from('grupos').select('id,nombre,abbr,color,musculo,orden,ejercicios').eq('user_id', uid).order('orden'),
       sb.from('rutinas').select('plan').eq('user_id', uid).maybeSingle(),
       todas(function () { return sb.from('mensajes').select('id,de_id,para_id,tipo,texto,datos,creado_en').order('creado_en').order('id'); }),
+      sb.rpc('mis_grupos'),
+      sb.rpc('libretas_grupo_de'),
+      todas(function () { return sb.from('mensajes_grupo').select('id,grupo_id,de_id,de_nombre,tipo,texto,datos,creado_en').order('creado_en').order('id'); }),
     ]);
     for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
 
@@ -636,6 +739,11 @@
       plan_semanal: q[9].data ? q[9].data.plan : null,
       // de_id / para_id: tu id o el de un amigo (ver "amigos").
       mensajes_chat: q[10].data,
+      grupos_amigos: (q[11].data || []).map(function (g) {
+        return { id: g.id, nombre: g.nombre, miembros: (g.miembros || []).map(function (m) { return { id: m.id, nombre: m.nombre }; }) };
+      }),
+      libreticas_de_grupo: q[12].data || [],
+      mensajes_grupos: q[13].data,
     };
   }
 
@@ -646,6 +754,11 @@
     buscarCodigo: buscarCodigo, invitar: invitar, aceptar: aceptar, borrarConexion: borrarConexion,
     compartirRutina: compartirRutina, borrarInvitacionRutina: borrarInvitacionRutina,
     mensajes: mensajes, enviarMensaje: enviarMensaje, marcarChatLeido: marcarChatLeido, mensajeDe: mensajeApp,
+    mensajesGrupo: mensajesGrupo, enviarMensajeGrupo: enviarMensajeGrupo, mensajeGrupoDe: mensajeGrupoApp,
+    misGrupos: misGrupos, marcarGrupoLeido: marcarGrupoLeido, crearGrupo: crearGrupo, agregarAGrupo: agregarAGrupo,
+    salirDeGrupo: salirDeGrupo, renombrarGrupo: renombrarGrupo,
+    crearLibretaGrupo: crearLibretaGrupo, abonarLibretaGrupo: abonarLibretaGrupo, borrarAbonoGrupo: borrarAbonoGrupo,
+    borrarLibretaGrupo: borrarLibretaGrupo, libretasGrupo: libretasGrupo,
     registrarSW: registrarSW, estadoPush: estadoPush, activarPush: activarPush, renovarPush: renovarPush,
     soltarPush: soltarPush, avisoDePrueba: avisoDePrueba, marcarAvisosLeidos: marcarAvisosLeidos, ponerGlobo: ponerGlobo,
     escuchar: escuchar, dejarDeEscuchar: dejarDeEscuchar, exportar: exportar,

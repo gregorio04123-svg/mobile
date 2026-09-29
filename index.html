@@ -568,6 +568,26 @@
   </div>
 
   <div data-desplaza style="flex:1;min-height:0;overflow:auto;padding:6px 22px calc(env(safe-area-inset-bottom,0px) + 112px);display:flex;flex-direction:column;gap:12px">
+    <sc-for list="{{ libsGAct }}" as="lgr" hint-placeholder-count="0">
+      <div sc-camel-on-click="{{ lgr.abrir }}" style="background:{{ lgr.bg }};border:1px solid {{ lgr.border }};border-radius:16px;padding:18px;cursor:pointer" style-active="transform:scale(.995)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="flex:none;font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;padding:6px 9px;border-radius:8px;background:{{ lgr.tint }};color:{{ lgr.color }}">{{ lgr.dirLabel }}</div>
+          <div style="min-width:0;font:700 9px/1.2 Manrope,sans-serif;letter-spacing:.1em;color:#B8C2D2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ lgr.grupo }}</div>
+        </div>
+        <div style="font:700 15px/1.3 Manrope,sans-serif;margin-top:14px;overflow-wrap:anywhere">{{ lgr.titulo }}</div>
+        <div style="margin-top:8px;font:800 30px/1 Manrope,sans-serif;letter-spacing:-.02em;color:{{ lgr.color }}">{{ lgr.montoTxt }}</div>
+        <sc-if value="{{ lgr.hasBar }}">
+          <div style="margin-top:14px;height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden">
+            <div style="height:100%;border-radius:3px;background:{{ lgr.color }};width:{{ lgr.barW }}"></div>
+          </div>
+        </sc-if>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="min-width:0;font:600 11.5px/1.35 Manrope,sans-serif;color:#8E9AAE">{{ lgr.linea }}</div>
+          <div style="flex:none;font:700 10px/1 Manrope,sans-serif;letter-spacing:.08em;color:{{ lgr.color }}">{{ lgr.accion }}</div>
+        </div>
+      </div>
+    </sc-for>
+
     <sc-for list="{{ libs }}" as="l" hint-placeholder-count="4">
       <div data-lib-id="{{ l.id }}" style="background:{{ l.bg }};border:1px solid {{ l.border }};border-radius:16px;padding:18px;opacity:{{ l.opacity }};scroll-margin-top:150px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -713,7 +733,22 @@
             </div>
           </div>
         </sc-for>
+        <sc-for list="{{ libsGHist }}" as="gh" hint-placeholder-count="0">
+          <div sc-camel-on-click="{{ gh.abrir }}" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:15px 17px;display:flex;align-items:center;gap:13px;cursor:pointer">
+            <div style="width:26px;height:26px;flex:none;border-radius:7px;background:rgba(87,185,160,.16);display:flex;align-items:center;justify-content:center">
+              <div style="width:10px;height:5px;border-left:2px solid #57B9A0;border-bottom:2px solid #57B9A0;transform:rotate(-45deg);margin-top:-3px"></div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font:700 13.5px/1.2 Manrope,sans-serif;color:#8E9AAE;text-decoration:line-through;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ gh.titulo }}</div>
+              <div style="font:700 10.5px/1.2 Manrope,sans-serif;color:#8E9AAE;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ gh.meta }}</div>
+            </div>
+            <div style="flex:none;font:700 15px/1 Manrope,sans-serif;color:#8E9AAE">{{ gh.montoTxt }}</div>
+            <div style="width:6px;height:6px;flex:none;border-top:1.6px solid #8E9AAE;border-right:1.6px solid #8E9AAE;transform:rotate(45deg)"></div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ clearHistOn }}">
         <div sc-camel-on-click="{{ clearHist }}" style="margin-top:2px;padding:16px;border-radius:12px;border:1px solid rgba(196,100,97,.28);background:rgba(196,100,97,.07);text-align:center;cursor:pointer;font:700 13px/1 Manrope,sans-serif;color:#C46461" style-hover="background:rgba(196,100,97,.14)" style-active="transform:translateY(1px)">{{ clearHistLabel }}</div>
+        </sc-if>
       </div>
     </sc-if>
   </div>
@@ -754,9 +789,21 @@
         </div>
       </sc-for>
 
+      <sc-if value="{{ nuevoGrupoOn }}">
+        <div sc-camel-on-click="{{ nuevoGrupo }}" style="padding:11px 13px;border-radius:16px;border:1px dashed rgba(87,185,160,.34);display:flex;align-items:center;gap:12px;cursor:pointer" style-active="transform:scale(.99)">
+          <div style="width:46px;height:46px;flex:none;border-radius:15px;background:rgba(87,185,160,.12);display:flex;align-items:center;justify-content:center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#57B9A0" stroke-width="1.8" stroke-linecap="round"><circle cx="8.5" cy="8" r="3"></circle><circle cx="16" cy="9" r="2.4"></circle><path d="M3 18.5c.6-2.9 2.8-4.5 5.5-4.5s4.9 1.6 5.5 4.5"></path><path d="M15.2 13.8c2.4 0 4.3 1.4 4.9 3.9"></path></svg>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font:700 15px/1.2 Manrope,sans-serif;color:#57B9A0">Nuevo grupo</div>
+            <div style="font:500 12.5px/1.3 Manrope,sans-serif;color:#8E9AAE;margin-top:5px">Chat y libreticas con varios amigos</div>
+          </div>
+        </div>
+      </sc-if>
+
       <sc-for list="{{ chatsList }}" as="ch" hint-placeholder-count="4">
         <div sc-camel-on-click="{{ ch.abrir }}" style="padding:12px 13px;border-radius:16px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:12px;cursor:pointer">
-          <div style="width:46px;height:46px;flex:none;border-radius:50%;background:{{ ch.color }};display:flex;align-items:center;justify-content:center;font:800 17px/1 Manrope,sans-serif;color:#0A0E1A">{{ ch.inicial }}</div>
+          <div style="width:46px;height:46px;flex:none;border-radius:{{ ch.radio }};background:{{ ch.color }};display:flex;align-items:center;justify-content:center;font:800 {{ ch.letra }}/1 Manrope,sans-serif;color:#0A0E1A">{{ ch.inicial }}</div>
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:baseline;gap:8px">
               <div style="flex:1;min-width:0;font:700 15px/1.2 Manrope,sans-serif;color:#EDF1F7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ch.nombre }}</div>
@@ -801,9 +848,12 @@
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#9AA6BA" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5L5.5 9 11 14.5"></path></svg>
       </div>
       <div style="display:flex;align-items:center;gap:9px;max-width:100%;margin-top:4px">
-        <div style="width:30px;height:30px;flex:none;border-radius:50%;background:{{ chatColor }};display:flex;align-items:center;justify-content:center;font:800 13px/1 Manrope,sans-serif;color:#0A0E1A">{{ chatInicial }}</div>
+        <div style="width:30px;height:30px;flex:none;border-radius:{{ chatRadio }};background:{{ chatColor }};display:flex;align-items:center;justify-content:center;font:800 {{ chatLetra }}/1 Manrope,sans-serif;color:#0A0E1A">{{ chatInicial }}</div>
         <div style="min-width:0;font:italic 300 26px/1.15 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#EDF1F7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ chatNombre }}</div>
       </div>
+      <sc-if value="{{ chatSubOn }}">
+        <div style="max-width:100%;font:600 11.5px/1.3 Manrope,sans-serif;color:#8E9AAE;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ chatSub }}</div>
+      </sc-if>
       <div sc-camel-on-click="{{ chatOpciones }}" aria-label="Opciones del chat" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;gap:3px;cursor:pointer">
         <div style="width:4px;height:4px;border-radius:50%;background:#9AA6BA"></div><div style="width:4px;height:4px;border-radius:50%;background:#9AA6BA"></div><div style="width:4px;height:4px;border-radius:50%;background:#9AA6BA"></div>
       </div>
@@ -824,9 +874,15 @@
         <sc-if value="{{ mi.esDia }}">
           <div style="align-self:center;margin:14px 0 6px;padding:5px 10px;border-radius:9px;background:rgba(255,255,255,.05);font:700 10px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE">{{ mi.dia }}</div>
         </sc-if>
+        <sc-if value="{{ mi.esSistema }}">
+          <div style="align-self:center;max-width:86%;margin:10px 0 4px;padding:6px 11px;border-radius:10px;background:rgba(255,255,255,.04);font:600 11.5px/1.4 Manrope,sans-serif;color:#8E9AAE;text-align:center;text-wrap:pretty">{{ mi.texto }}</div>
+        </sc-if>
         <sc-if value="{{ mi.esTexto }}">
           <div style="display:flex;justify-content:{{ mi.lado }};margin-top:{{ mi.sep }}">
             <div sc-camel-on-click="{{ mi.tocar }}" style="max-width:78%;padding:9px 12px 7px;border-radius:{{ mi.radio }};background:{{ mi.bg }};border:1px solid {{ mi.borde }}">
+              <sc-if value="{{ mi.autorOn }}">
+                <div style="font:700 11.5px/1.2 Manrope,sans-serif;color:{{ mi.autorColor }};margin-bottom:3px">{{ mi.autor }}</div>
+              </sc-if>
               <div style="font:500 15px/1.4 Manrope,sans-serif;color:#EDF1F7;white-space:pre-wrap;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text">{{ mi.texto }}</div>
               <div style="font:600 10px/1 Manrope,sans-serif;color:{{ mi.pieColor }};margin-top:5px;text-align:right">{{ mi.pie }}</div>
             </div>
@@ -835,6 +891,9 @@
         <sc-if value="{{ mi.esTarjeta }}">
           <div style="display:flex;justify-content:{{ mi.lado }};margin-top:8px">
             <div sc-camel-on-click="{{ mi.tocar }}" style="width:80%;max-width:300px;box-sizing:border-box;padding:13px 14px 11px;border-radius:16px;background:#121724;border:1px solid {{ mi.borde }};cursor:pointer">
+              <sc-if value="{{ mi.autorOn }}">
+                <div style="font:700 11.5px/1.2 Manrope,sans-serif;color:{{ mi.autorColor }};margin-bottom:8px">{{ mi.autor }}</div>
+              </sc-if>
               <div style="font:800 9px/1.2 Manrope,sans-serif;letter-spacing:.14em;color:{{ mi.color }}">{{ mi.kicker }}</div>
               <div style="font:800 19px/1.2 Manrope,sans-serif;letter-spacing:-.01em;color:#EDF1F7;margin-top:7px;overflow-wrap:anywhere">{{ mi.titulo }}</div>
               <sc-if value="{{ mi.sub }}">
@@ -857,7 +916,7 @@
     </div>
 
     <div data-chat-redactar style="flex:none;display:flex;align-items:center;gap:8px;padding:8px 10px var(--pie, calc(max(env(safe-area-inset-bottom,0px), var(--app-oculto,0px)) + 10px));background:#0B0F19;border-top:1px solid rgba(255,255,255,.07)">
-      <div sc-camel-on-click="{{ chatAdjuntar }}" aria-label="Enviar rutina, libretica o actividad" style="flex:none;width:42px;height:42px;border-radius:50%;background:rgba(206,127,85,.14);border:1px solid rgba(206,127,85,.34);display:flex;align-items:center;justify-content:center;cursor:pointer">
+      <div sc-camel-on-click="{{ chatAdjuntar }}" aria-label="{{ chatAdjuntarTxt }}" style="flex:none;width:42px;height:42px;border-radius:50%;background:rgba(206,127,85,.14);border:1px solid rgba(206,127,85,.34);display:flex;align-items:center;justify-content:center;cursor:pointer">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#CE7F55" stroke-width="2" stroke-linecap="round"><path d="M8 2.5v11M2.5 8h11"></path></svg>
       </div>
       <input data-chat-entrada value="{{ chatTexto }}" sc-camel-on-change="{{ onChatTexto }}" placeholder="Mensaje" enterkeyhint="send" maxlength="2000" autocomplete="off" style="flex:1;min-width:0;box-sizing:border-box;height:42px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:21px;color:#fff;font:500 16px Manrope,sans-serif;padding:0 16px">
@@ -1443,8 +1502,182 @@
         </sc-if>
       </sc-if>
 
+      <sc-if value="{{ hjGrupoNuevo }}">
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin:20px 0 6px">NOMBRE DEL GRUPO</div>
+        <input value="{{ hjGNombre }}" sc-camel-on-change="{{ onHjGNombre }}" maxlength="40" placeholder="ej. Los del viernes" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:600 16px Manrope,sans-serif;padding:11px 12px">
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin:18px 0 8px">¿A QUIÉNES AGREGAS?</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ hjGAmigos }}" as="ga" hint-placeholder-count="3">
+            <div sc-camel-on-click="{{ ga.pick }}" style="padding:10px 12px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:11px;cursor:pointer">
+              <div style="width:34px;height:34px;flex:none;border-radius:50%;background:{{ ga.color }};display:flex;align-items:center;justify-content:center;font:800 13px/1 Manrope,sans-serif;color:#0A0E1A">{{ ga.inicial }}</div>
+              <div style="flex:1;min-width:0;font:700 14px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ga.nombre }}</div>
+              <div style="width:24px;height:24px;flex:none;box-sizing:border-box;border-radius:50%;background:{{ ga.marca }};border:1.6px solid {{ ga.marcaBorde }};display:flex;align-items:center;justify-content:center">
+            <div style="width:9px;height:5px;border-left:2px solid {{ ga.tick }};border-bottom:2px solid {{ ga.tick }};transform:rotate(-45deg);margin-top:-2px"></div>
+          </div>
+            </div>
+          </sc-for>
+        </div>
+        <div sc-camel-on-click="{{ hjGCrear }}" style="margin-top:18px;padding:16px;border-radius:12px;text-align:center;cursor:pointer;background:{{ hjGCrearBg }};font:800 14px/1 Manrope,sans-serif;color:{{ hjGCrearFg }}">{{ hjGCrearTxt }}</div>
+        <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:9px;text-align:center;text-wrap:pretty">{{ hjGNota }}</div>
+      </sc-if>
+
+      <sc-if value="{{ hjGrupoOpc }}">
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin:20px 0 6px">NOMBRE</div>
+        <div style="display:flex;gap:8px">
+          <input value="{{ hjGONombre }}" sc-camel-on-change="{{ onHjGONombre }}" maxlength="40" style="flex:1;min-width:0;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:600 16px Manrope,sans-serif;padding:11px 12px">
+          <sc-if value="{{ hjGOGuardarOn }}">
+            <div sc-camel-on-click="{{ hjGOGuardar }}" style="flex:none;padding:14px 15px;border-radius:10px;cursor:pointer;background:#57B9A0;font:800 12.5px/1 Manrope,sans-serif;color:#0A0E1A">{{ hjGOGuardarTxt }}</div>
+          </sc-if>
+        </div>
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin:20px 0 8px">EN EL GRUPO · {{ hjGOCuantos }}</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ hjGOMiembros }}" as="gm" hint-placeholder-count="3">
+            <div style="padding:10px 12px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:11px">
+              <div style="width:32px;height:32px;flex:none;border-radius:50%;background:{{ gm.color }};display:flex;align-items:center;justify-content:center;font:800 12px/1 Manrope,sans-serif;color:#0A0E1A">{{ gm.inicial }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font:700 14px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ gm.nombre }}</div>
+                <div style="font:600 10.5px/1.2 Manrope,sans-serif;color:#8E9AAE;margin-top:4px">{{ gm.meta }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ hjGOAgregarOn }}">
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin:20px 0 8px">AGREGAR A TUS AMIGOS</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ hjGOAgregables }}" as="gx" hint-placeholder-count="2">
+              <div style="padding:10px 12px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:11px">
+                <div style="width:32px;height:32px;flex:none;border-radius:50%;background:{{ gx.color }};display:flex;align-items:center;justify-content:center;font:800 12px/1 Manrope,sans-serif;color:#0A0E1A">{{ gx.inicial }}</div>
+                <div style="flex:1;min-width:0;font:700 14px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ gx.nombre }}</div>
+                <div sc-camel-on-click="{{ gx.agregar }}" style="flex:none;padding:10px 13px;border-radius:10px;cursor:pointer;background:rgba(87,185,160,.12);border:1px solid rgba(87,185,160,.34);font:700 12px/1 Manrope,sans-serif;color:#57B9A0">{{ gx.accion }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <div sc-camel-on-click="{{ hjGOSalir }}" style="margin-top:22px;padding:15px;border-radius:12px;text-align:center;cursor:pointer;background:rgba(196,100,97,.07);border:1px solid rgba(196,100,97,.26);font:700 12.5px/1 Manrope,sans-serif;color:#C46461">Salir del grupo</div>
+        <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:9px;text-align:center;text-wrap:pretty">Nadie puede sacar a otro del grupo: cada quien sale cuando quiera. Lo que debas o te deban en sus libreticas se conserva.</div>
+      </sc-if>
+
+      <sc-if value="{{ hjGrupoLib }}">
+        <div style="margin-top:20px;display:flex;align-items:center;gap:10px">
+          <div style="font:800 24px/1 Manrope,sans-serif;color:#57B9A0">$</div>
+          <input value="{{ hjLGTotal }}" sc-camel-on-change="{{ onHjLGTotal }}" inputmode="numeric" placeholder="Total" style="flex:1;min-width:0;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.14);border-radius:0;color:#57B9A0;font:800 32px Manrope,sans-serif;letter-spacing:-.02em;padding:2px 0 7px">
+        </div>
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin:18px 0 6px">CONCEPTO</div>
+        <input value="{{ hjLGNota }}" sc-camel-on-change="{{ onHjLGNota }}" maxlength="80" placeholder="¿Qué fue? ej. Pizza del viernes" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:600 16px Manrope,sans-serif;padding:11px 12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 8px">
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE">¿QUIÉNES CONSUMIERON?</div>
+          <div sc-camel-on-click="{{ hjLGIguales }}" style="flex:none;padding:8px 11px;border-radius:9px;cursor:pointer;background:{{ hjLGIgualesBg }};border:1px solid {{ hjLGIgualesBorde }};font:700 11.5px/1 Manrope,sans-serif;color:{{ hjLGIgualesFg }}">Partes iguales</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ hjLGPersonas }}" as="lp" hint-placeholder-count="3">
+            <div style="padding:8px 12px;min-height:52px;box-sizing:border-box;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:10px">
+              <div sc-camel-on-click="{{ lp.pick }}" style="flex:1;min-width:0;align-self:stretch;display:flex;align-items:center;gap:10px;cursor:pointer">
+                <div style="width:24px;height:24px;flex:none;box-sizing:border-box;border-radius:50%;background:{{ lp.marca }};border:1.6px solid {{ lp.marcaBorde }};display:flex;align-items:center;justify-content:center">
+            <div style="width:9px;height:5px;border-left:2px solid {{ lp.tick }};border-bottom:2px solid {{ lp.tick }};transform:rotate(-45deg);margin-top:-2px"></div>
+          </div>
+                <div style="width:30px;height:30px;flex:none;border-radius:50%;background:{{ lp.color }};display:flex;align-items:center;justify-content:center;font:800 11px/1 Manrope,sans-serif;color:#0A0E1A">{{ lp.inicial }}</div>
+                <div style="flex:1;min-width:0;font:700 14px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ lp.nombre }}</div>
+              </div>
+              <sc-if value="{{ lp.on }}">
+                <div style="flex:none;width:116px;display:flex;align-items:center;gap:4px;border-bottom:1px solid rgba(255,255,255,.18)">
+                  <div style="font:800 15px/1 Manrope,sans-serif;color:#E08A87">$</div>
+                  <input value="{{ lp.monto }}" sc-camel-on-change="{{ lp.onMonto }}" inputmode="numeric" placeholder="0" aria-label="Cuánto le toca a {{ lp.nombre }}" style="flex:1;min-width:0;width:100%;box-sizing:border-box;background:transparent;border:none;border-radius:0;color:#fff;font:800 16px Manrope,sans-serif;padding:8px 0;text-align:right">
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ hjLGSinOtros }}">
+          <div style="font:500 12px/1.5 Manrope,sans-serif;color:#8E9AAE;margin-top:6px;text-wrap:pretty">En este grupo solo estás tú. Agrega amigos desde el botón ··· para repartir una cuenta.</div>
+        </sc-if>
+        <div style="margin-top:14px;font:700 12.5px/1.45 Manrope,sans-serif;color:{{ hjLGEstadoColor }};text-align:center;text-wrap:pretty">{{ hjLGEstado }}</div>
+        <div sc-camel-on-click="{{ hjLGEnviar }}" style="margin-top:12px;padding:16px;border-radius:12px;text-align:center;cursor:pointer;background:{{ hjLGEnviarBg }};font:800 14px/1 Manrope,sans-serif;color:{{ hjLGEnviarFg }}">{{ hjLGEnviarTxt }}</div>
+        <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:9px;text-align:center;text-wrap:pretty">Tú no te incluyes: el total es lo que te deben. Todos en el grupo ven el detalle y cada quien registra lo que te paga.</div>
+      </sc-if>
+
       <sc-if value="{{ hjMsg }}">
         <div style="font:600 12px/1.45 Manrope,sans-serif;color:#E08A87;margin-top:12px">{{ hjMsg }}</div>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ lgOn }}">
+  <div data-hoja-fondo="lg" style="position:absolute;inset:0;z-index:99;display:flex;align-items:flex-end">
+    <div data-hoja-velo style="position:absolute;inset:0;background:rgba(3,5,10,.62)"></div>
+    <div data-hoja="lg" style="position:relative;box-sizing:border-box;width:100%;max-height:calc(100% - env(safe-area-inset-top,0px) - 44px);overflow:auto;background:#0E131F;border-top:1px solid rgba(255,255,255,.1);border-radius:28px 28px 0 0;padding:10px 22px calc(env(safe-area-inset-bottom,0px) + 30px)">
+      <div style="width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.2);margin:0 auto 16px"></div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="min-width:0">
+          <div style="font:700 10px/1.3 Manrope,sans-serif;letter-spacing:.18em;color:#CE7F55">{{ lgKicker }}</div>
+          <div style="font:800 24px/1.15 Manrope,sans-serif;letter-spacing:-.02em;margin-top:9px;overflow-wrap:anywhere">{{ lgTitulo }}</div>
+        </div>
+        <div sc-camel-on-click="{{ lgCerrar }}" aria-label="Cerrar" style="flex:none;width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 16px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
+      </div>
+
+      <sc-if value="{{ lgListo }}">
+        <div style="margin-top:16px;font:800 34px/1 Manrope,sans-serif;letter-spacing:-.02em;color:#EDF1F7">{{ lgTotal }}</div>
+        <div style="font:600 12px/1.4 Manrope,sans-serif;color:#8E9AAE;margin-top:8px">{{ lgMeta }}</div>
+        <div style="margin-top:14px;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden">
+          <div style="height:100%;border-radius:3px;background:#57B9A0;width:{{ lgBarW }}"></div>
+        </div>
+        <div style="font:700 12px/1.4 Manrope,sans-serif;color:{{ lgResumenColor }};margin-top:8px">{{ lgResumen }}</div>
+
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin:20px 0 8px">LO DE CADA UNO</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ lgPartes }}" as="lq" hint-placeholder-count="3">
+            <div style="padding:11px 12px;border-radius:12px;background:{{ lq.fondo }};border:1px solid rgba(255,255,255,.07)">
+              <div style="display:flex;align-items:center;gap:11px">
+                <div style="width:32px;height:32px;flex:none;border-radius:50%;background:{{ lq.color }};display:flex;align-items:center;justify-content:center;font:800 12px/1 Manrope,sans-serif;color:#0A0E1A">{{ lq.inicial }}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font:700 14px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ lq.nombre }}</div>
+                  <div style="font:700 11px/1.3 Manrope,sans-serif;color:{{ lq.estadoColor }};margin-top:4px">{{ lq.estado }}</div>
+                </div>
+                <div style="flex:none;font:800 15px/1 Manrope,sans-serif;color:#EDF1F7">{{ lq.monto }}</div>
+              </div>
+              <div style="margin-top:10px;height:3px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden">
+                <div style="height:100%;border-radius:2px;background:{{ lq.barColor }};width:{{ lq.barW }}"></div>
+              </div>
+              <sc-if value="{{ lq.abonosOn }}">
+                <div style="display:flex;flex-direction:column;gap:5px;margin-top:10px">
+                  <sc-for list="{{ lq.abonos }}" as="ab" hint-placeholder-count="0">
+                    <div style="display:flex;align-items:center;gap:10px;padding:7px 8px 7px 10px;border-radius:9px;background:rgba(255,255,255,.04)">
+                      <div style="flex:1;min-width:0;font:800 13px/1 Manrope,sans-serif">{{ ab.txt }}</div>
+                      <div style="flex:none;font:700 9px/1 Manrope,sans-serif;letter-spacing:.08em;color:#8E9AAE">{{ ab.meta }}</div>
+                      <div sc-camel-on-click="{{ ab.borrar }}" aria-label="Borrar abono" style="flex:none;width:28px;height:26px;border-radius:7px;cursor:pointer;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font:600 14px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ lgPagarOn }}">
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin:20px 0 8px">REGISTRA LO QUE PAGASTE</div>
+          <div style="display:flex;gap:8px">
+            <input value="{{ lgAbono }}" sc-camel-on-change="{{ onLgAbono }}" inputmode="numeric" placeholder="$ abono" style="flex:1;min-width:0;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;font:700 16px Manrope,sans-serif;padding:12px">
+            <div sc-camel-on-click="{{ lgAbonar }}" style="flex:none;padding:14px 16px;border-radius:10px;cursor:pointer;background:rgba(196,100,97,.12);border:1px solid rgba(196,100,97,.32);font:700 13px/1 Manrope,sans-serif;color:#E08A87">{{ lgAbonarTxt }}</div>
+          </div>
+          <div sc-camel-on-click="{{ lgPagarTodo }}" style="margin-top:8px;padding:15px;border-radius:12px;text-align:center;cursor:pointer;background:#57B9A0;font:800 13.5px/1 Manrope,sans-serif;color:#0A0E1A">{{ lgPagarTodoTxt }}</div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ lgVacio }}">
+        <div style="margin-top:14px;font:500 13px/1.5 Manrope,sans-serif;color:#8E9AAE">{{ lgVacio }}</div>
+      </sc-if>
+      <sc-if value="{{ lgMsg }}">
+        <div style="font:600 12px/1.45 Manrope,sans-serif;color:#E08A87;margin-top:12px">{{ lgMsg }}</div>
+      </sc-if>
+
+      <sc-if value="{{ lgListo }}">
+        <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:9px;text-align:center;text-wrap:pretty">{{ lgNota }}</div>
+        <sc-if value="{{ lgIrChatOn }}">
+          <div sc-camel-on-click="{{ lgIrChat }}" style="margin-top:16px;padding:15px;border-radius:12px;text-align:center;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font:700 12.5px/1 Manrope,sans-serif;color:#B8C2D2">Ir al chat del grupo</div>
+        </sc-if>
+        <sc-if value="{{ lgBorrarOn }}">
+          <div sc-camel-on-click="{{ lgBorrar }}" style="margin-top:10px;padding:15px;border-radius:12px;text-align:center;cursor:pointer;background:rgba(196,100,97,.07);border:1px solid rgba(196,100,97,.26);font:700 12.5px/1 Manrope,sans-serif;color:#C46461">Borrar libretica</div>
+        </sc-if>
       </sc-if>
     </div>
   </div>
