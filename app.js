@@ -135,6 +135,8 @@ function tiposDe(p) {
   });
   return out.length ? out.slice(0, 30) : TIPOS_BASE;
 }
+/** ¿Ya se le envió al amigo? (una copia vieja no lo sabe: las compartidas lo estaban). */
+function enviadaDe(l) { return l.enviada === undefined ? !!l.contra : !!l.enviada; }
 /** ¿La actividad usa colores de urgencia? (una copia vieja no lo trae: la Tarea no). */
 function conUrg(a) { return a.urg === undefined ? a.tipo !== 'Tarea' : a.urg !== false; }
 function primerNombre(n) { return String(n || '').trim().split(/\s+/)[0] || 'tu amigo'; }
@@ -1205,6 +1207,18 @@ class Component extends DCLogic {
     };
   }
 
+  /* ── Libreticas: enviar al amigo ─────────────────────────────────── */
+
+  /** El amigo la ve y recibe el aviso (con monto y concepto) solo al enviarla. */
+  enviarLibreta(id) {
+    const l = this.state.libs.find(x => x.id === id);
+    if (!l || !l.contra || enviadaDe(l)) return;
+    if (!((+l.monto || 0) > 0)) { if (window.Fluido) Fluido.aviso('Escribe el monto antes de enviarla'); return; }
+    const nombre = (this.state.amigos.find(a => a.id === l.contra) || {}).nombre || 'tu amigo';
+    this.setState(st => ({ libs: st.libs.map(x => x.id === id ? { ...x, enviada: true } : x) }));
+    if (window.Fluido) Fluido.aviso('Libretica enviada a ' + primerNombre(nombre));
+  }
+
   /* ── Tipos de actividad propios ──────────────────────────────────── */
 
   tipoError(error) { this.setState(st => st.tipoEd ? { tipoEd: { ...st.tipoEd, error } } : null); }
@@ -1421,7 +1435,7 @@ class Component extends DCLogic {
     const nuevasLibs = (v.libs || []).map(l => ({
       id: Nube.uuid(), owner: uid, contra: null, deudor: l.deudor || '', prestamista: l.prestamista || '',
       monto: String(l.monto || '').replace(/\D/g, '') || '0', mine: !!l.mine, paid: !!l.paid,
-      nota: '', vence: '', abonos: [],
+      nota: '', vence: '', enviada: false, abonos: [],
     }));
 
     // Lo que ya está en la nube manda; del dispositivo solo entra lo que falta.
@@ -1708,6 +1722,8 @@ class Component extends DCLogic {
         : '';
       const open = s.openLib === l.id;
       const n = (l.abonos || []).length;
+      const pendiente = v.mia && !!l.contra && !enviadaDe(l);
+      const montoOk = (+l.monto || 0) > 0, quien = primerNombre(otroNombre);
       return {
         id: l.id, deudor: l.deudor, prestamista: l.prestamista, monto: fmtMoney(l.monto),
         montoTxt: '$ ' + fmtMoney(l.monto), color: col,
@@ -1722,16 +1738,28 @@ class Component extends DCLogic {
         tick: l.paid ? '#0A0E1A' : 'rgba(255,255,255,.18)',
         editable: v.mia, readonly: !v.mia,
         shared: !!otro,
-        sharedLabel: otro ? (v.mia ? 'COMPARTIDA CON ' : 'CREADA POR ') + String(otroNombre).toUpperCase() : '',
+        sharedLabel: !otro ? '' : (!v.mia ? 'CREADA POR ' : (pendiente ? 'PARA ' : 'COMPARTIDA CON ')) + String(otroNombre).toUpperCase() + (pendiente ? ' · SIN ENVIAR' : ''),
+        sharedDot: pendiente ? AMBER : col,
+        enviarOn: pendiente,
+        enviarTxt: 'Enviar a ' + quien,
+        enviarBg: montoOk ? MINT : 'rgba(87,185,160,.14)',
+        enviarFg: montoOk ? '#0A0E1A' : 'rgba(87,185,160,.55)',
+        enviarNota: montoOk
+          ? quien + ' aún no la ve. Le llegará con el monto' + ((l.nota || '').trim() ? ' y el concepto.' : '.')
+          : 'Escribe el monto para poder enviarla.',
+        enviar: () => self.enviarLibreta(l.id),
+        hayConcepto: !!(l.nota || '').trim(),
         hasChips: v.mia && amigosOk.length > 0,
         chips: [{ t: 'Solo yo', id: null }].concat(amigosOk.map(a => ({ t: a.nombre, id: a.id }))).map(c => {
           const on = (l.contra || null) === c.id;
           return {
             t: c.t, bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE',
+            // Elegir a alguien no se la muestra aún: hay que tocar Enviar.
             pick: () => setLib(l.id, x => {
-              if (!c.id) return { ...x, contra: null };
-              return x.mine ? { ...x, contra: c.id, deudor: c.t, prestamista: miNombre }
-                            : { ...x, contra: c.id, deudor: miNombre, prestamista: c.t };
+              if ((x.contra || null) === c.id) return x;
+              if (!c.id) return { ...x, contra: null, enviada: false };
+              return x.mine ? { ...x, contra: c.id, enviada: false, deudor: c.t, prestamista: miNombre }
+                            : { ...x, contra: c.id, enviada: false, deudor: miNombre, prestamista: c.t };
             }),
           };
         }),
@@ -1954,7 +1982,7 @@ class Component extends DCLogic {
       clearHistLabel: 'Eliminar historial · ' + paidL.filter(l => libView(l).mia).length,
       clearHist: () => self.setState(st => ({ libs: st.libs.filter(l => !l.paid || (l.owner && l.owner !== me)), showHist: false })),
       addLib: () => self.setState(st => ({ libs: [{ id: Nube.uuid(), owner: me, contra: null, deudor: 'Nombre del deudor', prestamista: miNombre,
-                                                     monto: '0', mine: true, paid: false, nota: '', vence: '', abonos: [] }].concat(st.libs) })),
+                                                     monto: '0', mine: true, paid: false, nota: '', vence: '', enviada: false, abonos: [] }].concat(st.libs) })),
 
       ringOffsetSm: 226.2 * (1 - pct / 100),
       todayLine: DOW_SH[NOW.getDay()] + ' ' + NOW.getDate() + ' ' + MONTHS_SH[NOW.getMonth()] + ' · ' + NOW.getFullYear(),

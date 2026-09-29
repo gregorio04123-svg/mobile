@@ -606,7 +606,7 @@
 
         <sc-if value="{{ l.shared }}">
           <div style="margin-top:12px;display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border-radius:8px;background:rgba(255,255,255,.05)">
-            <div style="width:6px;height:6px;border-radius:50%;background:{{ l.color }}"></div>
+            <div style="width:6px;height:6px;border-radius:50%;background:{{ l.sharedDot }}"></div>
             <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.1em;color:#B8C2D2">{{ l.sharedLabel }}</div>
           </div>
         </sc-if>
@@ -620,6 +620,10 @@
             <div>
               <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">PRESTAMISTA</div>
               <input value="{{ l.prestamista }}" sc-camel-on-change="{{ l.onPrestamista }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:9px;color:#8E9AAE;font:600 14px Manrope,sans-serif;padding:9px 11px">
+            </div>
+            <div>
+              <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">CONCEPTO</div>
+              <input value="{{ l.nota }}" sc-camel-on-change="{{ l.onNota }}" maxlength="80" placeholder="¿Por qué? ej. Almuerzo del viernes" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:9px;color:#fff;font:600 14px Manrope,sans-serif;padding:9px 11px">
             </div>
           </div>
 
@@ -636,6 +640,10 @@
             <div style="font:800 22px/1 Manrope,sans-serif;color:{{ l.color }}">$</div>
             <input value="{{ l.monto }}" sc-camel-on-change="{{ l.onMonto }}" inputmode="numeric" style="flex:1;min-width:0;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.12);border-radius:0;color:{{ l.color }};font:800 30px Manrope,sans-serif;letter-spacing:-.02em;padding:2px 0 7px">
           </div>
+          <sc-if value="{{ l.enviarOn }}">
+            <div sc-camel-on-click="{{ l.enviar }}" style="margin-top:14px;padding:15px;border-radius:12px;text-align:center;cursor:pointer;background:{{ l.enviarBg }};font:800 14px/1 Manrope,sans-serif;color:{{ l.enviarFg }};display:flex;align-items:center;justify-content:center;gap:8px"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 1.5L7 9M14.5 1.5L10 14.5 7 9 1.5 6z"></path></svg>{{ l.enviarTxt }}</div>
+            <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:8px;text-align:center;text-wrap:pretty">{{ l.enviarNota }}</div>
+          </sc-if>
         </sc-if>
 
         <sc-if value="{{ l.readonly }}">
@@ -649,6 +657,12 @@
               <div style="font:600 14px/1.2 Manrope,sans-serif;color:#8E9AAE;margin-top:6px">{{ l.prestamista }}</div>
             </div>
           </div>
+          <sc-if value="{{ l.hayConcepto }}">
+            <div style="margin-top:11px">
+              <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE">CONCEPTO</div>
+              <div style="font:600 14px/1.3 Manrope,sans-serif;margin-top:6px">{{ l.nota }}</div>
+            </div>
+          </sc-if>
           <div style="margin-top:14px;font:800 30px/1 Manrope,sans-serif;letter-spacing:-.02em;color:{{ l.color }}">{{ l.montoTxt }}</div>
         </sc-if>
 
@@ -685,10 +699,6 @@
             <div sc-camel-on-click="{{ l.addAbono }}" style="flex:none;padding:13px 15px;border-radius:10px;cursor:pointer;background:{{ l.tint }};border:1px solid {{ l.border }};font:700 12.5px/1 Manrope,sans-serif;color:{{ l.color }}" style-active="transform:translateY(1px)">Abonar</div>
           </div>
           <div style="display:flex;gap:8px;margin-top:12px">
-            <div style="flex:1.4;min-width:0">
-              <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">NOTA</div>
-              <input value="{{ l.nota }}" sc-camel-on-change="{{ l.onNota }}" placeholder="¿Por qué?" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:9px;color:#fff;font:600 14px Manrope,sans-serif;padding:9px 11px">
-            </div>
             <div style="flex:1;min-width:0">
               <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">VENCE</div>
               <input type="date" value="{{ l.vence }}" sc-camel-on-change="{{ l.onVence }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:9px;color:#fff;font:600 14px Manrope,sans-serif;padding:8px 9px;color-scheme:dark">
