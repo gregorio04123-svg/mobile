@@ -18,6 +18,8 @@
   // Correo interno de cada cuenta. El dominio .invalid esta reservado y no
   // existe, asi que nunca se envia ni se recibe nada ahi.
   var DOMINIO = 'usuarios.pilares.invalid';
+  // Clave pública VAPID (Web Push). La privada vive en Vault, en Supabase.
+  var VAPID_PUBLICA = 'BD2mpc_TALmqNCpa1M6xRybU0zr5HHN7eaT7k_lEpL6WpwfWCKE-NNa03TUY_sEpr4-h2L4J6hlGFyVLDoBURSo';
 
   var sb = global.supabase.createClient(URL_SB, CLAVE_PUBLICA, {
     auth: { persistSession: true, autoRefreshToken: true, storageKey: 'pilares.sesion' },
@@ -107,7 +109,7 @@
    * ---------------------------------------------------------------- */
   async function cargar(uid) {
     var q = await Promise.all([
-      sb.from('perfiles').select('nombre,altura,peso,sexo,codigo').eq('id', uid).single(),
+      sb.from('perfiles').select('nombre,altura,peso,sexo,codigo,hora_recordatorio,zona_horaria,avisos_leidos_hasta').eq('id', uid).single(),
       // Trae mis cuadernos y los de mis amigos (para asignarles actividades).
       sb.from('cuadernos').select('id,user_id,nombre,orden,creado_en').order('orden').order('creado_en'),
       sb.from('archivos').select('id,cuaderno_id,nombre,tamano,creado_en').eq('user_id', uid).order('creado_en'),
@@ -122,6 +124,9 @@
       sb.from('rutinas').select('plan').eq('user_id', uid).maybeSingle(),
       // Rutinas que un amigo me envió y aún no respondo.
       sb.from('rutinas_compartidas').select('id,de_id,de_nombre,tipo,contenido,creado_en').eq('para_id', uid).order('creado_en'),
+      // Los últimos avisos (los de prueba no se listan).
+      sb.from('avisos').select('id,tipo,titulo,cuerpo,ref,fecha,creado_en').eq('user_id', uid).neq('tipo', 'prueba')
+        .order('creado_en', { ascending: false }).limit(30),
     ]);
     for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
 
@@ -173,7 +178,12 @@
     });
 
     return {
-      profile: { nombre: perfil.nombre || '', altura: perfil.altura || '', peso: perfil.peso || '', sexo: perfil.sexo || '' },
+      profile: { nombre: perfil.nombre || '', altura: perfil.altura || '', peso: perfil.peso || '', sexo: perfil.sexo || '',
+                 hora: perfil.hora_recordatorio == null ? 19 : perfil.hora_recordatorio, zona: perfil.zona_horaria || '' },
+      avisosLeidos: perfil.avisos_leidos_hasta || null,
+      avisos: (q[11].data || []).map(function (a) {
+        return { id: a.id, tipo: a.tipo, titulo: a.titulo, cuerpo: a.cuerpo || '', ref: a.ref, fecha: a.fecha, creado: a.creado_en };
+      }),
       codigo: perfil.codigo || '',
       cuadernos: cuadernos, files: files, acts: acts, logs: logs, libs: libs,
       amigos: amigos, cuadAmigos: cuadAmigos, grupos: grupos, plan: plan,
@@ -202,7 +212,12 @@
     TABLAS.forEach(function (k) { t[k] = {}; });
 
     var p = d.profile || {};
-    t.perfiles[uid] = { nombre: p.nombre || '', altura: p.altura || '', peso: p.peso || '', sexo: p.sexo || '' };
+    var perfil = { nombre: p.nombre || '', altura: p.altura || '', peso: p.peso || '', sexo: p.sexo || '' };
+    // Hora del recordatorio y zona horaria solo si ya se leyeron del servidor
+    // (una copia local vieja no las trae y no debe pisar las de verdad).
+    if (typeof p.hora === 'number') perfil.hora_recordatorio = p.hora;
+    if (p.zona) perfil.zona_horaria = p.zona;
+    t.perfiles[uid] = perfil;
 
     (d.cuadernos || []).forEach(function (c, i) {
       t.cuadernos[c.id] = { id: c.id, user_id: uid, nombre: c.nombre || '', orden: i };
@@ -410,6 +425,7 @@
       ['abonos', 'DELETE'],
       ['rutinas_compartidas', 'INSERT', de('para_id')],  // me envían una rutina
       ['rutinas_compartidas', 'DELETE'],
+      ['avisos', 'INSERT', de('user_id')],               // aviso nuevo para mí
     ];
     var canal = sb.channel('pilares-' + uid);
     enlaces.forEach(function (e) {
@@ -425,6 +441,108 @@
 
   function dejarDeEscuchar(canal) {
     if (canal) sb.removeChannel(canal);
+  }
+
+  /* ------------------------------------------------------------------
+   * Notificaciones (Web Push)
+   * ---------------------------------------------------------------- */
+  var registroSW = null;
+  function registrarSW() {
+    if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+    if (!registroSW) {
+      registroSW = navigator.serviceWorker.register('sw.js')
+        .then(function () { return navigator.serviceWorker.ready; })
+        .catch(function (e) { console.warn('[pilares] service worker', e); return null; });
+    }
+    return registroSW;
+  }
+
+  function esIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+  function instalada() {
+    return navigator.standalone === true || (global.matchMedia && global.matchMedia('(display-mode: standalone)').matches);
+  }
+  function pushSoportado() {
+    return 'serviceWorker' in navigator && 'PushManager' in global && 'Notification' in global;
+  }
+
+  function bytesDe(b64) {
+    var s = global.atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+    var out = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+
+  /** 'instalar' (iPhone sin la app en inicio), 'no' (este navegador no puede),
+   *  'pedir' (aún no activadas), 'bloqueado' (permiso negado) o 'activo'. */
+  async function estadoPush() {
+    if (!pushSoportado()) return esIOS() && !instalada() ? 'instalar' : 'no';
+    if (Notification.permission === 'denied') return 'bloqueado';
+    if (Notification.permission !== 'granted') return 'pedir';
+    var reg = await registrarSW();
+    if (!reg) return 'no';
+    return (await reg.pushManager.getSubscription()) ? 'activo' : 'pedir';
+  }
+
+  async function guardarSuscripcion(sub) {
+    var j = sub.toJSON();
+    var r = await sb.rpc('guardar_suscripcion', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+    if (r.error) throw new Error(mensajeDe(r.error));
+  }
+
+  /** Pide el permiso (tiene que venir de un toque) y guarda este dispositivo. */
+  async function activarPush() {
+    if (!pushSoportado()) throw new Error('Este navegador no permite notificaciones.');
+    // Lo primero, sin esperar nada antes: Safari solo muestra la pregunta
+    // si viene directo del toque.
+    var permiso = await Notification.requestPermission();
+    if (permiso !== 'granted') return permiso === 'denied' ? 'bloqueado' : 'pedir';
+    var reg = await registrarSW();
+    if (!reg) throw new Error('Este navegador no permite notificaciones.');
+    var sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytesDe(VAPID_PUBLICA) });
+    await guardarSuscripcion(sub);
+    return 'activo';
+  }
+
+  /** Al abrir la app con el permiso ya dado: este dispositivo queda a nombre
+   *  de la cuenta que está dentro (y se renueva si el navegador cambió algo). */
+  async function renovarPush() {
+    if (!pushSoportado() || Notification.permission !== 'granted') return;
+    var reg = await registrarSW();
+    var sub = reg && await reg.pushManager.getSubscription();
+    if (sub) await guardarSuscripcion(sub);
+  }
+
+  /** Al cerrar sesión: este dispositivo deja de recibir los avisos de la cuenta. */
+  async function soltarPush() {
+    try {
+      if (!pushSoportado()) return;
+      var reg = await registrarSW();
+      var sub = reg && await reg.pushManager.getSubscription();
+      if (sub) await sb.from('suscripciones_push').delete().eq('endpoint', sub.endpoint);
+    } catch (e) {}
+  }
+
+  async function avisoDePrueba() {
+    var r = await sb.rpc('aviso_de_prueba');
+    if (r.error) throw new Error(/espera/.test(r.error.message) ? 'Espera unos segundos antes de otra prueba.' : mensajeDe(r.error));
+  }
+
+  /** Devuelve la hora del servidor hasta la que ya se vieron los avisos. */
+  async function marcarAvisosLeidos() {
+    var r = await sb.rpc('marcar_avisos_leidos');
+    if (r.error) throw r.error;
+    return r.data;
+  }
+
+  /** Número en el ícono de la app (si el sistema lo permite). */
+  function ponerGlobo(n) {
+    try {
+      if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n).catch(function () {});
+      else if (navigator.clearAppBadge) navigator.clearAppBadge().catch(function () {});
+    } catch (e) {}
   }
 
   /* ------------------------------------------------------------------
@@ -467,6 +585,8 @@
     cargar: cargar, sembrarRutina: sembrarRutina, filas: filas, pendientes: pendientes, sincronizar: sincronizar,
     buscarCodigo: buscarCodigo, invitar: invitar, aceptar: aceptar, borrarConexion: borrarConexion,
     compartirRutina: compartirRutina, rutinaDeAmigo: rutinaDeAmigo, borrarInvitacionRutina: borrarInvitacionRutina,
+    registrarSW: registrarSW, estadoPush: estadoPush, activarPush: activarPush, renovarPush: renovarPush,
+    soltarPush: soltarPush, avisoDePrueba: avisoDePrueba, marcarAvisosLeidos: marcarAvisosLeidos, ponerGlobo: ponerGlobo,
     escuchar: escuchar, dejarDeEscuchar: dejarDeEscuchar, exportar: exportar,
   };
 })(window);

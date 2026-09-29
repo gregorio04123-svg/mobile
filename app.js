@@ -123,6 +123,33 @@ function primerNombre(n) { return String(n || '').trim().split(/\s+/)[0] || 'tu 
 const DIAS_LUNES = [1, 2, 3, 4, 5, 6, 0];
 function entero(v, min, max, def) { const n = parseInt(v, 10); return isNaN(n) ? def : Math.max(min, Math.min(max, n)); }
 function recorte(v, max, def) { const x = typeof v === 'string' ? v.trim() : ''; return (x || def || '').slice(0, max); }
+/** Destino que trae el enlace de una notificación (?ir=estudio&fecha=…). */
+function leerDestino(url) {
+  try {
+    const u = new URL(url, location.href), ir = u.searchParams.get('ir');
+    if (!['estudio', 'finanzas', 'ejercicio'].includes(ir)) return null;
+    return { ir, fecha: u.searchParams.get('fecha'), libreta: u.searchParams.get('libreta'), inv: u.searchParams.get('inv') };
+  } catch (e) { return null; }
+}
+function destinoDe(a) {
+  if (a.tipo === 'actividad' || a.tipo === 'recordatorio') return { ir: 'estudio', fecha: a.fecha };
+  if (a.tipo === 'libreta' || a.tipo === 'abono') return { ir: 'finanzas', libreta: a.ref };
+  if (a.tipo === 'rutina') return { ir: 'ejercicio', inv: a.ref };
+  return null;
+}
+const SECCION_AVISO = { actividad: 'ESTUDIO', recordatorio: 'ESTUDIO', libreta: 'FINANZAS', abono: 'FINANZAS', rutina: 'EJERCICIO' };
+function hace(ts) {
+  const d = new Date(ts), min = Math.round((Date.now() - d.getTime()) / 60000);
+  if (!(min >= 0)) return '';
+  if (min < 1) return 'AHORA';
+  if (min < 60) return 'HACE ' + min + ' MIN';
+  if (min < 60 * 24 && d.getDate() === new Date().getDate()) return 'HACE ' + Math.round(min / 60) + ' H';
+  if (isoOf(d) === isoOf(addDays(new Date(), -1))) return 'AYER';
+  return d.getDate() + ' ' + MONTHS_SH[d.getMonth()];
+}
+function horaTxt(h) { return (h % 12 === 0 ? 12 : h % 12) + ':00 ' + (h < 12 ? 'a. m.' : 'p. m.'); }
+const HORAS = Array.from({ length: 24 }, (_, h) => ({ v: String(h), t: horaTxt(h) }));
+
 /** Rutina que llega de otra persona (invitación o vista de un amigo): solo
  *  se copian los campos conocidos, con límites, antes de mostrarla o guardarla. */
 function sanearRutina(c) {
@@ -194,8 +221,13 @@ class Component extends DCLogic {
       showHist: false, openLib: null, abonoMonto: '',
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
       invRutinas: [], verRutina: null,
+      avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false,
+      push: '', pushBusy: false, pushMsg: '',
     });
-    this.invPorBorrar = new Set();   // invitaciones respondidas que aún no se borran en el servidor
+    this.invPorBorrar = new Set();
+    // Si la app se abrió desde una notificación, a dónde hay que ir.
+    this.destino = leerDestino(location.href);
+    if (this.destino) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }   // invitaciones respondidas que aún no se borran en el servidor
   }
 
   /* ── Datos del servidor → estado ─────────────────────────────────── */
@@ -245,6 +277,7 @@ class Component extends DCLogic {
         data: { profile: s.profile, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, logs: this.snapshot().sesiones,
                 grupos: s.grupos, plan: s.plan },
         base: this.base, codigo: s.codigo, amigos: s.amigos, cuadAmigos: s.cuadAmigos, invRutinas: s.invRutinas,
+        avisos: s.avisos, avisosLeidos: s.avisosLeidos,
       }));
     } catch (e) {}
   }
@@ -267,6 +300,17 @@ class Component extends DCLogic {
     this.poll = setInterval(() => {
       if (document.visibilityState === 'visible' && !this.state.modal) this.refrescar();
     }, 300000);
+
+    Nube.registrarSW().then(() => this.actualizarPush());
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', e => {
+        const d = e.data && e.data.tipo === 'abrir-aviso' ? leerDestino(e.data.url) : null;
+        if (!d) return;
+        this.destino = d;
+        this.aplicarDestino(false);
+        this.refrescar();
+      });
+    }
 
     Nube.alPerderSesion(() => this.sesionPerdida());
     Nube.sesion().then(
@@ -296,8 +340,9 @@ class Component extends DCLogic {
       this.base = cache.base;
       this.setState(Object.assign(this.desdeDatos(cache.data), {
         auth: 'dentro', me, codigo: cache.codigo || '', amigos: cache.amigos || [], cuadAmigos: cache.cuadAmigos || {},
-        invRutinas: cache.invRutinas || [],
+        invRutinas: cache.invRutinas || [], avisos: cache.avisos || [], avisosLeidos: cache.avisosLeidos || null,
       }));
+      this.aplicarDestino(false);
     } else {
       this.base = null;
       this.setState(Object.assign(vacio(), { auth: 'cargando', cargaError: '', me }));
@@ -333,6 +378,8 @@ class Component extends DCLogic {
     if (this.hayPendientes() &&
         !window.confirm('Hay cambios que aún no llegan a la nube (sin conexión). Si cierras sesión se pierden. ¿Cerrar de todos modos?')) return;
     const uid = this.uid;
+    await Nube.soltarPush();
+    Nube.ponerGlobo(0);
     this.cerrarLocal();
     try { localStorage.removeItem('pilares.nube.' + uid); } catch (e) {}
     await Nube.salir();
@@ -361,6 +408,7 @@ class Component extends DCLogic {
       activeDay: 1, expanded: null,
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
       invRutinas: [], verRutina: null,
+      avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false, pushMsg: '',
     });
   }
 
@@ -769,10 +817,12 @@ class Component extends DCLogic {
       this.setState(Object.assign(this.desdeDatos(d), {
         auth: 'dentro', cargaError: '', codigo: d.codigo, amigos: d.amigos, cuadAmigos: d.cuadAmigos, nube: 'ok',
         invRutinas: d.invRutinas.filter(x => !this.invPorBorrar.has(x.id)),
+        avisos: d.avisos, avisosLeidos: d.avisosLeidos,
       }));
       this.base = Nube.filas(this.snapshot(), uid);
       this.__sig = DATA_KEYS.map(k => this.state[k]);
       this.guardarCache();
+      this.trasLeer();
     } catch (e) {
       console.warn('[pilares] no se pudo leer', e);
       if (this.state.auth === 'cargando') this.setState({ cargaError: 'No pudimos conectar con el servidor. Revisa tu internet.' });
@@ -980,6 +1030,161 @@ class Component extends DCLogic {
           ver: () => self.setState({ verRutina: { modo: 'inv', inv } }),
         };
       }),
+    };
+  }
+
+  /* ── Avisos y notificaciones ─────────────────────────────────────── */
+
+  avisosNuevos(desde) {
+    const t0 = Date.parse(desde || '') || 0;
+    return this.state.avisos.filter(a => Date.parse(a.creado) > t0).length;
+  }
+
+  /** Después de cada lectura: número del ícono, zona horaria del
+   *  dispositivo, este dispositivo a nombre de la cuenta y enlace pendiente. */
+  trasLeer() {
+    const s = this.state;
+    Nube.ponerGlobo(this.avisosNuevos(s.avisosLeidos));
+    let zona = '';
+    try { zona = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+    if (zona && s.profile.zona && s.profile.zona !== zona) this.setState(st => ({ profile: { ...st.profile, zona } }));
+    if (!this.pushRenovado) {
+      this.pushRenovado = true;
+      Nube.renovarPush().catch(e => console.warn('[pilares] push', e));
+    }
+    this.aplicarDestino(true);
+  }
+
+  /** Abre la sección de un aviso. Con datos frescos se da por hecho aunque
+   *  lo buscado ya no exista; con la copia local se reintenta al leer. */
+  aplicarDestino(fresco) {
+    const d = this.destino;
+    if (!d || this.state.auth !== 'dentro') return;
+    if (this.irA(d, true) || fresco) this.destino = null;
+  }
+
+  /** true si encontró lo que buscaba (o no buscaba nada en particular). */
+  irA(d, cerrarTodo) {
+    if (!d) return true;
+    const s = this.state;
+    const cambios = cerrarTodo ? { panel: false, modal: null, rutinaOn: false, verRutina: null, menuDia: null } : {};
+    let hallado = true, libreta = null;
+    if (d.ir === 'estudio') {
+      Object.assign(cambios, { tab: 'estudio', estudioTab: 'agenda', openCuaderno: null });
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d.fecha || '')) {
+        const p = d.fecha.split('-').map(Number);
+        Object.assign(cambios, { year: p[0], month: p[1] - 1, selDay: p[2] });
+      }
+    } else if (d.ir === 'finanzas') {
+      cambios.tab = 'finanzas';
+      const l = d.libreta && s.libs.find(x => x.id === d.libreta);
+      if (l && l.paid) cambios.showHist = true;
+      else if (l) { cambios.openLib = l.id; libreta = l.id; }
+      else hallado = !d.libreta;
+    } else if (d.ir === 'ejercicio') {
+      cambios.tab = 'ejercicio';
+      const inv = d.inv && s.invRutinas.find(x => x.id === d.inv);
+      if (inv) cambios.verRutina = { modo: 'inv', inv };
+      else hallado = !d.inv;
+    } else return true;
+    this.setState(cambios);
+    if (libreta) {
+      setTimeout(() => {
+        const el = document.querySelector('[data-lib-id="' + libreta + '"]');
+        if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }, 400);
+    }
+    return hallado;
+  }
+
+  /** Al abrir el panel se ven los avisos: los nuevos quedan marcados solo
+   *  mientras el panel siga abierto. */
+  abrirPanel() {
+    const s = this.state;
+    this.setState({ panel: true, avisosAntes: s.avisosLeidos, avisosTodos: false, pushMsg: '' });
+    this.actualizarPush();
+    if (!this.avisosNuevos(s.avisosLeidos)) return;
+    Nube.marcarAvisosLeidos().then(hasta => {
+      if (!hasta || !this.uid) return;
+      this.setState({ avisosLeidos: hasta });
+      setTimeout(() => this.guardarCache(), 0);
+      Nube.ponerGlobo(0);
+    }, e => console.warn('[pilares] avisos leídos', e));
+  }
+
+  async actualizarPush() {
+    try {
+      const e = await Nube.estadoPush();
+      if (e !== this.state.push) this.setState({ push: e });
+    } catch (err) { this.setState({ push: 'no' }); }
+  }
+
+  async activarNotificaciones() {
+    if (this.state.pushBusy) return;
+    this.setState({ pushBusy: true, pushMsg: '' });
+    try {
+      const e = await Nube.activarPush();
+      this.setState({ push: e, pushMsg: e === 'activo' ? 'Listo: te llegarán a este dispositivo. Toca Probar para ver una.' : '' });
+    } catch (err) {
+      this.setState({ pushMsg: err.message || 'No se pudieron activar. Intenta de nuevo.' });
+    } finally {
+      this.setState({ pushBusy: false });
+    }
+  }
+
+  async probarNotificacion() {
+    if (this.state.pushBusy) return;
+    this.setState({ pushBusy: true, pushMsg: '' });
+    try {
+      await Nube.avisoDePrueba();
+      this.setState({ pushMsg: 'Enviada. Debe llegar en unos segundos.' });
+    } catch (err) {
+      this.setState({ pushMsg: err.message || 'No se pudo enviar la prueba.' });
+    } finally {
+      this.setState({ pushBusy: false });
+    }
+  }
+
+  valsAvisos(s) {
+    const self = this;
+    const antes = Date.parse(s.avisosAntes || '') || 0;
+    const nuevos = this.avisosNuevos(s.avisosLeidos);
+    const nuevosAlAbrir = s.avisos.filter(a => Date.parse(a.creado) > antes).length;
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const P = {
+      instalar: ['Notificaciones en el iPhone', 'Primero agrega Pilares a tu pantalla de inicio: en Safari toca Compartir › Agregar a inicio y ábrela desde el ícono. Necesitas iOS 16.4 o más reciente.', ''],
+      no: ['Notificaciones', 'Este navegador no permite notificaciones. Tus avisos igual aparecen aquí.', ''],
+      pedir: ['Notificaciones en este dispositivo', 'Actívalas para enterarte aunque la app esté cerrada.', s.pushBusy ? 'Activando…' : 'Activar'],
+      bloqueado: ['Notificaciones bloqueadas', ios ? 'Para recibirlas, actívalas en Ajustes › Notificaciones › Pilares.' : 'Para recibirlas, permítelas en la configuración del navegador para este sitio.', ''],
+      activo: ['Notificaciones activas', 'Te llegan a este dispositivo.', s.pushBusy ? 'Enviando…' : 'Probar'],
+    }[s.push] || ['Notificaciones', 'Revisando este dispositivo…', ''];
+    const lista = s.avisosTodos ? s.avisos : s.avisos.slice(0, 5);
+    return {
+      avisosBadge: nuevos > 0, avisosBadgeTxt: nuevos > 9 ? '9+' : String(nuevos),
+      avisosNuevosTxt: nuevosAlAbrir ? cuenta(nuevosAlAbrir, 'NUEVO', 'NUEVOS') : '',
+      avisosList: lista.map(a => {
+        const nuevo = Date.parse(a.creado) > antes, dest = destinoDe(a);
+        return {
+          titulo: a.titulo, cuerpo: a.cuerpo, hayCuerpo: !!a.cuerpo,
+          cuando: [hace(a.creado), SECCION_AVISO[a.tipo]].filter(Boolean).join(' · '),
+          punto: nuevo ? AMBER : 'transparent',
+          bg: nuevo ? 'rgba(206,127,85,.07)' : '#121724', border: nuevo ? 'rgba(206,127,85,.26)' : 'rgba(255,255,255,.07)',
+          ir: () => { if (!dest) return; self.cerrarHoja('panel'); self.irA(dest, false); },
+        };
+      }),
+      avisosVacio: s.avisos.length === 0,
+      avisosMas: s.avisos.length > 5,
+      avisosMasTxt: s.avisosTodos ? 'Ver menos' : 'Ver todos (' + s.avisos.length + ')',
+      avisosAlternar: () => self.setState(st => ({ avisosTodos: !st.avisosTodos })),
+      pushTitulo: P[0], pushTexto: P[1], pushBtn: P[2], pushBtnOn: !!P[2],
+      pushGo: () => { if (s.push === 'activo') self.probarNotificacion(); else if (s.push === 'pedir') self.activarNotificaciones(); },
+      pushMsg: s.pushMsg,
+      horas: HORAS,
+      horaSel: String(typeof s.profile.hora === 'number' ? s.profile.hora : 19),
+      onHora: ev => {
+        const v = parseInt(ev.target.value, 10);
+        if (v >= 0 && v <= 23) self.setState(st => ({ profile: { ...st.profile, hora: v } }));
+      },
     };
   }
 
@@ -1479,13 +1684,13 @@ class Component extends DCLogic {
     return {
       yes: true,
       appOn: true, authOn: false, loadOn: false,
-      ...self.valsRutina(s), ...self.valsMenu(s), ...self.valsVer(s), ...self.valsInv(s),
+      ...self.valsRutina(s), ...self.valsMenu(s), ...self.valsVer(s), ...self.valsInv(s), ...self.valsAvisos(s),
       isHome: s.tab === 'home', isEjercicio: s.tab === 'ejercicio', isEstudio: s.tab === 'estudio', isFinanzas: s.tab === 'finanzas',
       editOn: s.edit, panelOn: s.panel, modalOn: !!m, restOn: s.restOn,
       goEjercicio: () => self.setState({ tab: 'ejercicio' }),
       goEstudio: () => self.setState({ tab: 'estudio', estudioTab: 'agenda', openCuaderno: null }),
       goFinanzas: () => self.setState({ tab: 'finanzas' }),
-      openPanel: () => self.setState({ panel: true }),
+      openPanel: () => self.abrirPanel(),
       closePanel: () => self.cerrarHoja('panel'),
       toggleEdit: () => self.setState(st => ({ edit: !st.edit })),
 

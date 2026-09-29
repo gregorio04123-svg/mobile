@@ -17,6 +17,7 @@ pilares/
 ├── runtime.js              ← motor que interpreta la plantilla del diseño
 ├── styles.css              ← estilos base + marco de teléfono en escritorio
 ├── viewport.js             ← corrige el alto de pantalla en la PWA instalada
+├── sw.js                   ← service worker: recibe las notificaciones push
 ├── icon.svg                ← ícono vectorial (favicon)
 ├── icon-192.png            ← ícono PWA / apple-touch-icon
 ├── icon-512.png            ← ícono PWA (incluye versión "maskable")
@@ -49,6 +50,11 @@ pilares/
   - **Ver la rutina de un amigo**: panel ⚙ → Amigos → tocar su nombre. Solo lectura.
 - **Persistencia**: todo se guarda en Supabase y además queda una copia en el teléfono, así abre al instante y funciona sin señal (lo pendiente se sube al volver la conexión). Seguridad por fila: nadie ve datos de otra cuenta salvo lo compartido.
 - **Tiempo real**: lo que haga un amigo (solicitud de amistad, actividad asignada, libretica compartida, abono, rutina enviada) aparece en uno o dos segundos mientras la app está en pantalla. En segundo plano la conexión se suelta y al volver se lee lo que pasó. Plan gratis de Supabase: 200 conexiones simultáneas y 2 millones de mensajes al mes; un círculo de amigos queda muy por debajo.
+- **Avisos y notificaciones**: el botón ⚙ muestra un número rojo con los avisos nuevos, y el panel los lista arriba (tocar uno lleva a su sección). Avisan de:
+  - **Estudio**: un amigo te asigna una actividad, y un recordatorio el día anterior a cada entrega a la hora que elijas en el panel (por defecto 7:00 p. m.).
+  - **Finanzas**: te comparten una libretica, o alguien registra un abono en una compartida.
+  - **Ejercicio**: un amigo te envía una rutina.
+  - Para que lleguen al celular con la app cerrada: panel ⚙ → *Activar* (y *Probar* para ver una). En iPhone primero hay que agregar Pilares a la pantalla de inicio (Safari → Compartir → *Agregar a inicio*) y abrirla desde el ícono; requiere iOS 16.4 o más reciente. Cada dispositivo se activa por separado; al cerrar sesión deja de recibirlas.
 - **Respaldo**: panel ⚙ → *Exportar mis datos* → *Guardar respaldo*. Descarga un `.json` con todo lo tuyo (perfil, amigos, cuadernos, actividades, todo el historial del gimnasio, libreticas y abonos). En iPhone se abre la hoja de compartir: elige *Guardar en Archivos*. El plan gratis no hace copias automáticas, así que conviene exportar de vez en cuando.
 - **Datos de antes de las cuentas**: si en un teléfono ya usabas la app, en el panel ⚙ aparece *Importar datos de este dispositivo* (una sola vez por dispositivo).
 
@@ -237,7 +243,7 @@ props: {
 }
 ```
 
-**Rutinas de gimnasio** — viven en Supabase: tabla `grupos` (cada grupo con sus ejercicios) y tabla `rutinas` (el plan de 7 días; índice 0 = domingo). La rutina base de las cuentas nuevas la crea la función `sembrar_rutina` de la base de datos. Las rutinas enviadas entre amigos viven en `rutinas_compartidas` hasta que se aceptan o rechazan; solo se crean con la función `compartir_rutina` (que toma la foto en el servidor y exige amistad), y `rutina_de_amigo` da la vista de solo lectura. Cada persona la cambia desde la app. Para que un ejercicio nuevo tenga ícono propio, añade su trazado en `ICONS` (en `app.js`) con la misma clave del nombre; si no, usa una mancuerna genérica.
+**Rutinas de gimnasio** — viven en Supabase: tabla `grupos` (cada grupo con sus ejercicios) y tabla `rutinas` (el plan de 7 días; índice 0 = domingo). La rutina base de las cuentas nuevas la crea la función `sembrar_rutina` de la base de datos. Los avisos los crean disparadores de la base de datos (tabla `avisos`); si la persona activó notificaciones, cada aviso sale como push por la función `enviar-push` (código en `supabase/functions/enviar-push`), que firma con claves VAPID guardadas en Vault. El recordatorio de entregas lo revisa cada hora `pg_cron` según la hora y zona horaria de cada quien. Todo dentro del plan gratis. Las rutinas enviadas entre amigos viven en `rutinas_compartidas` hasta que se aceptan o rechazan; solo se crean con la función `compartir_rutina` (que toma la foto en el servidor y exige amistad), y `rutina_de_amigo` da la vista de solo lectura. Cada persona la cambia desde la app. Para que un ejercicio nuevo tenga ícono propio, añade su trazado en `ICONS` (en `app.js`) con la misma clave del nombre; si no, usa una mancuerna genérica.
 
 **Supabase** — la URL del proyecto y la clave pública están al inicio de `nube.js`. La clave pública (`sb_publishable_…`) está hecha para ir en el navegador; lo que protege los datos son las políticas de seguridad por fila de la base de datos. **Nunca** pongas en este repo la clave `service_role` / `secret`.
 

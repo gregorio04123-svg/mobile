@@ -239,7 +239,8 @@
         continue;
       }
 
-      if (lower === 'value' && name === 'input') {
+      // value de <input> y <select> va como propiedad (el atributo no cambia la seleccion).
+      if (lower === 'value' && (name === 'input' || name === 'select')) {
         var v = interpolate(attrRaw, scope, ctx.vals);
         hasValue = true;
         valueText = (v == null ? '' : String(v));

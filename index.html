@@ -104,6 +104,7 @@
         <circle cx="12" cy="12" r="7.4" stroke-width="5.2"></circle>
       </svg>
       <sc-if value="{{ hasSolicitudes }}"><div style="position:absolute;top:-3px;left:-3px;width:12px;height:12px;border-radius:50%;background:#57B9A0;border:2px solid #090C14"></div></sc-if>
+      <sc-if value="{{ avisosBadge }}"><div style="position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:#C46461;border:2px solid #090C14;font:800 10px/16px Manrope,sans-serif;color:#fff;text-align:center">{{ avisosBadgeTxt }}</div></sc-if>
     </div>
   </div>
   </div>
@@ -212,7 +213,8 @@
         <circle cx="12" cy="12" r="7.4" stroke-width="5.2"></circle>
       </svg>
       <sc-if value="{{ hasSolicitudes }}"><div style="position:absolute;top:-3px;left:-3px;width:12px;height:12px;border-radius:50%;background:#57B9A0;border:2px solid #090C14"></div></sc-if>
-      <sc-if value="{{ editOn }}"><div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#CE7F55;border:2px solid #090C14"></div></sc-if>
+      <sc-if value="{{ avisosBadge }}"><div style="position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:#C46461;border:2px solid #090C14;font:800 10px/16px Manrope,sans-serif;color:#fff;text-align:center">{{ avisosBadgeTxt }}</div></sc-if>
+      <sc-if value="{{ editOn }}"><div style="position:absolute;bottom:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#CE7F55;border:2px solid #090C14"></div></sc-if>
     </div>
   </div>
   </div>
@@ -418,7 +420,8 @@
         <circle cx="12" cy="12" r="7.4" stroke-width="5.2"></circle>
       </svg>
       <sc-if value="{{ hasSolicitudes }}"><div style="position:absolute;top:-3px;left:-3px;width:12px;height:12px;border-radius:50%;background:#57B9A0;border:2px solid #090C14"></div></sc-if>
-        <sc-if value="{{ editOn }}"><div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#CE7F55;border:2px solid #090C14"></div></sc-if>
+      <sc-if value="{{ avisosBadge }}"><div style="position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:#C46461;border:2px solid #090C14;font:800 10px/16px Manrope,sans-serif;color:#fff;text-align:center">{{ avisosBadgeTxt }}</div></sc-if>
+        <sc-if value="{{ editOn }}"><div style="position:absolute;bottom:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#CE7F55;border:2px solid #090C14"></div></sc-if>
     </div>
   </div>
 
@@ -583,13 +586,14 @@
         <circle cx="12" cy="12" r="7.4" stroke-width="5.2"></circle>
       </svg>
       <sc-if value="{{ hasSolicitudes }}"><div style="position:absolute;top:-3px;left:-3px;width:12px;height:12px;border-radius:50%;background:#57B9A0;border:2px solid #090C14"></div></sc-if>
+      <sc-if value="{{ avisosBadge }}"><div style="position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:#C46461;border:2px solid #090C14;font:800 10px/16px Manrope,sans-serif;color:#fff;text-align:center">{{ avisosBadgeTxt }}</div></sc-if>
     </div>
   </div>
   </div>
 
   <div data-desplaza style="flex:1;min-height:0;overflow:auto;padding:6px 22px calc(env(safe-area-inset-bottom,0px) + 112px);display:flex;flex-direction:column;gap:12px">
     <sc-for list="{{ libs }}" as="l" hint-placeholder-count="4">
-      <div style="background:{{ l.bg }};border:1px solid {{ l.border }};border-radius:16px;padding:18px;opacity:{{ l.opacity }}">
+      <div data-lib-id="{{ l.id }}" style="background:{{ l.bg }};border:1px solid {{ l.border }};border-radius:16px;padding:18px;opacity:{{ l.opacity }};scroll-margin-top:150px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
           <div sc-camel-on-click="{{ l.flip }}" style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;padding:6px 9px;border-radius:8px;cursor:pointer;background:{{ l.tint }};color:{{ l.color }}">{{ l.dirLabel }}</div>
           <div sc-camel-on-click="{{ l.togglePaid }}" style="display:flex;align-items:center;gap:9px;cursor:pointer">
@@ -847,12 +851,65 @@
       <div style="display:flex;align-items:flex-start;justify-content:space-between">
         <div>
           <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">PANEL DE CUSTOMIZACIÓN</div>
-          <div style="font:800 24px/1.1 Manrope,sans-serif;letter-spacing:-.02em;margin-top:9px">Tu perfil</div>
+          <div style="font:800 24px/1.1 Manrope,sans-serif;letter-spacing:-.02em;margin-top:9px">Tu panel</div>
         </div>
         <div sc-camel-on-click="{{ closePanel }}" style="width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 16px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
       </div>
 
-      <div style="margin-top:20px;display:flex;flex-direction:column;gap:11px">
+      <div style="margin-top:22px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#8E9AAE" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1.2 1.3H2.8L4 11.5z"></path><path d="M6.5 14.2a1.6 1.6 0 0 0 3 0"></path></svg>
+          <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">AVISOS</div>
+        </div>
+        <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.1em;color:#CE7F55">{{ avisosNuevosTxt }}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+        <sc-for list="{{ avisosList }}" as="av" hint-placeholder-count="0">
+          <div sc-camel-on-click="{{ av.ir }}" style="padding:12px 14px;border-radius:12px;background:{{ av.bg }};border:1px solid {{ av.border }};display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+            <div style="width:7px;height:7px;flex:none;border-radius:50%;margin-top:5px;background:{{ av.punto }}"></div>
+            <div style="flex:1;min-width:0">
+              <div style="font:700 13.5px/1.3 Manrope,sans-serif;color:#EDF1F7;text-wrap:pretty">{{ av.titulo }}</div>
+              <sc-if value="{{ av.hayCuerpo }}">
+                <div style="font:500 12px/1.4 Manrope,sans-serif;color:#9AA6BA;margin-top:4px;text-wrap:pretty">{{ av.cuerpo }}</div>
+              </sc-if>
+              <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.1em;color:#4A566B;margin-top:8px">{{ av.cuando }}</div>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ avisosVacio }}">
+          <div style="padding:16px;border-radius:12px;border:1px dashed rgba(255,255,255,.12);font:500 12px/1.5 Manrope,sans-serif;color:#8E9AAE;text-align:center;text-wrap:pretty">Aquí verás cuando un amigo te asigne una actividad, te comparta una libretica, registre un abono o te envíe una rutina, y el recordatorio de tus entregas.</div>
+        </sc-if>
+        <sc-if value="{{ avisosMas }}">
+          <div sc-camel-on-click="{{ avisosAlternar }}" style="padding:12px;border-radius:11px;text-align:center;cursor:pointer;font:700 12px/1 Manrope,sans-serif;color:#8E9AAE;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07)">{{ avisosMasTxt }}</div>
+        </sc-if>
+      </div>
+
+      <div style="margin-top:12px;padding:15px 16px;border-radius:14px;background:#121724;border:1px solid rgba(255,255,255,.07)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="flex:1;min-width:0">
+            <div style="font:700 13.5px/1.25 Manrope,sans-serif;color:#EDF1F7">{{ pushTitulo }}</div>
+            <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:5px;text-wrap:pretty">{{ pushTexto }}</div>
+          </div>
+          <sc-if value="{{ pushBtnOn }}">
+            <div sc-camel-on-click="{{ pushGo }}" style="flex:none;padding:11px 14px;border-radius:10px;cursor:pointer;background:rgba(87,185,160,.12);border:1px solid rgba(87,185,160,.34);font:700 12.5px/1 Manrope,sans-serif;color:#57B9A0">{{ pushBtn }}</div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ pushMsg }}">
+          <div style="font:600 11.5px/1.45 Manrope,sans-serif;color:#9AA6BA;margin-top:10px">{{ pushMsg }}</div>
+        </sc-if>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:12px">
+          <div style="flex:1;min-width:0">
+            <div style="font:700 13px/1.25 Manrope,sans-serif;color:#EDF1F7">Recordatorio de entregas</div>
+            <div style="font:500 11px/1.4 Manrope,sans-serif;color:#8E9AAE;margin-top:4px">El día anterior a cada entrega</div>
+          </div>
+          <select value="{{ horaSel }}" sc-camel-on-change="{{ onHora }}" aria-label="Hora del recordatorio" style="flex:none;appearance:none;-webkit-appearance:none;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#fff;font:700 14px Manrope,sans-serif;padding:10px 12px;color-scheme:dark">
+            <sc-for list="{{ horas }}" as="h" hint-placeholder-count="0"><option value="{{ h.v }}">{{ h.t }}</option></sc-for>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:24px;font:700 10px/1 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">TU PERFIL</div>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:11px">
         <div>
           <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">NOMBRE</div>
           <input value="{{ pNombre }}" sc-camel-on-change="{{ onNombre }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:700 15px Manrope,sans-serif;padding:11px 12px">
