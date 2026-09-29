@@ -127,6 +127,8 @@
       // Los últimos avisos (los de prueba no se listan).
       sb.from('avisos').select('id,tipo,titulo,cuerpo,ref,fecha,creado_en').eq('user_id', uid).neq('tipo', 'prueba')
         .order('creado_en', { ascending: false }).limit(30),
+      // Un renglón por conversación: último mensaje y cuántos no he leído.
+      sb.rpc('mis_chats'),
     ]);
     for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
 
@@ -182,6 +184,7 @@
                  hora: perfil.hora_recordatorio == null ? 19 : perfil.hora_recordatorio, zona: perfil.zona_horaria || '',
                  tipos: Array.isArray(perfil.tipos_actividad) ? perfil.tipos_actividad : null },
       avisosLeidos: perfil.avisos_leidos_hasta || null,
+      chats: (q[12].data || []).map(chatDe),
       avisos: (q[11].data || []).map(function (a) {
         return { id: a.id, tipo: a.tipo, titulo: a.titulo, cuerpo: a.cuerpo || '', ref: a.ref, fecha: a.fecha, creado: a.creado_en };
       }),
@@ -192,6 +195,11 @@
         return { id: r.id, de: r.de_id, deNombre: r.de_nombre, tipo: r.tipo, contenido: r.contenido, creado: r.creado_en };
       }),
     };
+  }
+
+  function chatDe(c) {
+    return { otro: c.otro_id, tipo: c.tipo, texto: c.texto || '', datos: c.datos || null, de: c.de_id, en: c.creado_en,
+             sinLeer: c.sin_leer || 0, sinLeerTexto: c.sin_leer_texto || 0 };
   }
 
   /** Crea la rutina base si a la cuenta le falta (no hace nada si ya tiene). */
@@ -395,16 +403,45 @@
     if (r.error) throw new Error(ERRORES_RUTINA[r.error.message] || mensajeDe(r.error));
   }
 
-  async function rutinaDeAmigo(amigoId) {
-    var r = await sb.rpc('rutina_de_amigo', { p_amigo: amigoId });
-    if (r.error) throw new Error(ERRORES_RUTINA[r.error.message] || mensajeDe(r.error));
-    return r.data;
-  }
-
   /** Aceptada o rechazada, la invitación se borra. */
   async function borrarInvitacionRutina(id) {
     var r = await sb.from('rutinas_compartidas').delete().eq('id', id);
     if (r.error) throw new Error(mensajeDe(r.error));
+  }
+
+  /* ------------------------------------------------------------------
+   * Chat entre amigos
+   * ---------------------------------------------------------------- */
+  var POR_PAGINA = 60;
+
+  /** Mensaje de la base de datos con la forma que usa la app. */
+  function mensajeApp(m) {
+    return { id: m.id, de: m.de_id, para: m.para_id, tipo: m.tipo, texto: m.texto || '', ref: m.ref || null,
+             datos: m.datos || null, en: m.creado_en };
+  }
+
+  /** Los últimos mensajes con un amigo (o los anteriores a una fecha), del más viejo al más nuevo. */
+  async function mensajes(uid, otro, antesDe) {
+    var q = sb.from('mensajes').select('id,de_id,para_id,tipo,texto,ref,datos,creado_en')
+      .or('and(de_id.eq.' + uid + ',para_id.eq.' + otro + '),and(de_id.eq.' + otro + ',para_id.eq.' + uid + ')')
+      .order('creado_en', { ascending: false }).limit(POR_PAGINA);
+    if (antesDe) q = q.lt('creado_en', antesDe);
+    var r = await q;
+    if (r.error) throw new Error(mensajeDe(r.error));
+    return { lista: r.data.map(mensajeApp).reverse(), hayMas: r.data.length === POR_PAGINA };
+  }
+
+  /** El id lo pone la app: así el eco del tiempo real no duplica el mensaje. */
+  async function enviarMensaje(uid, id, para, texto) {
+    var r = await sb.from('mensajes').insert({ id: id, de_id: uid, para_id: para, texto: texto });
+    // Ya estaba guardado (un reintento de algo que sí había llegado): cuenta como enviado.
+    if (r.error && r.error.code !== '23505') throw new Error(mensajeDe(r.error));
+  }
+
+  async function marcarChatLeido(otro) {
+    var r = await sb.rpc('marcar_chat_leido', { p_otro: otro });
+    if (r.error) throw r.error;
+    return r.data;
   }
 
   /* ------------------------------------------------------------------
@@ -433,6 +470,8 @@
       ['rutinas_compartidas', 'INSERT', de('para_id')],  // me envían una rutina
       ['rutinas_compartidas', 'DELETE'],
       ['avisos', 'INSERT', de('user_id')],               // aviso nuevo para mí
+      ['mensajes', 'INSERT', de('para_id')],             // me escriben
+      ['mensajes', 'INSERT', de('de_id')],               // lo que escribo (o mi otro dispositivo)
     ];
     var canal = sb.channel('pilares-' + uid);
     enlaces.forEach(function (e) {
@@ -555,19 +594,31 @@
   /* ------------------------------------------------------------------
    * Respaldo: todo lo tuyo, tal como esta en la base de datos
    * ---------------------------------------------------------------- */
+  /** Todas las filas de una consulta: el servidor entrega máximo 1000 por vez. */
+  async function todas(consulta) {
+    var filas = [];
+    for (var desde = 0; ; desde += 1000) {
+      var r = await consulta().range(desde, desde + 999);
+      if (r.error) return r;
+      filas = filas.concat(r.data || []);
+      if (!r.data || r.data.length < 1000) return { data: filas, error: null };
+    }
+  }
+
   async function exportar(uid, usuario) {
     var q = await Promise.all([
-      sb.from('perfiles').select('nombre,altura,peso,sexo,codigo,creado_en').eq('id', uid).single(),
+      sb.from('perfiles').select('nombre,altura,peso,sexo,codigo,tipos_actividad,creado_en').eq('id', uid).single(),
       sb.from('cuadernos').select('id,nombre,orden,creado_en').eq('user_id', uid).order('orden'),
       sb.from('archivos').select('id,cuaderno_id,nombre,tamano,creado_en').eq('user_id', uid).order('creado_en'),
-      sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,con_urgencia,creado_en').order('fecha'),
+      todas(function () { return sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,con_urgencia,creado_en').order('fecha').order('id'); }),
       // Todo el historial del gimnasio, no solo los ultimos 120 dias.
-      sb.from('sesiones').select('fecha,grupo,abbr,dia,ejercicios,actualizado_en').eq('user_id', uid).order('fecha'),
-      sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,pagado_en,nota,vence_el,creado_en,actualizado_en').order('creado_en'),
-      sb.from('abonos').select('id,libreta_id,monto,nota,registrado_por,creado_en').order('creado_en'),
+      todas(function () { return sb.from('sesiones').select('fecha,grupo,abbr,dia,ejercicios,actualizado_en').eq('user_id', uid).order('fecha'); }),
+      todas(function () { return sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,pagado_en,nota,vence_el,enviada,creado_en,actualizado_en').order('creado_en').order('id'); }),
+      todas(function () { return sb.from('abonos').select('id,libreta_id,monto,nota,registrado_por,creado_en').order('creado_en').order('id'); }),
       sb.rpc('mis_conexiones'),
       sb.from('grupos').select('id,nombre,abbr,color,musculo,orden,ejercicios').eq('user_id', uid).order('orden'),
       sb.from('rutinas').select('plan').eq('user_id', uid).maybeSingle(),
+      todas(function () { return sb.from('mensajes').select('id,de_id,para_id,tipo,texto,datos,creado_en').order('creado_en').order('id'); }),
     ]);
     for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
 
@@ -583,6 +634,8 @@
       grupos_rutina: q[8].data,
       // Índice 0 = domingo … 6 = sábado; null = descanso.
       plan_semanal: q[9].data ? q[9].data.plan : null,
+      // de_id / para_id: tu id o el de un amigo (ver "amigos").
+      mensajes_chat: q[10].data,
     };
   }
 
@@ -591,7 +644,8 @@
     sesion: sesion, entrar: entrar, crear: crear, salir: salir, alPerderSesion: alPerderSesion,
     cargar: cargar, sembrarRutina: sembrarRutina, filas: filas, pendientes: pendientes, sincronizar: sincronizar,
     buscarCodigo: buscarCodigo, invitar: invitar, aceptar: aceptar, borrarConexion: borrarConexion,
-    compartirRutina: compartirRutina, rutinaDeAmigo: rutinaDeAmigo, borrarInvitacionRutina: borrarInvitacionRutina,
+    compartirRutina: compartirRutina, borrarInvitacionRutina: borrarInvitacionRutina,
+    mensajes: mensajes, enviarMensaje: enviarMensaje, marcarChatLeido: marcarChatLeido, mensajeDe: mensajeApp,
     registrarSW: registrarSW, estadoPush: estadoPush, activarPush: activarPush, renovarPush: renovarPush,
     soltarPush: soltarPush, avisoDePrueba: avisoDePrueba, marcarAvisosLeidos: marcarAvisosLeidos, ponerGlobo: ponerGlobo,
     escuchar: escuchar, dejarDeEscuchar: dejarDeEscuchar, exportar: exportar,

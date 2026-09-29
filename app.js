@@ -148,17 +148,59 @@ function recorte(v, max, def) { const x = typeof v === 'string' ? v.trim() : '';
 function leerDestino(url) {
   try {
     const u = new URL(url, location.href), ir = u.searchParams.get('ir');
-    if (!['estudio', 'finanzas', 'ejercicio'].includes(ir)) return null;
-    return { ir, fecha: u.searchParams.get('fecha'), libreta: u.searchParams.get('libreta'), inv: u.searchParams.get('inv') };
+    if (!['estudio', 'finanzas', 'ejercicio', 'chat'].includes(ir)) return null;
+    return { ir, fecha: u.searchParams.get('fecha'), libreta: u.searchParams.get('libreta'), inv: u.searchParams.get('inv'), con: u.searchParams.get('con') };
   } catch (e) { return null; }
 }
 function destinoDe(a) {
   if (a.tipo === 'actividad' || a.tipo === 'recordatorio') return { ir: 'estudio', fecha: a.fecha };
   if (a.tipo === 'libreta' || a.tipo === 'abono') return { ir: 'finanzas', libreta: a.ref };
-  if (a.tipo === 'rutina') return { ir: 'ejercicio', inv: a.ref };
+  if (a.tipo === 'rutina') return { ir: 'ejercicio', inv: a.ref, quien: a.titulo };
   return null;
 }
-const SECCION_AVISO = { actividad: 'ESTUDIO', recordatorio: 'ESTUDIO', libreta: 'FINANZAS', abono: 'FINANZAS', rutina: 'EJERCICIO' };
+const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const DIAS_LARGO = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+function fechaLarga(f) {
+  const p = String(f || '').split('-').map(Number);
+  if (p.length !== 3 || !p[0]) return '';
+  return DIAS_LARGO[new Date(p[0], p[1] - 1, p[2]).getDay()] + ' ' + p[2] + ' de ' + MESES_LARGO[p[1] - 1];
+}
+function horaCorta(ts) {
+  const d = new Date(ts), h = d.getHours();
+  return (h % 12 || 12) + ':' + String(d.getMinutes()).padStart(2, '0') + ' ' + (h < 12 ? 'a. m.' : 'p. m.');
+}
+/** Separador de días en el chat. */
+function diaChat(ts) {
+  const d = new Date(ts), k = isoOf(d), hoy = new Date();
+  if (k === isoOf(hoy)) return 'Hoy';
+  if (k === isoOf(addDays(hoy, -1))) return 'Ayer';
+  return fechaLarga(k) + (d.getFullYear() !== hoy.getFullYear() ? ' de ' + d.getFullYear() : '');
+}
+/** Hora corta en la lista de chats: hoy la hora, ayer "Ayer", esta semana el día. */
+function cuandoChat(ts) {
+  const d = new Date(ts), hoy = new Date(), dias = dayDiff(isoOf(d), isoOf(hoy));
+  if (dias <= 0) return horaCorta(ts);
+  if (dias === 1) return 'Ayer';
+  if (dias < 7) return DIAS_LARGO[d.getDay()].slice(0, 3);
+  return d.getDate() + ' ' + MONTHS_SH[d.getMonth()].toLowerCase();
+}
+/** Un color fijo por persona para su avatar. */
+function colorDe(id) {
+  let h = 0;
+  for (const ch of String(id || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return PALETA[h % PALETA.length];
+}
+function pesosTxt(n) { return '$' + fmtMoney(String(Math.round(+n || 0))); }
+/** Resumen del último mensaje para la lista de chats. */
+function previewChat(c, me) {
+  const yo = c.de === me ? 'Tú: ' : '', d = c.datos || {};
+  if (c.tipo === 'texto') return yo + c.texto;
+  if (c.tipo === 'libreta') return yo + 'Libretica · ' + pesosTxt(d.monto) + (d.nota ? ' · ' + d.nota : '');
+  if (c.tipo === 'actividad') return yo + 'Actividad · ' + (d.tipo || '') + (d.cuaderno ? ' · ' + d.cuaderno : '');
+  if (c.tipo === 'rutina') return yo + (d.tipo === 'semana' ? 'Rutina · semana completa' : 'Rutina · «' + (d.nombre || 'grupo') + '»');
+  return '';
+}
+const SECCION_AVISO = { actividad: 'ESTUDIO', recordatorio: 'ESTUDIO', libreta: 'FINANZAS', abono: 'FINANZAS', rutina: 'AMIGOS' };
 function hace(ts) {
   const d = new Date(ts), min = Math.round((Date.now() - d.getTime()) / 60000);
   if (!(min >= 0)) return '';
@@ -243,6 +285,10 @@ class Component extends DCLogic {
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false,
       push: '', pushBusy: false, pushMsg: '',
       tipoEd: null,   // editor de un tipo de actividad (Modo edición)
+      chats: [],      // un renglón por conversación (último mensaje, sin leer)
+      chatCon: null,  // amigo con el chat abierto
+      chatMsgs: {},   // mensajes cargados por amigo: { lista, hayMas, cargando, error }
+      chatTexto: '', chatHoja: null,
     });
     this.invPorBorrar = new Set();
     // Si la app se abrió desde una notificación, a dónde hay que ir.
@@ -297,7 +343,7 @@ class Component extends DCLogic {
         data: { profile: s.profile, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, logs: this.snapshot().sesiones,
                 grupos: s.grupos, plan: s.plan },
         base: this.base, codigo: s.codigo, amigos: s.amigos, cuadAmigos: s.cuadAmigos, invRutinas: s.invRutinas,
-        avisos: s.avisos, avisosLeidos: s.avisosLeidos,
+        avisos: s.avisos, avisosLeidos: s.avisosLeidos, chats: s.chats,
       }));
     } catch (e) {}
   }
@@ -322,6 +368,19 @@ class Component extends DCLogic {
     }, 300000);
 
     Nube.registrarSW().then(() => this.actualizarPush());
+    // Chat: Enter envía; con el teclado abierto el chat usa solo la parte visible.
+    document.addEventListener('keydown', e => {
+      const x = e.target;
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && x && x.matches && x.matches('[data-chat-entrada]')) {
+        e.preventDefault();
+        this.enviarMensaje();
+      }
+    });
+    if (window.visualViewport) {
+      const ajustar = () => this.ajustarTeclado();
+      window.visualViewport.addEventListener('resize', ajustar);
+      window.visualViewport.addEventListener('scroll', ajustar);
+    }
     if (navigator.serviceWorker) {
       navigator.serviceWorker.addEventListener('message', e => {
         const d = e.data && e.data.tipo === 'abrir-aviso' ? leerDestino(e.data.url) : null;
@@ -341,6 +400,10 @@ class Component extends DCLogic {
   componentWillUnmount() { clearInterval(this.timer); clearInterval(this.poll); this.desconectarTiempoReal(); }
 
   componentDidUpdate() {
+    if (this.bajarPend) {
+      const el = document.querySelector('[data-chat-lista]');
+      if (el) { el.scrollTop = el.scrollHeight; this.bajarPend = false; }
+    }
     if (this.state.auth !== 'dentro' || !this.base) return;
     const sig = DATA_KEYS.map(k => this.state[k]);
     if (this.__sig && sig.every((v, i) => v === this.__sig[i])) return;
@@ -361,6 +424,7 @@ class Component extends DCLogic {
       this.setState(Object.assign(this.desdeDatos(cache.data), {
         auth: 'dentro', me, codigo: cache.codigo || '', amigos: cache.amigos || [], cuadAmigos: cache.cuadAmigos || {},
         invRutinas: cache.invRutinas || [], avisos: cache.avisos || [], avisosLeidos: cache.avisosLeidos || null,
+        chats: cache.chats || [],
       }));
       this.aplicarDestino(false);
     } else {
@@ -429,6 +493,7 @@ class Component extends DCLogic {
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
       invRutinas: [], verRutina: null,
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false, pushMsg: '',
+      chats: [], chatCon: null, chatMsgs: {}, chatTexto: '', chatHoja: null,
     });
   }
 
@@ -722,6 +787,7 @@ class Component extends DCLogic {
     const cerrar = () => this.setState(st => tipo === 'modal' ? { modal: null, tipoEd: null }
       : tipo === 'rutina' ? { rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null }
       : tipo === 'ver' ? { verRutina: null }
+      : tipo === 'chat' ? { chatHoja: null }
       : {
         panel: false,
         respaldo: st.respaldo === 'preparando' ? 'preparando' : '',
@@ -752,6 +818,7 @@ class Component extends DCLogic {
    *  (por ejemplo, el eco de un cambio mío) no hago nada; si no, releo. */
   cambioRemoto(tabla, tipo, nuevo, viejo) {
     if (!this.uid) return;
+    if (tabla === 'mensajes') { if (tipo === 'INSERT') this.recibirMensaje(nuevo); return; }
     if (tabla === 'rutinas_compartidas') {
       if (tipo === 'DELETE' && !this.state.invRutinas.some(x => x.id === viejo.id)) return;
     } else if (tabla === 'conexiones') {
@@ -837,7 +904,7 @@ class Component extends DCLogic {
       this.setState(Object.assign(this.desdeDatos(d), {
         auth: 'dentro', cargaError: '', codigo: d.codigo, amigos: d.amigos, cuadAmigos: d.cuadAmigos, nube: 'ok',
         invRutinas: d.invRutinas.filter(x => !this.invPorBorrar.has(x.id)),
-        avisos: d.avisos, avisosLeidos: d.avisosLeidos,
+        avisos: d.avisos, avisosLeidos: d.avisosLeidos, chats: d.chats,
       }));
       this.base = Nube.filas(this.snapshot(), uid);
       this.__sig = DATA_KEYS.map(k => this.state[k]);
@@ -925,17 +992,6 @@ class Component extends DCLogic {
     }
   }
 
-  async verRutinaAmigo(a) {
-    this.setState({ verRutina: { modo: 'amigo', id: a.id, nombre: a.nombre, estado: 'cargando' } });
-    try {
-      const datos = sanearRutina(await Nube.rutinaDeAmigo(a.id));
-      this.setState(st => st.verRutina && st.verRutina.id === a.id ? { verRutina: { ...st.verRutina, estado: 'listo', datos } } : null);
-    } catch (e) {
-      const error = navigator.onLine === false ? 'Necesitas conexión a internet para ver su rutina.' : (e.message || 'No se pudo cargar su rutina.');
-      this.setState(st => st.verRutina && st.verRutina.id === a.id ? { verRutina: { ...st.verRutina, estado: 'error', error } } : null);
-    }
-  }
-
   /** Respondida la invitación, desaparece ya; en el servidor se borra en
    *  cuanto haya conexión (si no, en la próxima lectura). */
   quitarInvitacion(id) {
@@ -1001,7 +1057,6 @@ class Component extends DCLogic {
       cerrarVer: () => self.cerrarHoja('ver'),
       vCargando: !inv && v.estado === 'cargando',
       vError: !inv && v.estado === 'error' ? v.error : '',
-      vReintentar: () => self.verRutinaAmigo({ id: v.id, nombre: v.nombre }),
       vListo: !!datos,
     };
     if (!datos) return base;
@@ -1035,24 +1090,6 @@ class Component extends DCLogic {
     });
   }
 
-  /** Tarjetas en Ejercicio para las rutinas que me enviaron. */
-  valsInv(s) {
-    const self = this;
-    return {
-      hayInv: s.invRutinas.length > 0,
-      invCards: s.invRutinas.map(inv => {
-        const c = sanearRutina(inv.contenido), g0 = c.grupos[0];
-        const quien = primerNombre(self.nombreAmigo(inv)), semana = inv.tipo === 'semana';
-        return {
-          dots: c.grupos.slice(0, 5).map(g => ({ color: g.color })),
-          titulo: semana ? quien + ' te envió su semana' : quien + ' te envió «' + (g0 ? g0.nombre : 'un grupo') + '»',
-          meta: semana ? cuenta(c.grupos.length, 'GRUPO', 'GRUPOS') : cuenta(g0 ? g0.ejercicios.length : 0, 'EJERCICIO', 'EJERCICIOS'),
-          ver: () => self.setState({ verRutina: { modo: 'inv', inv } }),
-        };
-      }),
-    };
-  }
-
   /* ── Avisos y notificaciones ─────────────────────────────────────── */
 
   avisosNuevos(desde) {
@@ -1064,7 +1101,11 @@ class Component extends DCLogic {
    *  dispositivo, este dispositivo a nombre de la cuenta y enlace pendiente. */
   trasLeer() {
     const s = this.state;
-    Nube.ponerGlobo(this.avisosNuevos(s.avisosLeidos));
+    this.actualizarGlobo();
+    if (s.chatCon) {
+      this.cargarChat(s.chatCon);
+      if (document.visibilityState === 'visible') this.marcarLeido(s.chatCon);
+    }
     let zona = '';
     try { zona = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
     if (zona && s.profile.zona && s.profile.zona !== zona) this.setState(st => ({ profile: { ...st.profile, zona } }));
@@ -1101,11 +1142,20 @@ class Component extends DCLogic {
       if (l && l.paid) cambios.showHist = true;
       else if (l) { cambios.openLib = l.id; libreta = l.id; }
       else hallado = !d.libreta;
-    } else if (d.ir === 'ejercicio') {
-      cambios.tab = 'ejercicio';
+    } else if (d.ir === 'ejercicio' || d.ir === 'chat') {
+      // Las rutinas llegan por el chat: se abre la conversación con quien la envió.
       const inv = d.inv && s.invRutinas.find(x => x.id === d.inv);
-      if (inv) cambios.verRutina = { modo: 'inv', inv };
-      else hallado = !d.inv;
+      // Ya respondida: el chat con quien la envió, si su nombre no se repite entre tus amigos.
+      const tocayos = !inv && d.quien ? s.amigos.filter(a => a.estado === 'aceptada' && a.nombre === d.quien) : [];
+      const con = inv ? inv.de : d.con || (tocayos.length === 1 ? tocayos[0].id : null);
+      cambios.tab = 'amigos';
+      if (con && s.amigos.some(a => a.id === con && a.estado === 'aceptada')) {
+        this.setState(cambios);
+        this.abrirChat(con);
+        if (inv) this.setState({ verRutina: { modo: 'inv', inv } });
+        return true;
+      }
+      hallado = !(d.inv || d.con);
     } else return true;
     this.setState(cambios);
     if (libreta) {
@@ -1128,7 +1178,7 @@ class Component extends DCLogic {
       if (!hasta || !this.uid) return;
       this.setState({ avisosLeidos: hasta });
       setTimeout(() => this.guardarCache(), 0);
-      Nube.ponerGlobo(0);
+      this.actualizarGlobo();
     }, e => console.warn('[pilares] avisos leídos', e));
   }
 
@@ -1205,6 +1255,442 @@ class Component extends DCLogic {
         if (v >= 0 && v <= 23) self.setState(st => ({ profile: { ...st.profile, hora: v } }));
       },
     };
+  }
+
+  /* ── Chat entre amigos ───────────────────────────────────────────── */
+
+  textoSinLeer() { return this.state.chats.reduce((t, c) => t + (c.sinLeerTexto || 0), 0); }
+  /** Número del ícono de la app: avisos sin ver + mensajes sin leer. */
+  actualizarGlobo() { Nube.ponerGlobo(this.avisosNuevos(this.state.avisosLeidos) + this.textoSinLeer()); }
+
+  abrirChat(otro) {
+    if (!this.state.amigos.some(a => a.id === otro && a.estado === 'aceptada')) return false;
+    this.setState(st => ({ tab: 'amigos', chatCon: otro, chatHoja: null, chatTexto: st.chatCon === otro ? st.chatTexto : '' }));
+    this.cargarChat(otro, true);
+    this.marcarLeido(otro);
+    return true;
+  }
+
+  cerrarChat() {
+    this.soltarTeclado();
+    this.setState({ chatCon: null, chatHoja: null, chatTexto: '' });
+  }
+
+  /** Trae los mensajes más recientes; conserva los viejos ya cargados y los míos pendientes. */
+  async cargarChat(otro, abajo) {
+    const uid = this.uid;
+    if (!uid) return;
+    const previo = this.state.chatMsgs[otro];
+    this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [otro]: { lista: [], hayMas: false, ...(st.chatMsgs[otro] || {}), cargando: true, error: '' } } }));
+    try {
+      const r = await Nube.mensajes(uid, otro, null);
+      if (uid !== this.uid) return;
+      const cerca = this.chatAbajo();
+      this.setState(st => {
+        const prev = st.chatMsgs[otro] || { lista: [], hayMas: false };
+        const ids = new Set(r.lista.map(m => m.id));
+        const primero = r.lista[0];
+        const viejos = primero ? prev.lista.filter(m => !m.estado && m.en < primero.en && !ids.has(m.id)) : [];
+        const pendientes = prev.lista.filter(m => m.estado && !ids.has(m.id));
+        return { chatMsgs: { ...st.chatMsgs, [otro]: {
+          lista: viejos.concat(r.lista, pendientes), hayMas: viejos.length ? prev.hayMas : r.hayMas, cargando: false, error: '',
+        } } };
+      });
+      if (abajo || !previo || cerca) this.bajarChat(true);
+    } catch (e) {
+      this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [otro]: { lista: [], hayMas: false, ...(st.chatMsgs[otro] || {}), cargando: false,
+        error: navigator.onLine === false ? 'Sin conexión: no se pudieron cargar los mensajes.' : 'No se pudieron cargar los mensajes.' } } }));
+    }
+  }
+
+  async cargarAnteriores() {
+    const otro = this.state.chatCon, hilo = otro && this.state.chatMsgs[otro];
+    if (!hilo || !hilo.hayMas || hilo.cargando) return;
+    const primero = hilo.lista.find(m => !m.estado);
+    if (!primero) return;
+    const el = document.querySelector('[data-chat-lista]');
+    const alto0 = el ? el.scrollHeight : 0, arriba0 = el ? el.scrollTop : 0;
+    this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [otro]: { ...st.chatMsgs[otro], cargando: true } } }));
+    try {
+      const r = await Nube.mensajes(this.uid, otro, primero.en);
+      this.setState(st => {
+        const h = st.chatMsgs[otro], ids = new Set(h.lista.map(m => m.id));
+        return { chatMsgs: { ...st.chatMsgs, [otro]: { ...h, lista: r.lista.filter(m => !ids.has(m.id)).concat(h.lista), hayMas: r.hayMas, cargando: false } } };
+      });
+      // Que lo que se estaba leyendo no salte.
+      setTimeout(() => { const e = document.querySelector('[data-chat-lista]'); if (e) e.scrollTop = arriba0 + (e.scrollHeight - alto0); }, 60);
+    } catch (e) {
+      this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [otro]: { ...st.chatMsgs[otro], cargando: false } } }));
+      if (window.Fluido) Fluido.aviso('No se pudieron cargar los mensajes anteriores');
+    }
+  }
+
+  /** Mensaje nuevo por tiempo real (de un amigo, o el eco de uno mío). */
+  recibirMensaje(n) {
+    const me = this.uid;
+    if (!me || !n || !n.id) return;
+    const m = Nube.mensajeDe(n);
+    const otro = m.de === me ? m.para : m.de;
+    const s0 = this.state;
+    const abierto = s0.tab === 'amigos' && s0.chatCon === otro && document.visibilityState === 'visible';
+    const cerca = abierto && this.chatAbajo();
+    this.setState(st => {
+      const hilo = st.chatMsgs[otro];
+      const chatMsgs = !hilo ? st.chatMsgs : { ...st.chatMsgs, [otro]: { ...hilo,
+        lista: hilo.lista.some(x => x.id === m.id) ? hilo.lista.map(x => x.id === m.id ? m : x) : hilo.lista.concat([m]) } };
+      const prev = st.chats.find(c => c.otro === otro) || { sinLeer: 0, sinLeerTexto: 0 };
+      const suma = m.de !== me && !abierto ? 1 : 0;
+      // El eco de un mensaje ya mostrado no lo vuelve a contar.
+      const nuevo = !(hilo && hilo.lista.some(x => x.id === m.id)) && !(prev.en && prev.en >= m.en && prev.de === m.de && prev.texto === m.texto);
+      const fila = { otro, tipo: m.tipo, texto: m.texto, datos: m.datos, de: m.de, en: m.en,
+                     sinLeer: prev.sinLeer + (nuevo ? suma : 0), sinLeerTexto: prev.sinLeerTexto + (nuevo && m.tipo === 'texto' ? suma : 0) };
+      return { chatMsgs, chats: [fila].concat(st.chats.filter(c => c.otro !== otro)) };
+    });
+    if (abierto && m.de !== me) this.marcarLeido(otro);
+    if (abierto) this.bajarChat(cerca);
+    this.actualizarGlobo();
+    setTimeout(() => this.guardarCache(), 0);
+  }
+
+  marcarLeido(otro) {
+    this.setState(st => ({ chats: st.chats.map(c => c.otro === otro ? { ...c, sinLeer: 0, sinLeerTexto: 0 } : c) }));
+    this.actualizarGlobo();
+    clearTimeout(this.tLeido);
+    this.tLeido = setTimeout(() => { Nube.marcarChatLeido(otro).catch(() => {}); }, 400);
+  }
+
+  async enviarMensaje() {
+    const s = this.state, otro = s.chatCon, me = this.uid;
+    const texto = (s.chatTexto || '').trim();
+    if (!otro || !me || !texto) return;
+    if (texto.length > 2000) { if (window.Fluido) Fluido.aviso('El mensaje es muy largo (máximo 2000 letras)'); return; }
+    const m = { id: Nube.uuid(), de: me, para: otro, tipo: 'texto', texto, ref: null, datos: null, en: new Date().toISOString(), estado: 'enviando' };
+    this.setState(st => {
+      const hilo = st.chatMsgs[otro] || { lista: [], hayMas: false, cargando: false, error: '' };
+      const prev = st.chats.find(c => c.otro === otro) || { sinLeer: 0, sinLeerTexto: 0 };
+      return {
+        chatTexto: '',
+        chatMsgs: { ...st.chatMsgs, [otro]: { ...hilo, lista: hilo.lista.concat([m]) } },
+        chats: [{ ...prev, otro, tipo: 'texto', texto, datos: null, de: me, en: m.en }].concat(st.chats.filter(c => c.otro !== otro)),
+      };
+    });
+    // Que el teclado siga abierto para escribir el siguiente.
+    const entrada = document.querySelector('[data-chat-entrada]');
+    if (entrada && document.activeElement !== entrada) entrada.focus();
+    this.bajarChat(true);
+    await this.subirMensaje(m);
+  }
+
+  async subirMensaje(m) {
+    try {
+      await Nube.enviarMensaje(this.uid, m.id, m.para, m.texto);
+      this.estadoMensaje(m.para, m.id, null);
+    } catch (e) {
+      this.estadoMensaje(m.para, m.id, 'error');
+    }
+  }
+
+  reintentarMensaje(otro, id) {
+    const h = this.state.chatMsgs[otro], m = h && h.lista.find(x => x.id === id);
+    if (!m || m.estado !== 'error') return;
+    this.estadoMensaje(otro, id, 'enviando');
+    this.subirMensaje(m);
+  }
+
+  estadoMensaje(otro, id, estado) {
+    this.setState(st => {
+      const h = st.chatMsgs[otro];
+      if (!h) return null;
+      return { chatMsgs: { ...st.chatMsgs, [otro]: { ...h, lista: h.lista.map(x => {
+        if (x.id !== id) return x;
+        const y = { ...x };
+        if (estado) y.estado = estado; else delete y.estado;
+        return y;
+      }) } } };
+    });
+  }
+
+  /** ¿La lista del chat está (casi) al final? */
+  chatAbajo() {
+    const el = document.querySelector('[data-chat-lista]');
+    return !el || el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+  }
+
+  bajarChat(forzar) {
+    if (!forzar) return;
+    this.bajarPend = true;   // el pintado espera a rAF: al terminarlo se baja (componentDidUpdate)
+    const bajar = () => { const el = document.querySelector('[data-chat-lista]'); if (el) el.scrollTop = el.scrollHeight; };
+    setTimeout(bajar, 30);
+    setTimeout(bajar, 200);
+  }
+
+  /** Con el teclado abierto, el chat ocupa solo la parte visible de la pantalla. */
+  ajustarTeclado() {
+    const vv = window.visualViewport, el = document.querySelector('[data-chat]');
+    if (!vv || !el || !window.Fluido) return;
+    const teclado = window.innerHeight - vv.height;
+    if (this.state.chatCon && teclado > 120 && window.innerWidth < 560) {
+      const cerca = this.chatAbajo();
+      Fluido.fijar(el, { top: Math.round(vv.offsetTop) + 'px', height: Math.round(vv.height) + 'px', bottom: 'auto', '--pie': '8px' });
+      this.tecladoAbierto = true;
+      if (cerca) this.bajarChat(true);
+    } else if (this.tecladoAbierto) {
+      this.soltarTeclado();
+    }
+  }
+
+  soltarTeclado() {
+    const el = document.querySelector('[data-chat]');
+    if (el && window.Fluido) Fluido.fijar(el, { top: null, height: null, bottom: null, '--pie': null });
+    this.tecladoAbierto = false;
+  }
+
+  /* Hoja del chat: adjuntar, enviar rutina, nueva libretica, opciones y agregar amigo. */
+  hojaChat(vista, extra) { this.setState(st => ({ chatHoja: Object.assign({ vista }, extra || {}) })); }
+
+  async enviarRutinaChat(gid) {
+    const otro = this.state.chatCon, h = this.state.chatHoja;
+    if (!otro || !h || h.enviando) return;
+    this.setState({ chatHoja: { ...h, enviando: gid || 'semana', msg: '' } });
+    try {
+      if (!(await this.alDia())) throw new Error('Necesitas conexión a internet para enviarla.');
+      await Nube.compartirRutina(otro, gid || null);
+      this.cerrarHoja('chat');
+      if (window.Fluido) Fluido.aviso('Rutina enviada');
+    } catch (e) {
+      this.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, enviando: null, msg: e.message || 'No se pudo enviar.' } } : null);
+    }
+  }
+
+  crearLibretaChat() {
+    const s = this.state, h = s.chatHoja, otro = s.chatCon;
+    if (!h || !otro) return;
+    const a = s.amigos.find(x => x.id === otro);
+    if (!a) return;
+    const monto = String(h.monto || '').replace(/\D/g, '');
+    if (!(+monto > 0)) { this.setState({ chatHoja: { ...h, msg: 'Escribe el monto.' } }); return; }
+    const miNombre = s.profile.nombre || (s.me && s.me.usuario) || 'Yo';
+    const lib = {
+      id: Nube.uuid(), owner: this.uid, contra: otro, mine: !!h.meDebe,
+      deudor: h.meDebe ? a.nombre : miNombre, prestamista: h.meDebe ? miNombre : a.nombre,
+      monto, paid: false, nota: String(h.nota || '').trim().slice(0, 80), vence: '', enviada: true, abonos: [],
+    };
+    this.setState(st => ({ libs: [lib].concat(st.libs) }));
+    this.cerrarHoja('chat');
+    if (window.Fluido) Fluido.aviso('Libretica enviada a ' + primerNombre(a.nombre));
+  }
+
+  /** "Nueva actividad" ya dirigida al amigo del chat. */
+  abrirActividadPara(otro) {
+    const s = this.state, t0 = tiposDe(s.profile)[0], cuads = s.cuadAmigos[otro] || [];
+    this.setState({ chatHoja: null, tipoEd: null,
+      modal: { id: null, c: cuads[0] ? cuads[0].id : null, tipo: t0.nombre, urg: t0.urgencia, fecha: TODAY, asunto: [], tema: '', para: otro, por: null } });
+  }
+
+  /** Lista de amigos y chats (pestaña Amigos). */
+  valsAmigos(s) {
+    const self = this, me = this.uid;
+    const acept = s.amigos.filter(a => a.estado === 'aceptada');
+    const porId = {};
+    s.chats.forEach(c => { porId[c.otro] = c; });
+    const filas = acept.map(a => ({ a, c: porId[a.id] || null })).sort((x, y) => {
+      if (x.c && y.c) return x.c.en < y.c.en ? 1 : -1;
+      if (x.c || y.c) return x.c ? -1 : 1;
+      return String(x.a.nombre).localeCompare(String(y.a.nombre), 'es');
+    });
+    const sinLeer = acept.reduce((t, a) => t + ((porId[a.id] || {}).sinLeer || 0), 0);
+    const solicitudes = s.amigos.filter(a => a.estado === 'pendiente' && !a.yo);
+    const esperando = s.amigos.filter(a => a.estado === 'pendiente' && a.yo);
+    return {
+      amigosTabBadge: sinLeer + solicitudes.length,
+      amigosKicker: acept.length ? cuenta(acept.length, 'AMIGO', 'AMIGOS') + (sinLeer ? ' · ' + sinLeer + ' SIN LEER' : '') : 'CHATS',
+      solicitudes: solicitudes.map(a => ({
+        nombre: a.nombre, codigo: a.codigo, inicial: (a.nombre || '?').charAt(0).toUpperCase(), color: colorDe(a.id),
+        aceptar: () => self.conexion('aceptar', a),
+        rechazar: () => self.conexion('rechazar', a),
+      })),
+      chatsList: filas.map(({ a, c }) => ({
+        nombre: a.nombre, inicial: (a.nombre || '?').charAt(0).toUpperCase(), color: colorDe(a.id),
+        preview: c ? previewChat(c, me) : 'Toca para escribirle',
+        previewColor: c && c.sinLeer ? '#EDF1F7' : '#8E9AAE',
+        previewPeso: c && c.sinLeer ? '600' : '500',
+        cuando: c ? cuandoChat(c.en) : '',
+        cuandoColor: c && c.sinLeer ? MINT : '#4A566B',
+        badgeOn: !!(c && c.sinLeer), badge: c ? (c.sinLeer > 99 ? '99+' : String(c.sinLeer)) : '',
+        abrir: () => self.abrirChat(a.id),
+      })),
+      hayEsperando: esperando.length > 0,
+      esperando: esperando.map(a => ({ nombre: a.nombre, codigo: a.codigo, cancelar: () => self.conexion('quitar', a) })),
+      sinAmigos: !acept.length && !solicitudes.length && !esperando.length,
+      abrirAgregar: () => { self.setState({ amigoMsg: '' }); self.hojaChat('agregar'); },
+    };
+  }
+
+  /** Conversación abierta. */
+  valsChat(s) {
+    const self = this, me = this.uid, otro = s.chatCon;
+    const enAmigos = s.tab === 'amigos';
+    const a = otro && s.amigos.find(x => x.id === otro && x.estado === 'aceptada');
+    if (!enAmigos || !a) return { chatOn: false, listaAmigosOn: enAmigos };
+    const quien = primerNombre(a.nombre);
+    const hilo = s.chatMsgs[otro] || { lista: [], hayMas: false, cargando: true, error: '' };
+    const items = [];
+    let diaPrev = '', dePrev = null;
+    hilo.lista.forEach(m => {
+      const dia = diaChat(m.en);
+      if (dia !== diaPrev) { items.push({ esDia: true, dia }); diaPrev = dia; dePrev = null; }
+      const mio = m.de === me, seguido = dePrev === m.de;
+      dePrev = m.de;
+      const base = { lado: mio ? 'flex-end' : 'flex-start', sep: seguido ? '2px' : '8px', hora: horaCorta(m.en) };
+      if (m.tipo === 'texto') {
+        items.push(Object.assign(base, {
+          esTexto: true, texto: m.texto,
+          bg: mio ? 'rgba(87,185,160,.16)' : '#121724', borde: mio ? 'rgba(87,185,160,.34)' : 'rgba(255,255,255,.08)',
+          radio: mio ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
+          pie: m.estado === 'enviando' ? 'Enviando…' : (m.estado === 'error' ? 'No se envió · toca para reintentar' : base.hora),
+          pieColor: m.estado === 'error' ? '#E08A87' : '#6B778C',
+          tocar: m.estado === 'error' ? () => self.reintentarMensaje(otro, m.id) : () => {},
+        }));
+        return;
+      }
+      items.push(Object.assign(base, { esTarjeta: true }, self.tarjetaChat(m, mio, a, s)));
+    });
+    const listo = !!(s.chatTexto || '').trim();
+    return {
+      chatOn: true, listaAmigosOn: false,
+      chatNombre: a.nombre, chatInicial: (a.nombre || '?').charAt(0).toUpperCase(), chatColor: colorDe(a.id),
+      chatItems: items,
+      chatVacio: !hilo.cargando && !hilo.error && !hilo.lista.length,
+      chatVacioTxt: 'Escríbele a ' + quien + ', o envíale una rutina, una libretica o una actividad con el +.',
+      chatCargando: !!hilo.cargando && !hilo.lista.length,
+      chatError: hilo.error || '',
+      chatHayMas: !!hilo.hayMas,
+      chatMasTxt: hilo.cargando ? 'Cargando…' : 'Ver mensajes anteriores',
+      chatCargarMas: () => self.cargarAnteriores(),
+      chatTexto: s.chatTexto,
+      onChatTexto: ev => { const v = ev.target.value; self.setState({ chatTexto: v }); },
+      chatEnviar: () => self.enviarMensaje(),
+      chatEnviarBg: listo ? MINT : 'rgba(255,255,255,.08)',
+      chatEnviarFg: listo ? '#0A0E1A' : '#6B778C',
+      chatAdjuntar: () => self.hojaChat('adjuntar'),
+      chatVolver: () => self.cerrarChat(),
+      chatOpciones: () => self.hojaChat('opciones'),
+    };
+  }
+
+  /** Tarjeta de una libretica, actividad o rutina dentro del chat. */
+  tarjetaChat(m, mio, a, s) {
+    const self = this, d = m.datos || {}, nada = () => {};
+    if (m.tipo === 'libreta') {
+      const meDeben = mio ? !!d.mine : !d.mine;
+      const l = s.libs.find(x => x.id === m.ref);
+      let extra = '';
+      if (l) {
+        const abonado = (l.abonos || []).reduce((t2, x) => t2 + (+x.monto || 0), 0);
+        const saldo = Math.max(0, (+l.monto || 0) - abonado);
+        extra = l.paid ? 'Saldada ✓' : (abonado ? 'Abonado ' + pesosTxt(abonado) + ' · queda ' + pesosTxt(saldo) : 'Sin abonos todavía');
+      }
+      return {
+        kicker: 'LIBRETICA · ' + (meDeben ? 'TE DEBE' : 'LE DEBES'), color: meDeben ? MINT : RED,
+        borde: meDeben ? 'rgba(87,185,160,.32)' : 'rgba(196,100,97,.3)',
+        titulo: pesosTxt(d.monto), sub: d.nota || '', extra,
+        accion: l ? 'Ver en Finanzas ›' : '',
+        tocar: l ? () => self.irA({ ir: 'finanzas', libreta: m.ref }, true) : nada,
+      };
+    }
+    if (m.tipo === 'actividad') {
+      const temas = Array.isArray(d.temas) ? d.temas : [];
+      return {
+        kicker: 'ACTIVIDAD' + (mio ? ' · PARA ' + String(primerNombre(a.nombre)).toUpperCase() : ''), color: AMBER,
+        borde: 'rgba(206,127,85,.3)',
+        titulo: (d.tipo || 'Actividad') + (d.cuaderno ? ' · ' + d.cuaderno : ''),
+        sub: fechaLarga(d.fecha), extra: temas.length ? 'Temas: ' + temas.join(', ') : '',
+        accion: 'Ver en la agenda ›',
+        tocar: () => self.irA({ ir: 'estudio', fecha: d.fecha }, true),
+      };
+    }
+    // Rutina
+    const inv = !mio && s.invRutinas.find(x => x.id === m.ref);
+    return {
+      kicker: 'RUTINA', color: MINT, borde: 'rgba(87,185,160,.32)',
+      titulo: d.tipo === 'semana' ? (mio ? 'Tu semana' : 'Su semana') : '«' + (d.nombre || 'Grupo') + '»',
+      sub: d.tipo === 'semana' ? cuenta(+d.grupos || 0, 'grupo', 'grupos') : cuenta(+d.ejercicios || 0, 'ejercicio', 'ejercicios'),
+      extra: '',
+      accion: mio ? 'Enviada' : (inv ? 'Ver y aceptar ›' : 'Ya respondida'),
+      tocar: inv ? () => self.setState({ verRutina: { modo: 'inv', inv } }) : nada,
+    };
+  }
+
+  /** Hoja del chat. */
+  valsChatHoja(s) {
+    const self = this, h = s.chatHoja;
+    if (!h) return { chatHojaOn: false };
+    const a = s.chatCon ? s.amigos.find(x => x.id === s.chatCon) : null;
+    const quien = a ? primerNombre(a.nombre) : '';
+    const chip = on => ({ bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE' });
+    const volver = () => self.hojaChat('adjuntar');
+    const base = {
+      chatHojaOn: true, cerrarChatHoja: () => self.cerrarHoja('chat'),
+      hjAdjuntar: h.vista === 'adjuntar', hjRutina: h.vista === 'rutina', hjLibreta: h.vista === 'libreta',
+      hjOpciones: h.vista === 'opciones', hjAgregar: h.vista === 'agregar',
+      hjKicker: h.vista === 'rutina' || h.vista === 'libreta' ? '‹ ENVIAR A ' + quien.toUpperCase() : (h.vista === 'agregar' ? 'AMIGOS' : (h.vista === 'opciones' ? 'CHAT' : 'ENVIAR A ' + quien.toUpperCase())),
+      hjKickerColor: h.vista === 'rutina' || h.vista === 'libreta' ? AMBER : '#8E9AAE',
+      hjVolver: h.vista === 'rutina' || h.vista === 'libreta' ? volver : () => {},
+      hjTitulo: { adjuntar: 'Adjuntar', rutina: 'Rutina', libreta: 'Libretica', opciones: a ? a.nombre : 'Amigo', agregar: 'Agregar amigo' }[h.vista] || '',
+      hjMsg: h.msg || '',
+    };
+    if (h.vista === 'adjuntar') {
+      return Object.assign(base, {
+        hjOpcionesAdj: [
+          { titulo: 'Rutina', sub: 'Tu semana o uno de tus grupos', color: MINT, ir: () => self.hojaChat('rutina') },
+          { titulo: 'Libretica', sub: 'Lo que ' + quien + ' te debe o le debes', color: AMBER, ir: () => self.hojaChat('libreta', { meDebe: true, monto: '', nota: '' }) },
+          { titulo: 'Actividad', sub: 'Quiz, parcial, salida… en su agenda', color: '#4B7BE5', ir: () => self.abrirActividadPara(s.chatCon) },
+        ],
+      });
+    }
+    if (h.vista === 'rutina') {
+      const enSemana = s.grupos.filter(g => s.plan.includes(g.id));
+      const filas = [{ gid: null, titulo: 'Tu semana completa', meta: cuenta(enSemana.length, 'grupo', 'grupos') + ' y tus días de descanso', color: MINT }]
+        .concat(s.grupos.map(g => ({ gid: g.id, titulo: g.nombre || 'Sin nombre', meta: cuenta(g.ejercicios.length, 'ejercicio', 'ejercicios'), color: g.color })));
+      return Object.assign(base, {
+        hjRutinas: filas.map(f => {
+          const clave = f.gid || 'semana', enviando = h.enviando === clave;
+          return { titulo: f.titulo, meta: f.meta, color: f.color, accion: enviando ? 'Enviando…' : 'Enviar', enviar: () => self.enviarRutinaChat(f.gid) };
+        }),
+        hjRutinaNota: 'Le llega a ' + quien + ' como tarjeta en este chat. Si la acepta, queda como copia suya. Solo va la rutina, nunca tus pesos.',
+      });
+    }
+    if (h.vista === 'libreta') {
+      const monto = String(h.monto || '').replace(/\D/g, ''), listo = +monto > 0;
+      return Object.assign(base, {
+        hjDireccion: [['Me debe', true], ['Le debo', false]].map(([t2, v]) => Object.assign({
+          t: t2, pick: () => self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, meDebe: v, msg: '' } } : null),
+        }, chip(!!h.meDebe === v))),
+        hjMonto: fmtMoney(monto),
+        onHjMonto: ev => { const v = ev.target.value.replace(/\D/g, '').slice(0, 12); self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, monto: v, msg: '' } } : null); },
+        hjNota: h.nota || '',
+        onHjNota: ev => { const v = ev.target.value; self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, nota: v } } : null); },
+        hjLibColor: h.meDebe ? MINT : RED,
+        hjEnviarBg: listo ? MINT : 'rgba(87,185,160,.14)', hjEnviarFg: listo ? '#0A0E1A' : 'rgba(87,185,160,.55)',
+        hjEnviarTxt: 'Enviar a ' + quien,
+        hjEnviar: () => self.crearLibretaChat(),
+        hjLibNota: listo
+          ? 'A ' + quien + ' le llegará: «' + (h.meDebe ? 'Te debe ' : 'Le debes ') + '… ' + pesosTxt(monto) + '». Queda también en Finanzas.'
+          : 'Escribe el monto para poder enviarla.',
+      });
+    }
+    if (h.vista === 'opciones') {
+      return Object.assign(base, {
+        hjAmigoCodigo: a ? a.codigo : '',
+        hjQuitar: () => {
+          if (!a || !window.confirm('¿Quitar a ' + a.nombre + ' de tus amigos? Las libreticas que ya comparten se conservan.')) return;
+          self.cerrarHoja('chat', true);
+          self.cerrarChat();
+          self.conexion('quitar', a);
+        },
+      });
+    }
+    return base; // agregar: usa los valores de siempre (código, campo y mensaje)
   }
 
   /* ── Libreticas: enviar al amigo ─────────────────────────────────── */
@@ -1359,8 +1845,9 @@ class Component extends DCLogic {
       this.setState({
         respaldo: 'listo',
         respaldoMsg: 'Listo (' + kb + ' KB): ' + cuenta(datos.actividades.length, 'actividad', 'actividades') + ', ' +
-                     cuenta(datos.libreticas.length, 'libretica', 'libreticas') + ' y ' +
-                     cuenta(datos.sesiones_gimnasio.length, 'día de gimnasio', 'días de gimnasio') + '. Toca para guardarlo.',
+                     cuenta(datos.libreticas.length, 'libretica', 'libreticas') + ', ' +
+                     cuenta(datos.sesiones_gimnasio.length, 'día de gimnasio', 'días de gimnasio') + ' y ' +
+                     cuenta(datos.mensajes_chat.length, 'mensaje', 'mensajes') + '. Toca para guardarlo.',
       });
     } catch (e) {
       console.warn('[pilares] respaldo', e);
@@ -1843,13 +2330,16 @@ class Component extends DCLogic {
     const nu = nextA ? self.urg(nextA) : { color: GREY, tint: 'rgba(142,154,174,.14)' };
     const nc = nextA ? s.cuadernos.find(c => c.id === nextA.c) : null;
 
-    const tabDefs = [[ 'Ejercicio', 'ejercicio', ['8px','14px','18px'] ], [ 'Estudio', 'estudio', ['16px','16px','16px'] ], [ 'Finanzas', 'finanzas', ['18px','10px','14px'] ]];
+    const tabDefs = [[ 'Ejercicio', 'ejercicio', ['8px','14px','18px'] ], [ 'Estudio', 'estudio', ['16px','16px','16px'] ], [ 'Finanzas', 'finanzas', ['18px','10px','14px'] ], [ 'Amigos', 'amigos', ['11px','18px','11px'] ]];
 
     return {
       yes: true,
       appOn: true, authOn: false, loadOn: false,
-      ...self.valsRutina(s), ...self.valsMenu(s), ...self.valsVer(s), ...self.valsInv(s), ...self.valsAvisos(s),
+      ...self.valsRutina(s), ...self.valsMenu(s), ...self.valsVer(s), ...self.valsAvisos(s),
+      ...self.valsAmigos(s), ...self.valsChat(s), ...self.valsChatHoja(s),
       isHome: s.tab === 'home', isEjercicio: s.tab === 'ejercicio', isEstudio: s.tab === 'estudio', isFinanzas: s.tab === 'finanzas',
+      isAmigos: s.tab === 'amigos',
+      barraOn: !(s.tab === 'amigos' && s.chatCon),
       editOn: s.edit, panelOn: s.panel, modalOn: !!m, restOn: s.restOn,
       goEjercicio: () => self.setState({ tab: 'ejercicio' }),
       goEstudio: () => self.setState({ tab: 'estudio', estudioTab: 'agenda', openCuaderno: null }),
@@ -2043,36 +2533,13 @@ class Component extends DCLogic {
       agregarAmigo: () => self.agregarAmigo(),
       agregarTxt: s.amigoBusy ? '…' : 'Agregar',
       amigoMsg: s.amigoMsg,
-      solicitudes: s.amigos.filter(a => a.estado === 'pendiente' && !a.yo).map(a => ({
-        nombre: a.nombre, codigo: a.codigo,
-        aceptar: () => self.conexion('aceptar', a),
-        rechazar: () => self.conexion('rechazar', a),
-      })),
-      amigosList: s.amigos.filter(a => a.estado === 'aceptada' || a.yo).map((a, i) => {
-        const ok = a.estado === 'aceptada';
-        return {
-          nombre: a.nombre, codigo: a.codigo, inicial: (a.nombre || '?').charAt(0).toUpperCase(),
-          bg: i % 2 ? MINT : AMBER,
-          estado: ok ? 'VER SU RUTINA ›' : 'ESPERANDO RESPUESTA · ' + a.codigo, estadoColor: ok ? MINT : '#8E9AAE',
-          cursor: ok ? 'pointer' : 'default',
-          ver: () => { if (ok) self.verRutinaAmigo(a); },
-          quitarTxt: ok ? 'QUITAR' : 'CANCELAR',
-          quitar: () => {
-            if (ok && !window.confirm('¿Quitar a ' + a.nombre + ' de tus amigos? Las libreticas que ya comparten se conservan.')) return;
-            self.conexion('quitar', a);
-          },
-        };
-      }),
-      sinAmigos: s.amigos.length === 0,
-      amigosCount: amigosOk.length ? amigosOk.length + (amigosOk.length === 1 ? ' AMIGO' : ' AMIGOS') : '',
-      hasSolicitudes: s.amigos.some(a => a.estado === 'pendiente' && !a.yo),
       importarOn: !!s.importMsg || self.hayDatosLocales(),
       importarTxt: s.importMsg || 'Importar datos de este dispositivo',
       importarSub: s.importMsg ? 'Ya quedaron en tu cuenta.' : 'Sube a tu cuenta lo que esta app tenía guardado aquí antes de las cuentas. Hazlo una sola vez.',
       importar: () => { if (!s.importMsg) self.importarLocal(); },
       respaldoBtn: s.respaldo === 'preparando' ? 'Preparando respaldo…' : (s.respaldo === 'listo' ? 'Guardar respaldo' : 'Exportar mis datos'),
       respaldoColor: s.respaldo === 'error' ? RED : (s.respaldo === 'listo' ? MINT : '#fff'),
-      respaldoSub: s.respaldoMsg || 'Descarga un archivo con todo lo tuyo (gimnasio, agenda, cuadernos, libreticas con abonos y perfil). Guárdalo como respaldo.',
+      respaldoSub: s.respaldoMsg || 'Descarga un archivo con todo lo tuyo (gimnasio, agenda, cuadernos, libreticas con abonos, chats y perfil). Guárdalo como respaldo.',
       respaldoGo: () => { if (s.respaldo === 'listo') self.descargarRespaldo(); else self.prepararRespaldo(); },
       salir: () => self.salir(),
       editCardBg: s.edit ? 'rgba(206,127,85,.1)' : '#121724',
@@ -2084,10 +2551,12 @@ class Component extends DCLogic {
 
       tabs: tabDefs.map(([label, key, hs]) => {
         const on = s.tab === key;
+        const n = key === 'amigos' ? self.valsAmigos(s).amigosTabBadge : 0;
         return {
           label, h1: hs[0], h2: hs[1], h3: hs[2],
           fg: on ? '#CE7F55' : '#8E9AAE', bg: on ? 'rgba(206,127,85,.12)' : 'transparent',
           border: on ? 'rgba(206,127,85,.26)' : 'transparent',
+          badgeOn: n > 0, badge: n > 99 ? '99+' : String(n),
           go: () => self.setState({ tab: key }),
         };
       }),

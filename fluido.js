@@ -585,5 +585,6 @@
     animarSalida: animarSalida,
     cerrarMenu: cerrarMenu,
     aviso: mostrarAviso,
+    fijar: fijar,
   };
 })(window);

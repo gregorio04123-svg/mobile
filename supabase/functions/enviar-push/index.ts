@@ -1,6 +1,6 @@
 // Pilares · enviar-push
-// La base de datos la llama (pg_net) cada vez que se crea un aviso para
-// alguien con dispositivos activos. Envía el push a esos dispositivos.
+// La base de datos la llama (pg_net) cada vez que se crea un aviso o llega
+// un mensaje de chat para alguien con dispositivos activos, y envía el push.
 //
 // - Solo acepta llamadas con la clave compartida guardada en Vault.
 // - Cada aviso se envía una sola vez (se marca push_en antes de enviar).
@@ -53,33 +53,50 @@ Deno.serve(async (req) => {
     if (!k.pilares_push_clave || !igual(req.headers.get("x-pilares-clave") || "", k.pilares_push_clave)) {
       return json({ error: "no autorizado" }, 401);
     }
-    const { id } = await req.json().catch(() => ({}));
-    if (typeof id !== "string" || !UUID.test(id)) return json({ error: "id" }, 400);
+    const cuerpoPeticion = await req.json().catch(() => ({}));
+    const { id, mensaje } = cuerpoPeticion as { id?: string; mensaje?: string };
+    let para: string, contenido: { id: string; tipo: string; titulo: string; cuerpo: string; url: string };
 
-    // Se toma el aviso: si ya se envió (o no existe), no se repite.
-    const { data: aviso, error: e1 } = await sb.from("avisos")
-      .update({ push_en: new Date().toISOString() })
-      .eq("id", id).is("push_en", null)
-      .select("id,user_id,tipo,titulo,cuerpo,ref,fecha")
-      .maybeSingle();
-    if (e1) throw e1;
-    if (!aviso) return json({ ok: true, omitido: "ya enviado" });
+    if (typeof mensaje === "string") {
+      if (!UUID.test(mensaje)) return json({ error: "mensaje" }, 400);
+      // Mensaje de chat: título = quien escribe, cuerpo = el mensaje.
+      const { data: m, error: e1 } = await sb.from("mensajes")
+        .update({ push_en: new Date().toISOString() })
+        .eq("id", mensaje).is("push_en", null).eq("tipo", "texto")
+        .select("id,de_id,para_id,texto")
+        .maybeSingle();
+      if (e1) throw e1;
+      if (!m) return json({ ok: true, omitido: "ya enviado" });
+      const { data: autor } = await sb.from("perfiles").select("nombre").eq("id", m.de_id).maybeSingle();
+      const texto = String(m.texto || "");
+      para = m.para_id;
+      contenido = {
+        id: m.id, tipo: "mensaje", titulo: (autor?.nombre || "").trim() || "Un amigo",
+        cuerpo: texto.length > 180 ? texto.slice(0, 179) + "…" : texto,
+        url: "./?ir=chat&con=" + m.de_id,
+      };
+    } else {
+      if (typeof id !== "string" || !UUID.test(id)) return json({ error: "id" }, 400);
+      // Aviso: si ya se envió (o no existe), no se repite.
+      const { data: aviso, error: e1 } = await sb.from("avisos")
+        .update({ push_en: new Date().toISOString() })
+        .eq("id", id).is("push_en", null)
+        .select("id,user_id,tipo,titulo,cuerpo,ref,fecha")
+        .maybeSingle();
+      if (e1) throw e1;
+      if (!aviso) return json({ ok: true, omitido: "ya enviado" });
+      para = aviso.user_id;
+      contenido = { id: aviso.id, tipo: aviso.tipo, titulo: aviso.titulo, cuerpo: aviso.cuerpo, url: destino(aviso) };
+    }
 
     const { data: subs, error: e2 } = await sb.from("suscripciones_push")
-      .select("id,endpoint,p256dh,auth").eq("user_id", aviso.user_id);
+      .select("id,endpoint,p256dh,auth").eq("user_id", para);
     if (e2) throw e2;
     if (!subs || !subs.length) return json({ ok: true, enviados: 0 });
 
-    // Número para el globo del ícono: avisos que aún no ha visto.
-    const { data: perfil } = await sb.from("perfiles").select("avisos_leidos_hasta").eq("id", aviso.user_id).maybeSingle();
-    const { count } = await sb.from("avisos").select("id", { count: "exact", head: true })
-      .eq("user_id", aviso.user_id).neq("tipo", "prueba")
-      .gt("creado_en", perfil?.avisos_leidos_hasta || "1970-01-01");
-
-    const carga = JSON.stringify({
-      id: aviso.id, tipo: aviso.tipo, titulo: aviso.titulo, cuerpo: aviso.cuerpo,
-      url: destino(aviso), pendientes: count || 0,
-    });
+    // Número para el globo del ícono: avisos sin ver + mensajes sin leer.
+    const { data: pendientes } = await sb.rpc("pendientes_de", { p_user: para });
+    const carga = JSON.stringify({ ...contenido, pendientes: typeof pendientes === "number" ? pendientes : 0 });
 
     let enviados = 0, borrados = 0;
     const fallos: Array<{ status?: number; msg: string }> = [];
