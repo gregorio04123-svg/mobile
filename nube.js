@@ -114,7 +114,7 @@
       sb.from('cuadernos').select('id,user_id,nombre,orden,creado_en').order('orden').order('creado_en'),
       sb.from('archivos').select('id,cuaderno_id,nombre,tamano,creado_en').eq('user_id', uid).order('creado_en'),
       // Las mias y las que yo asigne a amigos.
-      sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,con_urgencia').order('fecha'),
+      sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,con_urgencia,grupo_id,lote').order('fecha'),
       sb.from('sesiones').select('fecha,grupo,abbr,dia,ejercicios,grupo_id').eq('user_id', uid).gte('fecha', haceDias(120)),
       // Las que cree y las que otra persona compartio conmigo.
       sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,nota,vence_el,enviada,creado_en').order('creado_en', { ascending: false }),
@@ -123,7 +123,7 @@
       sb.from('grupos').select('id,nombre,abbr,color,musculo,orden,ejercicios').eq('user_id', uid).order('orden').order('creado_en'),
       sb.from('rutinas').select('plan').eq('user_id', uid).maybeSingle(),
       // Rutinas que un amigo me envió y aún no respondo.
-      sb.from('rutinas_compartidas').select('id,de_id,de_nombre,tipo,contenido,creado_en').eq('para_id', uid).order('creado_en'),
+      sb.from('rutinas_compartidas').select('id,de_id,de_nombre,tipo,contenido,creado_en,grupo_id,lote').eq('para_id', uid).order('creado_en'),
       // Los últimos avisos (los de prueba no se listan).
       sb.from('avisos').select('id,tipo,titulo,cuerpo,ref,fecha,creado_en').eq('user_id', uid).neq('tipo', 'prueba')
         .order('creado_en', { ascending: false }).limit(30),
@@ -154,8 +154,10 @@
     });
 
     var acts = q[3].data.map(function (a) {
+      // g y lote (actividad de grupo) solo se leen: nunca viajan en `filas`.
       return { id: a.id, c: a.cuaderno_id, tipo: a.tipo, fecha: a.fecha, asunto: a.asunto || [],
-               owner: a.user_id, por: a.asignado_por, nota: a.nota || '', urg: a.con_urgencia !== false };
+               owner: a.user_id, por: a.asignado_por, nota: a.nota || '', urg: a.con_urgencia !== false,
+               g: a.grupo_id || null, lote: a.lote || null };
     });
 
     var logs = {};
@@ -197,7 +199,8 @@
       cuadernos: cuadernos, files: files, acts: acts, logs: logs, libs: libs,
       amigos: amigos, cuadAmigos: cuadAmigos, grupos: grupos, plan: plan,
       invRutinas: (q[10].data || []).map(function (r) {
-        return { id: r.id, de: r.de_id, deNombre: r.de_nombre, tipo: r.tipo, contenido: r.contenido, creado: r.creado_en };
+        return { id: r.id, de: r.de_id, deNombre: r.de_nombre, tipo: r.tipo, contenido: r.contenido, creado: r.creado_en,
+                 grupo: r.grupo_id || null, lote: r.lote || null };
       }),
     };
   }
@@ -492,6 +495,13 @@
     excede: 'Es más de lo que te falta por pagar.',
     no_abono: 'Ese abono ya no existe.',
     no_creador: 'Solo quien la creó puede borrarla.',
+    tipo: 'Elige un tipo de actividad.',
+    fecha: 'Elige la fecha.',
+    cuaderno: 'Ese cuaderno ya no existe. Elige otro.',
+    temas: 'Son demasiados temas.',
+    sin_otros: 'En este grupo solo estás tú.',
+    semana_vacia: 'Tu semana no tiene grupos asignados.',
+    sin_grupo: 'Ese grupo aún no está guardado. Intenta de nuevo en un momento.',
   };
   async function rpcGrupo(nombre, args) {
     var r = await sb.rpc(nombre, args);
@@ -534,6 +544,15 @@
   async function borrarAbonoGrupo(abono) { return rpcGrupo('borrar_abono_grupo', { p_abono: abono }); }
   async function borrarLibretaGrupo(libreta) { return rpcGrupo('borrar_libreta_grupo', { p_libreta: libreta }); }
   /** Sin ids: las mías (las que creé o en las que debo). Con ids: esas, si las puedo ver. */
+  /** Una actividad en la agenda de todos los del grupo (también la mía). */
+  async function crearActividadGrupo(grupo, a) {
+    return rpcGrupo('crear_actividad_grupo', { p_grupo: grupo, p_tipo: a.tipo, p_urgencia: a.urg !== false, p_fecha: a.fecha,
+                                               p_temas: a.asunto || [], p_cuaderno: a.c || null });
+  }
+  /** Mi semana (rgrupo nulo) o uno de mis grupos de rutina, a cada uno del grupo. */
+  async function compartirRutinaGrupo(grupo, rgrupo) {
+    return rpcGrupo('compartir_rutina_grupo', { p_grupo: grupo, p_rgrupo: rgrupo || null });
+  }
   async function libretasGrupo(ids) {
     return ((await rpcGrupo('libretas_grupo_de', { p_ids: ids || null })) || []).map(libretaGrupoDe);
   }
@@ -759,6 +778,7 @@
     salirDeGrupo: salirDeGrupo, renombrarGrupo: renombrarGrupo,
     crearLibretaGrupo: crearLibretaGrupo, abonarLibretaGrupo: abonarLibretaGrupo, borrarAbonoGrupo: borrarAbonoGrupo,
     borrarLibretaGrupo: borrarLibretaGrupo, libretasGrupo: libretasGrupo,
+    crearActividadGrupo: crearActividadGrupo, compartirRutinaGrupo: compartirRutinaGrupo,
     registrarSW: registrarSW, estadoPush: estadoPush, activarPush: activarPush, renovarPush: renovarPush,
     soltarPush: soltarPush, avisoDePrueba: avisoDePrueba, marcarAvisosLeidos: marcarAvisosLeidos, ponerGlobo: ponerGlobo,
     escuchar: escuchar, dejarDeEscuchar: dejarDeEscuchar, exportar: exportar,

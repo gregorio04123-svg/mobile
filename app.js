@@ -180,6 +180,10 @@ function textoSistema(m, me) {
   if (d.accion === 'borrar_libreta') {
     return (yo ? 'Borraste' : quien + ' borró') + ' la libretica ' + (d.nota ? '«' + d.nota + '»' : 'de ' + pesosTxt(d.total));
   }
+  if (d.accion === 'actividad') {
+    return (yo ? 'Actualizaste' : quien + ' actualizó') + ' «' + (d.tipo || 'la actividad') + '»: ' + fechaLarga(d.fecha).toLowerCase() +
+      (d.antes ? ' (antes ' + fechaLarga(d.antes).toLowerCase() + ')' : '');
+  }
   return '';
 }
 /** Vista previa del último mensaje de un grupo en la lista de chats. */
@@ -189,7 +193,8 @@ function previewGrupo(u, me) {
   const quien = u.de === me ? 'Tú: ' : primerNombre(u.deNombre || 'Alguien') + ': ', d = u.datos || {};
   if (u.tipo === 'texto') return quien + u.texto;
   if (u.tipo === 'libreta') return quien + 'Libretica · ' + pesosTxt(d.total) + (d.nota ? ' · ' + d.nota : '');
-  return quien + 'Actividad';
+  if (u.tipo === 'rutina') return quien + (d.tipo === 'semana' ? 'Rutina · semana completa' : 'Rutina · «' + (d.nombre || 'grupo') + '»');
+  return quien + 'Actividad · ' + (d.tipo || '') + (d.cuaderno ? ' · ' + d.cuaderno : '');
 }
 /** Iniciales de un grupo: «Viernes de pizza» → «VP». */
 const PALABRAS_VACIAS = ['de', 'del', 'la', 'las', 'los', 'el', 'y', 'e', 'en', 'a', 'al', 'con', 'para', 'por'];
@@ -1230,6 +1235,12 @@ class Component extends DCLogic {
     } else if (d.ir === 'ejercicio' || d.ir === 'chat') {
       // Las rutinas llegan por el chat: se abre la conversación con quien la envió.
       const inv = d.inv && s.invRutinas.find(x => x.id === d.inv);
+      if (inv && inv.grupo && s.gAmigos.some(g => g.id === inv.grupo)) {
+        this.setState(cambios);
+        this.abrirGrupo(inv.grupo);
+        this.setState({ verRutina: { modo: 'inv', inv } });
+        return true;
+      }
       // Ya respondida: el chat con quien la envió, si su nombre no se repite entre tus amigos.
       const tocayos = !inv && d.quien ? s.amigos.filter(a => a.estado === 'aceptada' && a.nombre === d.quien) : [];
       const con = inv ? inv.de : d.con || (tocayos.length === 1 ? tocayos[0].id : null);
@@ -1636,14 +1647,15 @@ class Component extends DCLogic {
   hojaChat(vista, extra) { this.setState(st => ({ chatHoja: Object.assign({ vista }, extra || {}) })); }
 
   async enviarRutinaChat(gid) {
-    const otro = this.state.chatCon, h = this.state.chatHoja;
-    if (!otro || !h || h.enviando) return;
+    const otro = this.state.chatCon, grupo = this.state.chatG, h = this.state.chatHoja;
+    if ((!otro && !grupo) || !h || h.enviando) return;
     this.setState({ chatHoja: { ...h, enviando: gid || 'semana', msg: '' } });
     try {
       if (!(await this.alDia())) throw new Error('Necesitas conexión a internet para enviarla.');
-      await Nube.compartirRutina(otro, gid || null);
+      if (grupo) await Nube.compartirRutinaGrupo(grupo, gid || null);
+      else await Nube.compartirRutina(otro, gid || null);
       this.cerrarHoja('chat');
-      if (window.Fluido) Fluido.aviso('Rutina enviada');
+      if (window.Fluido) Fluido.aviso(grupo ? 'Rutina enviada al grupo' : 'Rutina enviada');
     } catch (e) {
       this.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, enviando: null, msg: e.message || 'No se pudo enviar.' } } : null);
     }
@@ -1665,6 +1677,32 @@ class Component extends DCLogic {
     this.setState(st => ({ libs: [lib].concat(st.libs) }));
     this.cerrarHoja('chat');
     if (window.Fluido) Fluido.aviso('Libretica enviada a ' + primerNombre(a.nombre));
+  }
+
+  /** "Nueva actividad" para todo el grupo (también queda en mi agenda). */
+  abrirActividadGrupo(gid) {
+    const s = this.state, t0 = tiposDe(s.profile)[0];
+    this.setState({ chatHoja: null, tipoEd: null,
+      modal: { id: null, c: s.cuadernos[0] ? s.cuadernos[0].id : null, tipo: t0.nombre, urg: t0.urgencia, fecha: TODAY,
+               asunto: [], tema: '', para: this.uid, por: null, grupo: gid } });
+  }
+
+  /** La crea el servidor: una copia en la agenda de cada uno, en su cuaderno del mismo nombre. */
+  async crearActividadGrupo() {
+    const mm = this.state.modal;
+    if (!mm || mm.id || !mm.grupo || mm.enviando) return;
+    this.setState(st => st.modal ? { modal: { ...st.modal, enviando: true } } : null);
+    try {
+      // El cuaderno elegido tiene que estar ya en el servidor.
+      if (!(await this.alDia())) throw new Error('Necesitas conexión a internet para agendarla.');
+      await Nube.crearActividadGrupo(mm.grupo, { tipo: mm.tipo, urg: mm.urg, fecha: mm.fecha, asunto: mm.asunto, c: mm.c });
+      this.cerrarHoja('modal');
+      if (window.Fluido) Fluido.aviso('Actividad agendada para el grupo');
+      this.refrescar();   // trae mi copia
+    } catch (e) {
+      this.setState(st => st.modal ? { modal: { ...st.modal, enviando: false } } : null);
+      if (window.Fluido) Fluido.aviso(e.message || 'No se pudo agendar.');
+    }
   }
 
   /** "Nueva actividad" ya dirigida al amigo del chat. */
@@ -1790,9 +1828,9 @@ class Component extends DCLogic {
         chatNombre: g.nombre, chatInicial: inicialesDe(g.nombre), chatColor: colorDe(g.id), chatRadio: '9px', chatLetra: '11px',
         chatSubOn: true,
         chatSub: otros.length ? listaNombres(otros.map(x => primerNombre(x.nombre)).concat(['tú'])) : 'Solo tú en el grupo',
-        chatVacioTxt: 'Escríbanse aquí. Con el + repartes una cuenta entre los del grupo.',
-        chatAdjuntarTxt: 'Libretica de grupo',
-        chatAdjuntar: () => self.hojaChat('grupoLibreta', { total: '', nota: '', partes: {} }),
+        chatVacioTxt: 'Escríbanse aquí. Con el + envías una rutina, repartes una cuenta o agendan una actividad para todos.',
+        chatAdjuntarTxt: 'Enviar rutina, libretica o actividad al grupo',
+        chatAdjuntar: () => self.hojaChat('adjuntar'),
         chatOpciones: () => self.hojaChat('grupoOpciones', { nombre: g.nombre }),
       });
     }
@@ -1853,8 +1891,30 @@ class Component extends DCLogic {
    *  quien debe, su parte; los demás del grupo, quiénes consumieron. */
   tarjetaGrupo(m, mio, s, borradas) {
     const self = this, me = this.uid, d = m.datos || {}, nada = () => {};
-    if (m.tipo !== 'libreta') {
-      return { kicker: 'ACTIVIDAD', color: AMBER, borde: 'rgba(206,127,85,.3)', titulo: 'Actividad', sub: '', extra: '', accion: '', tocar: nada };
+    if (m.tipo === 'actividad') {
+      // Con mi copia a la mano se ve como está hoy (quien la creó pudo cambiarla).
+      const mia = s.acts.find(a => a.lote === m.ref && (a.owner || me) === me);
+      const tipo = mia ? mia.tipo : (d.tipo || 'Actividad'), fecha = mia ? mia.fecha : d.fecha;
+      const temas = mia ? mia.asunto.filter(t => t && t !== 'Sin temas') : (Array.isArray(d.temas) ? d.temas : []);
+      const cuadN = mia ? ((s.cuadernos.find(c => c.id === mia.c) || {}).nombre || '') : (mio ? (d.cuaderno || '') : '');
+      return {
+        kicker: 'ACTIVIDAD DEL GRUPO', color: AMBER, borde: 'rgba(206,127,85,.3)',
+        titulo: tipo + (cuadN ? ' · ' + cuadN : ''),
+        sub: fechaLarga(fecha), extra: temas.length ? 'Temas: ' + temas.join(', ') : '',
+        accion: 'Ver en la agenda ›',
+        tocar: () => self.irA({ ir: 'estudio', fecha }, true),
+      };
+    }
+    if (m.tipo === 'rutina') {
+      const inv = !mio && s.invRutinas.find(x => x.lote && x.lote === m.ref);
+      return {
+        kicker: 'RUTINA', color: MINT, borde: 'rgba(87,185,160,.32)',
+        titulo: d.tipo === 'semana' ? (mio ? 'Tu semana' : 'Su semana') : '«' + (d.nombre || 'Grupo') + '»',
+        sub: d.tipo === 'semana' ? cuenta(+d.grupos || 0, 'grupo', 'grupos') : cuenta(+d.ejercicios || 0, 'ejercicio', 'ejercicios'),
+        extra: '',
+        accion: mio ? 'Enviada al grupo' : (inv ? 'Ver y aceptar ›' : 'Ya respondida'),
+        tocar: inv ? () => self.setState({ verRutina: { modo: 'inv', inv } }) : nada,
+      };
     }
     const partes = Array.isArray(d.partes) ? d.partes : [];
     const mia = partes.find(p => p.id === me);
@@ -1894,7 +1954,8 @@ class Component extends DCLogic {
     const quien = a ? primerNombre(a.nombre) : '';
     const chip = on => ({ bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE' });
     const volver = () => self.hojaChat('adjuntar');
-    const sub = h.vista === 'rutina' || h.vista === 'libreta';
+    const sub = h.vista === 'rutina' || h.vista === 'libreta' || h.vista === 'grupoLibreta';
+    const dest = g ? 'AL GRUPO' : 'A ' + quien.toUpperCase();
     const cta = (on, txt) => ({ bg: on ? MINT : 'rgba(87,185,160,.14)', fg: on ? '#0A0E1A' : 'rgba(87,185,160,.55)', txt });
     const base = {
       chatHojaOn: true, cerrarChatHoja: () => self.cerrarHoja('chat'),
@@ -1902,8 +1963,8 @@ class Component extends DCLogic {
       hjOpciones: h.vista === 'opciones', hjAgregar: h.vista === 'agregar',
       hjGrupoNuevo: h.vista === 'grupoNuevo', hjGrupoOpc: h.vista === 'grupoOpciones', hjGrupoLib: h.vista === 'grupoLibreta',
       hjKicker: {
-        adjuntar: 'ENVIAR A ' + quien.toUpperCase(), rutina: '‹ ENVIAR A ' + quien.toUpperCase(), libreta: '‹ ENVIAR A ' + quien.toUpperCase(),
-        opciones: 'CHAT', agregar: 'AMIGOS', grupoNuevo: 'AMIGOS', grupoOpciones: 'GRUPO', grupoLibreta: 'ENVIAR AL GRUPO',
+        adjuntar: 'ENVIAR ' + dest, rutina: '‹ ENVIAR ' + dest, libreta: '‹ ENVIAR ' + dest,
+        opciones: 'CHAT', agregar: 'AMIGOS', grupoNuevo: 'AMIGOS', grupoOpciones: 'GRUPO', grupoLibreta: '‹ ENVIAR AL GRUPO',
       }[h.vista] || '',
       hjKickerColor: sub ? AMBER : '#8E9AAE',
       hjVolver: sub ? volver : () => {},
@@ -1913,6 +1974,15 @@ class Component extends DCLogic {
       }[h.vista] || '',
       hjMsg: h.msg || '',
     };
+    if (h.vista === 'adjuntar' && g) {
+      return Object.assign(base, {
+        hjOpcionesAdj: [
+          { titulo: 'Rutina', sub: 'Tu semana o uno de tus grupos, para todos', color: MINT, ir: () => self.hojaChat('rutina') },
+          { titulo: 'Libretica', sub: 'Reparte una cuenta entre el grupo', color: AMBER, ir: () => self.hojaChat('grupoLibreta', { total: '', nota: '', partes: {} }) },
+          { titulo: 'Actividad', sub: 'Quiz, parcial, salida… en la agenda de todos', color: '#4B7BE5', ir: () => self.abrirActividadGrupo(g.id) },
+        ],
+      });
+    }
     if (h.vista === 'adjuntar') {
       return Object.assign(base, {
         hjOpcionesAdj: [
@@ -1931,7 +2001,9 @@ class Component extends DCLogic {
           const clave = f.gid || 'semana', enviando = h.enviando === clave;
           return { titulo: f.titulo, meta: f.meta, color: f.color, accion: enviando ? 'Enviando…' : 'Enviar', enviar: () => self.enviarRutinaChat(f.gid) };
         }),
-        hjRutinaNota: 'Le llega a ' + quien + ' como tarjeta en este chat. Si la acepta, queda como copia suya. Solo va la rutina, nunca tus pesos.',
+        hjRutinaNota: g
+          ? 'Les llega a todos los del grupo como tarjeta en este chat. Quien la acepte la tiene como copia suya. Solo va la rutina, nunca tus pesos.'
+          : 'Le llega a ' + quien + ' como tarjeta en este chat. Si la acepta, queda como copia suya. Solo va la rutina, nunca tus pesos.',
       });
     }
     if (h.vista === 'libreta') {
@@ -2764,7 +2836,9 @@ class Component extends DCLogic {
     const openC = s.cuadernos.find(c => c.id === s.openCuaderno);
     const mesKey = iso(s.year, s.month, 1).slice(0, 7);
     const monthActs = misActs.filter(a => a.fecha.slice(0, 7) === mesKey);
-    const monthAll = s.acts.filter(a => a.fecha.slice(0, 7) === mesKey);
+    // Las copias de grupo de los demás (las que agendé para el grupo) no se listan.
+    const monthAll = s.acts.filter(a => a.fecha.slice(0, 7) === mesKey && !(a.lote && a.owner && a.owner !== me));
+    const grupoNombre = id => (s.gAmigos.find(g => g.id === id) || {}).nombre || '';
     const first = new Date(s.year, s.month, 1).getDay();
     const lead = (first + 6) % 7;
     const dim = new Date(s.year, s.month + 1, 0).getDate();
@@ -2792,7 +2866,8 @@ class Component extends DCLogic {
         fechaTxt: self.fechaTxt(a.fecha) + ' · ' + s.year,
         asuntos: a.asunto.map(t => ({ t })),
         cuad: cn ? '· ' + cn : '',
-        tag: ajena ? 'PARA ' + nombreDe(a.owner).toUpperCase() : (a.por ? 'DE ' + nombreDe(a.por).toUpperCase() : ''),
+        tag: a.lote ? 'GRUPO' + (grupoNombre(a.g) ? ' · ' + grupoNombre(a.g).toUpperCase() : '')
+          : (ajena ? 'PARA ' + nombreDe(a.owner).toUpperCase() : (a.por ? 'DE ' + nombreDe(a.por).toUpperCase() : '')),
         op: ajena ? 0.6 : 1,
         edit: () => self.setState({ tipoEd: null, modal: { id: a.id, c: a.c, tipo: a.tipo, urg: conUrg(a), fecha: a.fecha, asunto: a.asunto.slice(), tema: '', para: a.owner || me, por: a.por } }),
       };
@@ -2800,6 +2875,15 @@ class Component extends DCLogic {
 
     const m = s.modal;
     const mPara = m ? (m.para || me) : me;
+    // Actividad de grupo: la nueva (m.grupo) o una copia existente (lote).
+    const mAct = m && m.id ? s.acts.find(a => a.id === m.id) : null;
+    const mLote = !!(mAct && mAct.lote), mFijo = mLote && !!mAct.por;
+    const mGrupoNueva = !!(m && !m.id && m.grupo);
+    const mGrupoId = mGrupoNueva ? m.grupo : (mLote ? mAct.g : null);
+    const mGrupoNom = mGrupoId ? ((s.gAmigos.find(g => g.id === mGrupoId) || {}).nombre || '') : '';
+    const mCreador = mFijo
+      ? primerNombre(((s.gAmigos.find(g => g.id === mAct.g) || { miembros: [] }).miembros.find(x => x.id === mAct.por) || {}).nombre || nombreDe(mAct.por))
+      : '';
     const mCuads = mPara === me ? s.cuadernos : (s.cuadAmigos[mPara] || []);
     let mCells = [], mUrg = { color: GREY, tint: 'rgba(142,154,174,.14)', label: 'SIN URGENCIA' };
     if (m) {
@@ -3093,7 +3177,7 @@ class Component extends DCLogic {
       modalSinCuadsTxt: mPara === me
         ? 'Aún no tienes cuadernos. Puedes crear uno en Estudio › Cuadernos.'
         : nombreDe(mPara) + ' no tiene cuadernos.',
-      modalParaOn: !!(m && !m.id && amigosOk.length),
+      modalParaOn: !!(m && !m.id && !m.grupo && amigosOk.length),
       modalPara: [{ t: 'Mí', id: me }].concat(amigosOk.map(a => ({ t: a.nombre, id: a.id }))).map(p => {
         const on = mPara === p.id;
         return {
@@ -3104,13 +3188,26 @@ class Component extends DCLogic {
           }),
         };
       }),
-      modalDe: !m ? '' : (m.id
-        ? (mPara !== me ? 'En la agenda de ' + nombreDe(mPara) + '.' : (m.por ? 'Te la asignó ' + nombreDe(m.por) + '.' : ''))
-        : (mPara !== me ? 'Aparecerá en la agenda de ' + nombreDe(mPara) + '.' : '')),
+      modalDe: !m ? '' : (mGrupoNueva
+        ? 'Para todos en «' + mGrupoNom + '»: aparecerá en la agenda de cada uno, también en la tuya.'
+        : (mFijo
+          ? 'La agendó ' + mCreador + ' para ' + (mGrupoNom ? '«' + mGrupoNom + '»' : 'el grupo') + '. Solo quien la creó cambia la fecha, el tipo y los temas; tú puedes moverla de cuaderno o quitarla de tu agenda.'
+          : (mLote
+            ? 'Es del grupo' + (mGrupoNom ? ' «' + mGrupoNom + '»' : '') + ': si cambias la fecha, el tipo o los temas, cambia para todos y les llega un aviso.'
+            : (m.id
+              ? (mPara !== me ? 'En la agenda de ' + nombreDe(mPara) + '.' : (m.por ? 'Te la asignó ' + nombreDe(m.por) + '.' : ''))
+              : (mPara !== me ? 'Aparecerá en la agenda de ' + nombreDe(mPara) + '.' : ''))))),
+      modalCuadNotaOn: mGrupoNueva,
+      modalCuadNota: 'A cada uno le queda en su cuaderno con el mismo nombre, si tiene uno.',
+      modalLibre: !mFijo, modalFijo: mFijo,
+      modalFijoTipo: m ? m.tipo : '',
+      modalFijoFecha: m ? fechaLarga(m.fecha) : '',
+      modalFijoTemas: m ? (m.asunto.filter(t => t && t !== 'Sin temas').join(', ') || 'Sin temas') : '',
+      modalBorrarTxt: mLote ? 'QUITAR DE MI AGENDA' : 'ELIMINAR ACTIVIDAD',
       closeModal: () => self.cerrarHoja('modal'),
       modalTitle: m && m.id ? 'Editar actividad' : 'Nueva actividad',
       modalCuaderno: m ? ((mCuads.find(c => c.id === m.c) || {}).nombre || '') : '',
-      modalCta: m && m.id ? 'Guardar' : 'Crear actividad',
+      modalCta: mGrupoNueva ? (m.enviando ? 'Agendando…' : 'Agendar para el grupo') : (m && m.id ? 'Guardar' : 'Crear actividad'),
       modalEditing: !!(m && m.id),
       modalMonth: m ? MONTHS[+m.fecha.split('-')[1] - 1] + ' ' + m.fecha.split('-')[0] : '',
       modalCells: mCells, modalColor: mUrg.color, modalTint: mUrg.tint,
@@ -3121,6 +3218,8 @@ class Component extends DCLogic {
       ...self.valsTipos(s),
       // Se guarda al instante; la hoja se va con su animación y luego se cierra.
       saveAct: () => {
+        const mm0 = self.state.modal;
+        if (mm0 && !mm0.id && mm0.grupo) { self.crearActividadGrupo(); return; }
         self.setState(st => {
           const mm = st.modal;
           if (mm.id) return { acts: st.acts.map(a => a.id === mm.id ? { ...a, c: mm.c, tipo: mm.tipo, urg: mm.urg !== false, fecha: mm.fecha, asunto: mm.asunto } : a) };
@@ -3132,6 +3231,9 @@ class Component extends DCLogic {
       },
       deleteAct: () => {
         const id = s.modal && s.modal.id;
+        if (mLote && !window.confirm(mFijo
+          ? '¿Quitarla de tu agenda? A los demás del grupo les seguirá apareciendo.'
+          : '¿Quitarla de tu agenda? A los demás del grupo les seguirá apareciendo, y ya no podrás cambiarla para todos.')) return;
         self.setState(st => ({ acts: st.acts.filter(a => a.id !== id) }));
         self.cerrarHoja('modal');
       },
