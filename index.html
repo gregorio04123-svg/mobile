@@ -229,6 +229,26 @@
       </sc-for>
     </div>
 
+    <sc-if value="{{ hayInv }}">
+      <div style="padding:0 14px 10px;display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ invCards }}" as="iv" hint-placeholder-count="0">
+          <div sc-camel-on-click="{{ iv.ver }}" style="padding:13px 14px;border-radius:14px;background:rgba(87,185,160,.08);border:1px solid rgba(87,185,160,.32);display:flex;align-items:center;gap:12px;cursor:pointer">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#57B9A0">RUTINA COMPARTIDA</div>
+                <div style="display:flex;gap:3px">
+                  <sc-for list="{{ iv.dots }}" as="dt" hint-placeholder-count="0"><div style="width:6px;height:6px;border-radius:50%;background:{{ dt.color }}"></div></sc-for>
+                </div>
+              </div>
+              <div style="font:700 14px/1.25 Manrope,sans-serif;color:#EDF1F7;margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ iv.titulo }}</div>
+              <div style="font:700 9.5px/1.2 Manrope,sans-serif;letter-spacing:.08em;color:#8E9AAE;margin-top:6px">{{ iv.meta }}</div>
+            </div>
+            <div style="flex:none;padding:10px 14px;border-radius:10px;background:#57B9A0;font:800 12px/1 Manrope,sans-serif;color:#0A0E1A">Ver</div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
     <div data-deslizar-dias>
     <sc-if value="{{ esDescanso }}">
       <div style="margin:4px 14px 0;padding:30px 22px;border-radius:16px;border:1px dashed rgba(255,255,255,.12);text-align:center">
@@ -896,7 +916,7 @@
           </div>
           <div sc-camel-on-click="{{ copiarCodigo }}" style="flex:none;padding:11px 13px;border-radius:10px;cursor:pointer;background:rgba(206,127,85,.12);border:1px solid rgba(206,127,85,.34);font:700 10px/1 Manrope,sans-serif;letter-spacing:.1em;color:#CE7F55" style-active="transform:translateY(1px)">{{ copiarTxt }}</div>
         </div>
-        <div style="font:500 11px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:10px;text-wrap:pretty">Compártelo para que te agreguen. Entre amigos pueden asignarse actividades y compartir libreticas.</div>
+        <div style="font:500 11px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:10px;text-wrap:pretty">Compártelo para que te agreguen. Entre amigos pueden asignarse actividades, compartir libreticas y enviarse rutinas.</div>
       </div>
 
       <div style="margin-top:24px;display:flex;align-items:center;justify-content:space-between">
@@ -924,10 +944,12 @@
         </sc-for>
         <sc-for list="{{ amigosList }}" as="am" hint-placeholder-count="0">
           <div style="padding:12px 14px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:11px">
-            <div style="width:32px;height:32px;flex:none;border-radius:50%;background:{{ am.bg }};display:flex;align-items:center;justify-content:center;font:800 13px/1 Manrope,sans-serif;color:#0A0E1A">{{ am.inicial }}</div>
-            <div style="flex:1;min-width:0">
-              <div style="font:700 13.5px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ am.nombre }}</div>
-              <div style="font:700 9.5px/1.2 Manrope,sans-serif;letter-spacing:.08em;color:{{ am.estadoColor }};margin-top:6px">{{ am.estado }} · {{ am.codigo }}</div>
+            <div sc-camel-on-click="{{ am.ver }}" style="flex:1;min-width:0;display:flex;align-items:center;gap:11px;cursor:{{ am.cursor }}">
+              <div style="width:32px;height:32px;flex:none;border-radius:50%;background:{{ am.bg }};display:flex;align-items:center;justify-content:center;font:800 13px/1 Manrope,sans-serif;color:#0A0E1A">{{ am.inicial }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font:700 13.5px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ am.nombre }}</div>
+                <div style="font:700 9.5px/1.2 Manrope,sans-serif;letter-spacing:.08em;color:{{ am.estadoColor }};margin-top:6px">{{ am.estado }}</div>
+              </div>
             </div>
             <div sc-camel-on-click="{{ am.quitar }}" style="flex:none;padding:9px 10px;border-radius:9px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.08em;color:#8E9AAE">{{ am.quitarTxt }}</div>
           </div>
@@ -982,6 +1004,7 @@
           </sc-for>
         </div>
         <div style="font:500 11.5px/1.5 Manrope,sans-serif;color:#8E9AAE;margin-top:10px;text-wrap:pretty">Para cambiar un día, mantenlo presionado en la semana de Ejercicio: arrástralo sobre otro para intercambiarlos, o suéltalo para elegir su grupo.</div>
+        <div sc-camel-on-click="{{ rCompartirSemana }}" style="margin-top:12px;padding:14px;border-radius:12px;cursor:pointer;background:rgba(87,185,160,.1);border:1px solid rgba(87,185,160,.32);font:700 13px/1 Manrope,sans-serif;color:#57B9A0;display:flex;align-items:center;justify-content:center;gap:9px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#57B9A0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10V2M5 4.5L8 1.5l3 3"></path><path d="M5.5 7H3.5v7.5h9V7h-2"></path></svg>Compartir mi semana</div>
 
         <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:24px 0 10px">GRUPOS</div>
         <div style="display:flex;flex-direction:column;gap:9px">
@@ -1077,8 +1100,128 @@
           </sc-if>
           <div sc-camel-on-click="{{ rAgregarEj }}" style="margin-top:3px;padding:16px;border-radius:12px;cursor:pointer;background:rgba(87,185,160,.1);border:1px solid rgba(87,185,160,.32);font:700 13.5px/1 Manrope,sans-serif;color:#57B9A0;display:flex;align-items:center;justify-content:center;gap:9px"><div style="width:15px;height:15px;position:relative;display:flex;align-items:center;justify-content:center"><div style="position:absolute;width:13px;height:1.8px;border-radius:2px;background:#57B9A0"></div><div style="position:absolute;width:1.8px;height:13px;border-radius:2px;background:#57B9A0"></div></div>Añadir ejercicio</div>
         </div>
-        <div sc-camel-on-click="{{ rBorrarGrupo }}" style="margin-top:22px;padding:15px;border-radius:12px;text-align:center;cursor:pointer;background:rgba(196,100,97,.07);border:1px solid rgba(196,100,97,.26);font:700 11.5px/1 Manrope,sans-serif;letter-spacing:.1em;color:#C46461">BORRAR GRUPO</div>
+        <div sc-camel-on-click="{{ rCompartirGrupo }}" style="margin-top:22px;padding:14px;border-radius:12px;cursor:pointer;background:rgba(87,185,160,.1);border:1px solid rgba(87,185,160,.32);font:700 13px/1 Manrope,sans-serif;color:#57B9A0;display:flex;align-items:center;justify-content:center;gap:9px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#57B9A0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10V2M5 4.5L8 1.5l3 3"></path><path d="M5.5 7H3.5v7.5h9V7h-2"></path></svg>Compartir este grupo</div>
+        <div sc-camel-on-click="{{ rBorrarGrupo }}" style="margin-top:10px;padding:15px;border-radius:12px;text-align:center;cursor:pointer;background:rgba(196,100,97,.07);border:1px solid rgba(196,100,97,.26);font:700 11.5px/1 Manrope,sans-serif;letter-spacing:.1em;color:#C46461">BORRAR GRUPO</div>
         <div style="font:500 11px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:9px;text-align:center">Los días que lo tenían quedan en descanso.</div>
+      </sc-if>
+
+      <sc-if value="{{ rCompOn }}">
+        <div style="margin-top:20px;padding:15px 16px;border-radius:14px;background:#121724;border:1px solid rgba(255,255,255,.07)">
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE">QUÉ SE ENVÍA</div>
+          <div style="font:700 14px/1.4 Manrope,sans-serif;color:#EDF1F7;margin-top:8px;text-wrap:pretty">{{ rCompQue }}</div>
+          <sc-if value="{{ rCompSemana }}">
+            <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:12px">
+              <sc-for list="{{ rSemana }}" as="cs" hint-placeholder-count="7">
+                <div style="min-width:0;padding:9px 0 8px;border-radius:10px;text-align:center;background:#0E131F;border:1px solid rgba(255,255,255,.07)">
+                  <div style="font:700 8.5px/1 Manrope,sans-serif;letter-spacing:.04em;color:#8E9AAE">{{ cs.dow }}</div>
+                  <div style="width:7px;height:7px;border-radius:50%;margin:7px auto 0;background:{{ cs.color }}"></div>
+                  <div style="font:800 9.5px/1.1 Manrope,sans-serif;margin-top:6px;color:{{ cs.fg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cs.abbr }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div style="font:500 11.5px/1.5 Manrope,sans-serif;color:#8E9AAE;margin-top:12px;text-wrap:pretty">{{ rCompNota }}</div>
+        </div>
+        <sc-if value="{{ rCompVacia }}">
+          <div style="margin-top:14px;padding:18px;border-radius:12px;border:1px dashed rgba(255,255,255,.12);text-align:center;font:500 12px/1.5 Manrope,sans-serif;color:#8E9AAE">Tu semana no tiene grupos asignados.<br>Asigna al menos un día antes de compartirla.</div>
+        </sc-if>
+        <sc-if value="{{ rCompSinAmigos }}">
+          <div style="margin-top:14px;padding:18px;border-radius:12px;border:1px dashed rgba(255,255,255,.12);text-align:center;font:500 12px/1.5 Manrope,sans-serif;color:#8E9AAE">Aún no tienes amigos.<br>Agrégalos con su código en el panel ⚙.</div>
+        </sc-if>
+        <sc-if value="{{ rCompHayAmigos }}">
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:22px 0 10px">ENVIAR A</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ rCompAmigos }}" as="ca" hint-placeholder-count="0">
+              <div style="padding:12px 14px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:11px">
+                <div style="width:32px;height:32px;flex:none;border-radius:50%;background:{{ ca.bg }};display:flex;align-items:center;justify-content:center;font:800 13px/1 Manrope,sans-serif;color:#0A0E1A">{{ ca.inicial }}</div>
+                <div style="flex:1;min-width:0;font:700 13.5px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ca.nombre }}</div>
+                <div sc-camel-on-click="{{ ca.enviar }}" style="flex:none;padding:11px 14px;border-radius:10px;cursor:pointer;background:{{ ca.btnBg }};border:1px solid {{ ca.btnBorder }};font:700 12.5px/1 Manrope,sans-serif;color:{{ ca.btnFg }}">{{ ca.txt }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ rCompMsg }}">
+          <div style="font:600 11.5px/1.45 Manrope,sans-serif;color:#E08A87;margin-top:10px">{{ rCompMsg }}</div>
+        </sc-if>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ verOn }}">
+  <div data-hoja-fondo="ver" style="position:absolute;inset:0;z-index:97;display:flex;align-items:flex-end">
+    <div data-hoja-velo style="position:absolute;inset:0;background:rgba(3,5,10,.62)"></div>
+    <div data-hoja="ver" style="position:relative;box-sizing:border-box;width:100%;max-height:calc(100% - env(safe-area-inset-top,0px) - 44px);overflow:auto;background:#0E131F;border-top:1px solid rgba(255,255,255,.1);border-radius:28px 28px 0 0;padding:10px 22px calc(env(safe-area-inset-bottom,0px) + 30px)">
+      <div style="width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.2);margin:0 auto 16px"></div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="min-width:0">
+          <div style="font:700 10px/1.3 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">{{ vKicker }}</div>
+          <div style="font:800 24px/1.1 Manrope,sans-serif;letter-spacing:-.02em;margin-top:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ vTitulo }}</div>
+        </div>
+        <div sc-camel-on-click="{{ cerrarVer }}" style="flex:none;width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 16px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
+      </div>
+
+      <sc-if value="{{ vCargando }}">
+        <div style="padding:44px 0 30px;text-align:center;font:600 12.5px/1.4 Manrope,sans-serif;color:#8E9AAE">Cargando su rutina…</div>
+      </sc-if>
+      <sc-if value="{{ vError }}">
+        <div style="padding:34px 8px 10px;text-align:center">
+          <div style="font:600 12.5px/1.5 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">{{ vError }}</div>
+          <div sc-camel-on-click="{{ vReintentar }}" style="display:inline-block;margin-top:14px;padding:12px 18px;border-radius:10px;cursor:pointer;background:rgba(87,185,160,.12);border:1px solid rgba(87,185,160,.34);font:700 12.5px/1 Manrope,sans-serif;color:#57B9A0">Reintentar</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vListo }}">
+        <sc-if value="{{ vHaySemana }}">
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:22px 0 10px">SU SEMANA</div>
+          <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px">
+            <sc-for list="{{ vSemana }}" as="vs" hint-placeholder-count="7">
+              <div style="min-width:0;padding:9px 0 8px;border-radius:10px;text-align:center;background:#121724;border:1px solid rgba(255,255,255,.07)">
+                <div style="font:700 8.5px/1 Manrope,sans-serif;letter-spacing:.04em;color:#8E9AAE">{{ vs.dow }}</div>
+                <div style="width:7px;height:7px;border-radius:50%;margin:7px auto 0;background:{{ vs.color }}"></div>
+                <div style="font:800 9.5px/1.1 Manrope,sans-serif;margin-top:6px;color:{{ vs.fg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ vs.abbr }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:24px 0 10px">{{ vGruposLabel }}</div>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <sc-for list="{{ vGrupos }}" as="vg" hint-placeholder-count="3">
+            <div style="border-radius:14px;background:#121724;border:1px solid rgba(255,255,255,.07);overflow:hidden">
+              <div style="padding:14px 15px;display:flex;align-items:center;gap:13px">
+                <div style="width:8px;height:36px;flex:none;border-radius:4px;background:{{ vg.color }}"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font:700 15px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ vg.nombre }}</div>
+                  <div style="font:700 9.5px/1.2 Manrope,sans-serif;letter-spacing:.08em;color:#8E9AAE;margin-top:7px">{{ vg.meta }}</div>
+                </div>
+              </div>
+              <div style="border-top:1px solid #1D2534;padding:5px 0">
+                <sc-for list="{{ vg.ejercicios }}" as="ve" hint-placeholder-count="0">
+                  <div style="padding:9px 15px;display:flex;align-items:center;gap:11px">
+                    <div style="flex:none;font:800 11px/1 Manrope,sans-serif;color:#4A566B">{{ ve.num }}</div>
+                    <div style="flex:1;min-width:0;font:600 13.5px/1.25 Manrope,sans-serif;color:#EDF1F7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ve.name }}</div>
+                    <div style="flex:none;font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE">{{ ve.meta }}</div>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ vg.sinEj }}">
+                  <div style="padding:10px 15px;font:500 12px/1.4 Manrope,sans-serif;color:#8E9AAE">Sin ejercicios.</div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ vSinGrupos }}">
+            <div style="padding:20px;border-radius:12px;border:1px dashed rgba(255,255,255,.12);text-align:center;font:500 12px/1.5 Manrope,sans-serif;color:#8E9AAE">Aún no tiene grupos.</div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ vInv }}">
+          <div style="margin-top:18px;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);font:500 11.5px/1.5 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">{{ vNota }}</div>
+          <div style="display:flex;gap:9px;margin-top:14px">
+            <div sc-camel-on-click="{{ vRechazar }}" style="flex:1;padding:16px;border-radius:12px;text-align:center;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);font:700 13.5px/1 Manrope,sans-serif;color:#8E9AAE">Rechazar</div>
+            <div sc-camel-on-click="{{ vAceptar }}" style="flex:1.6;padding:16px;border-radius:12px;text-align:center;cursor:pointer;background:#57B9A0;font:800 13.5px/1 Manrope,sans-serif;color:#0A0E1A">Aceptar</div>
+          </div>
+        </sc-if>
       </sc-if>
     </div>
   </div>

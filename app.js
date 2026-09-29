@@ -118,6 +118,33 @@ function cap(t) { t = String(t || ''); return t ? t.charAt(0).toUpperCase() + t.
 function tierDe(e) { return /^[A-ZÁÉÍÓÚ]+$/.test(e.type || '') ? (TIER[e.name] || cap(e.type)) : (e.type || ''); }
 function abreviar(nombre) { return String(nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 6) || 'GRUPO'; }
 function cuenta(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
+function primerNombre(n) { return String(n || '').trim().split(/\s+/)[0] || 'tu amigo'; }
+// Semana empezando en lunes (índices de día: 0 = domingo).
+const DIAS_LUNES = [1, 2, 3, 4, 5, 6, 0];
+function entero(v, min, max, def) { const n = parseInt(v, 10); return isNaN(n) ? def : Math.max(min, Math.min(max, n)); }
+function recorte(v, max, def) { const x = typeof v === 'string' ? v.trim() : ''; return (x || def || '').slice(0, max); }
+/** Rutina que llega de otra persona (invitación o vista de un amigo): solo
+ *  se copian los campos conocidos, con límites, antes de mostrarla o guardarla. */
+function sanearRutina(c) {
+  c = c && typeof c === 'object' ? c : {};
+  const grupos = (Array.isArray(c.grupos) ? c.grupos : []).filter(g => g && typeof g === 'object').slice(0, 20).map(g => {
+    const nombre = recorte(g.nombre, 40, 'Grupo');
+    return {
+      ref: String(g.ref || ''), nombre,
+      abbr: recorte(g.abbr, 8) || abreviar(nombre),
+      color: /^#[0-9a-f]{6}$/i.test(g.color || '') ? g.color : PALETA[0],
+      musculo: recorte(g.musculo, 40, nombre.toUpperCase()),
+      ejercicios: (Array.isArray(g.ejercicios) ? g.ejercicios : []).filter(e => e && typeof e === 'object').slice(0, 40).map(e => ({
+        name: recorte(e.name, 60, 'Ejercicio'), group: recorte(e.group, 40), type: recorte(e.type, 20, 'Compuesto'),
+        sets: entero(e.sets, 1, 10, 3), reps: entero(e.reps, 1, 50, 10), rest: recorte(e.rest, 8, '1:30'),
+        drops: e.drops === true, desc: recorte(e.desc, 400),
+      })),
+    };
+  });
+  const refs = new Set(grupos.map(g => g.ref));
+  const plan = Array.isArray(c.plan) && c.plan.length === 7 ? c.plan.map(r => (r && refs.has(String(r)) ? String(r) : null)) : null;
+  return { grupos, plan };
+}
 
 // Partes del estado que son datos del usuario (lo demás es interfaz).
 const DATA_KEYS = ['logs', 'days', 'cuadernos', 'files', 'acts', 'libs', 'profile', 'grupos', 'plan'];
@@ -165,8 +192,10 @@ class Component extends DCLogic {
       month: NOW.getMonth(), year: NOW.getFullYear(), selDay: NOW.getDate(),
       modal: null,
       showHist: false, openLib: null, abonoMonto: '',
-      menuDia: null, rutinaOn: false, rGrupo: null, rEj: null,
+      menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
+      invRutinas: [], verRutina: null,
     });
+    this.invPorBorrar = new Set();   // invitaciones respondidas que aún no se borran en el servidor
   }
 
   /* ── Datos del servidor → estado ─────────────────────────────────── */
@@ -215,7 +244,7 @@ class Component extends DCLogic {
       localStorage.setItem('pilares.nube.' + this.uid, JSON.stringify({
         data: { profile: s.profile, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, logs: this.snapshot().sesiones,
                 grupos: s.grupos, plan: s.plan },
-        base: this.base, codigo: s.codigo, amigos: s.amigos, cuadAmigos: s.cuadAmigos,
+        base: this.base, codigo: s.codigo, amigos: s.amigos, cuadAmigos: s.cuadAmigos, invRutinas: s.invRutinas,
       }));
     } catch (e) {}
   }
@@ -267,6 +296,7 @@ class Component extends DCLogic {
       this.base = cache.base;
       this.setState(Object.assign(this.desdeDatos(cache.data), {
         auth: 'dentro', me, codigo: cache.codigo || '', amigos: cache.amigos || [], cuadAmigos: cache.cuadAmigos || {},
+        invRutinas: cache.invRutinas || [],
       }));
     } else {
       this.base = null;
@@ -320,6 +350,7 @@ class Component extends DCLogic {
   cerrarLocal() {
     this.desconectarTiempoReal();
     this.uid = null; this.base = null; this.__sig = null; this.respaldoArchivo = null; this.sembrada = false;
+    this.invPorBorrar = new Set();
   }
 
   estadoFuera() {
@@ -328,7 +359,8 @@ class Component extends DCLogic {
       me: null, codigo: '', amigos: [], cuadAmigos: {}, amigoCodigo: '', amigoMsg: '', importMsg: '',
       nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null,
       activeDay: 1, expanded: null,
-      menuDia: null, rutinaOn: false, rGrupo: null, rEj: null,
+      menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
+      invRutinas: [], verRutina: null,
     });
   }
 
@@ -422,7 +454,7 @@ class Component extends DCLogic {
     this.asignarDia(md.i, gid);
   }
 
-  abrirRutina(grupoId) { this.setState({ rutinaOn: true, rGrupo: grupoId || null, rEj: null, menuDia: null }); }
+  abrirRutina(grupoId) { this.setState({ rutinaOn: true, rGrupo: grupoId || null, rEj: null, rCompartir: null, menuDia: null }); }
 
   nuevoGrupo() {
     const id = Nube.uuid();
@@ -520,20 +552,54 @@ class Component extends DCLogic {
     const self = this;
     if (!s.rutinaOn) return { rutinaOn: false };
     const g = s.rGrupo ? s.grupos.find(x => x.id === s.rGrupo) : null;
+    const rc = s.rCompartir;
     const base = {
-      rutinaOn: true, rListaOn: !g, rEditOn: !!g,
-      rKicker: g ? '‹ TU RUTINA' : 'TU RUTINA', rKickerColor: g ? AMBER : '#8E9AAE',
-      rTitulo: g ? (g.nombre || 'Sin nombre') : 'Grupos y semana',
-      rVolver: () => { if (g) self.setState({ rGrupo: null, rEj: null }); },
+      rutinaOn: true, rCompOn: !!rc, rListaOn: !rc && !g, rEditOn: !rc && !!g,
+      rKicker: rc ? '‹ ' + (g ? (g.nombre || 'Grupo').toUpperCase() : 'TU RUTINA') : (g ? '‹ TU RUTINA' : 'TU RUTINA'),
+      rKickerColor: rc || g ? AMBER : '#8E9AAE',
+      rTitulo: rc ? (rc.gid ? 'Compartir grupo' : 'Compartir semana') : (g ? (g.nombre || 'Sin nombre') : 'Grupos y semana'),
+      rVolver: () => {
+        if (rc) self.setState({ rCompartir: null });
+        else if (g) self.setState({ rGrupo: null, rEj: null });
+      },
       cerrarRutina: () => self.cerrarHoja('rutina'),
+      rSemana: DIAS_LUNES.map(wd => {
+        const gg = s.grupos.find(x => x.id === s.plan[wd]);
+        return { dow: DOW_SH[wd], color: gg ? gg.color : '#28324A', abbr: gg ? (gg.abbr || '').slice(0, 3) : 'LIBRE', fg: gg ? '#fff' : '#4A566B' };
+      }),
     };
+    if (rc) {
+      const gc = rc.gid ? s.grupos.find(x => x.id === rc.gid) : null;
+      const enSemana = s.grupos.filter(x => s.plan.includes(x.id));
+      const amigos = s.amigos.filter(a => a.estado === 'aceptada');
+      const vacia = !rc.gid && enSemana.length === 0;
+      return Object.assign(base, {
+        rCompSemana: !rc.gid,
+        rCompQue: rc.gid
+          ? '"' + (gc ? gc.nombre || 'Sin nombre' : 'Grupo') + '" con ' + cuenta(gc ? gc.ejercicios.length : 0, 'ejercicio', 'ejercicios') + '.'
+          : 'Tu semana con sus ' + cuenta(enSemana.length, 'grupo', 'grupos') + ' y los días de descanso.',
+        rCompNota: 'Le llega como invitación. Si la acepta, queda como copia suya: lo que cambie después no afecta la tuya. Solo va la rutina, nunca tus pesos.',
+        rCompVacia: vacia,
+        rCompSinAmigos: !vacia && amigos.length === 0,
+        rCompHayAmigos: !vacia && amigos.length > 0,
+        rCompAmigos: vacia ? [] : amigos.map((a, i) => {
+          const e = rc.enviados[a.id];
+          return {
+            nombre: a.nombre, inicial: (a.nombre || '?').charAt(0).toUpperCase(), bg: i % 2 ? MINT : AMBER,
+            txt: e === 'enviando' ? 'Enviando…' : e === 'ok' ? 'Enviada ✓' : e === 'error' ? 'Reintentar' : 'Enviar',
+            btnBg: e === 'ok' ? 'transparent' : 'rgba(87,185,160,.12)',
+            btnBorder: e === 'ok' ? 'transparent' : 'rgba(87,185,160,.34)',
+            btnFg: e === 'error' ? RED : MINT,
+            enviar: () => self.compartirCon(a.id),
+          };
+        }),
+        rCompMsg: rc.msg || '',
+      });
+    }
     if (!g) {
       const diasDe = id => s.plan.filter(p => p === id).length;
       return Object.assign(base, {
-        rSemana: [1, 2, 3, 4, 5, 6, 0].map(wd => {
-          const gg = s.grupos.find(x => x.id === s.plan[wd]);
-          return { dow: DOW_SH[wd], color: gg ? gg.color : '#28324A', abbr: gg ? (gg.abbr || '').slice(0, 3) : 'LIBRE', fg: gg ? '#fff' : '#4A566B' };
-        }),
+        rCompartirSemana: () => self.abrirCompartir(null),
         rGrupos: s.grupos.map(gg => {
           const d = diasDe(gg.id);
           return {
@@ -578,6 +644,7 @@ class Component extends DCLogic {
         };
       }),
       rAgregarEj: () => self.agregarEjercicio(g.id),
+      rCompartirGrupo: () => self.abrirCompartir(g.id),
       rBorrarGrupo: () => self.borrarGrupo(g.id),
     });
   }
@@ -585,7 +652,8 @@ class Component extends DCLogic {
   /* ── Lo que piden los gestos y animaciones (fluido.js) ───────────── */
   cerrarHoja(tipo, yaAnimado) {
     const cerrar = () => this.setState(st => tipo === 'modal' ? { modal: null }
-      : tipo === 'rutina' ? { rutinaOn: false, rGrupo: null, rEj: null }
+      : tipo === 'rutina' ? { rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null }
+      : tipo === 'ver' ? { verRutina: null }
       : {
         panel: false,
         respaldo: st.respaldo === 'preparando' ? 'preparando' : '',
@@ -616,7 +684,9 @@ class Component extends DCLogic {
    *  (por ejemplo, el eco de un cambio mío) no hago nada; si no, releo. */
   cambioRemoto(tabla, tipo, nuevo, viejo) {
     if (!this.uid) return;
-    if (tabla === 'conexiones') {
+    if (tabla === 'rutinas_compartidas') {
+      if (tipo === 'DELETE' && !this.state.invRutinas.some(x => x.id === viejo.id)) return;
+    } else if (tabla === 'conexiones') {
       if (tipo === 'DELETE' && !this.state.amigos.some(a => a.conexion === viejo.id)) return;
     } else {
       const mias = Nube.filas(this.snapshot(), this.uid)[tabla] || {};
@@ -682,6 +752,9 @@ class Component extends DCLogic {
         await this.subir();
         if (this.hayPendientes()) { this.releerTrasSubir = true; return; }   // no pisar lo local
       }
+      for (const id of Array.from(this.invPorBorrar)) {
+        try { await Nube.borrarInvitacionRutina(id); this.invPorBorrar.delete(id); } catch (e) {}
+      }
       const antes = this.huella();
       let d = await Nube.cargar(uid);
       if (uid !== this.uid) return;                 // cerró sesión mientras tanto
@@ -695,6 +768,7 @@ class Component extends DCLogic {
       if (this.base && this.huella() !== antes) { this.releer = true; return; }   // editaron mientras llegaba
       this.setState(Object.assign(this.desdeDatos(d), {
         auth: 'dentro', cargaError: '', codigo: d.codigo, amigos: d.amigos, cuadAmigos: d.cuadAmigos, nube: 'ok',
+        invRutinas: d.invRutinas.filter(x => !this.invPorBorrar.has(x.id)),
       }));
       this.base = Nube.filas(this.snapshot(), uid);
       this.__sig = DATA_KEYS.map(k => this.state[k]);
@@ -749,6 +823,166 @@ class Component extends DCLogic {
     }, () => {});
   }
 
+  /* ── Rutinas entre amigos ────────────────────────────────────────── */
+
+  /** Sube lo pendiente y espera a que el servidor lo tenga (lo que se
+   *  comparte o exporta se lee de allá). false si no se pudo. */
+  async alDia() {
+    for (let i = 0; i < 6 && this.hayPendientes(); i++) {
+      await this.subir();
+      if (this.hayPendientes()) await new Promise(r => setTimeout(r, 700));
+    }
+    return !this.hayPendientes();
+  }
+
+  nombreAmigo(inv) { return (this.state.amigos.find(a => a.id === inv.de) || {}).nombre || inv.deNombre || 'Un amigo'; }
+
+  /** Vista de compartir dentro de "Tu rutina": la semana (gid nulo) o un grupo. */
+  abrirCompartir(gid) { this.setState({ rCompartir: { gid: gid || null, enviados: {}, msg: '' } }); }
+
+  async compartirCon(amigoId) {
+    const rc = this.state.rCompartir;
+    if (!rc || rc.enviados[amigoId] === 'enviando' || rc.enviados[amigoId] === 'ok') return;
+    const marcar = (estado, msg) => this.setState(st => st.rCompartir && st.rCompartir.gid === rc.gid
+      ? { rCompartir: { ...st.rCompartir, enviados: { ...st.rCompartir.enviados, [amigoId]: estado }, msg: msg || '' } } : null);
+    marcar('enviando');
+    try {
+      if (!(await this.alDia())) throw new Error('Necesitas conexión a internet para compartir.');
+      await Nube.compartirRutina(amigoId, rc.gid);
+      marcar('ok');
+    } catch (e) {
+      marcar('error', e.message || 'No se pudo enviar. Intenta de nuevo.');
+    }
+  }
+
+  async verRutinaAmigo(a) {
+    this.setState({ verRutina: { modo: 'amigo', id: a.id, nombre: a.nombre, estado: 'cargando' } });
+    try {
+      const datos = sanearRutina(await Nube.rutinaDeAmigo(a.id));
+      this.setState(st => st.verRutina && st.verRutina.id === a.id ? { verRutina: { ...st.verRutina, estado: 'listo', datos } } : null);
+    } catch (e) {
+      const error = navigator.onLine === false ? 'Necesitas conexión a internet para ver su rutina.' : (e.message || 'No se pudo cargar su rutina.');
+      this.setState(st => st.verRutina && st.verRutina.id === a.id ? { verRutina: { ...st.verRutina, estado: 'error', error } } : null);
+    }
+  }
+
+  /** Respondida la invitación, desaparece ya; en el servidor se borra en
+   *  cuanto haya conexión (si no, en la próxima lectura). */
+  quitarInvitacion(id) {
+    this.invPorBorrar.add(id);
+    this.setState(st => ({ invRutinas: st.invRutinas.filter(x => x.id !== id) }));
+    setTimeout(() => this.guardarCache(), 0);
+    Nube.borrarInvitacionRutina(id).then(() => this.invPorBorrar.delete(id), () => {});
+  }
+
+  /** Aceptar = copia propia: grupos nuevos con ids nuevos (lo que el amigo
+   *  cambie después no me afecta). La semana además reemplaza mi plan. */
+  aceptarRutina(inv) {
+    const s = this.state;
+    if (!s.rutinaLista) { if (window.Fluido) Fluido.aviso('Tu rutina aún está cargando. Intenta en un momento.'); return; }
+    const c = sanearRutina(inv.contenido);
+    const quien = primerNombre(this.nombreAmigo(inv));
+    this.cerrarHoja('ver');
+    this.quitarInvitacion(inv.id);
+    if (!c.grupos.length) { if (window.Fluido) Fluido.aviso('Esa rutina llegó vacía.'); return; }
+
+    // Si ya tengo un grupo con el mismo nombre, la copia lleva el nombre de quien la envió.
+    const usados = new Set(s.grupos.map(g => norm(g.nombre)));
+    const mapa = {};
+    const nuevos = c.grupos.map(g => {
+      let nombre = g.nombre;
+      for (let n = 1; usados.has(norm(nombre)); n++) nombre = g.nombre + ' · ' + quien + (n > 1 ? ' ' + n : '');
+      usados.add(norm(nombre));
+      const id = Nube.uuid();
+      mapa[g.ref] = id;
+      return { id, nombre, abbr: g.abbr, color: g.color, musculo: g.musculo,
+               ejercicios: g.ejercicios.map(e => Object.assign({ id: Nube.uuid() }, e)) };
+    });
+    const semana = inv.tipo === 'semana' && c.plan ? c.plan.map(r => (r && mapa[r]) || null) : null;
+    const nota = semana
+      ? this.notaSiEmpezado(WEEK.map((w, i) => i).filter(i => (s.plan[WEEK[i].wd] || null) !== semana[WEEK[i].wd]))
+      : '';
+    const antes = { grupos: s.grupos, plan: s.plan };
+    this.mutGrupos(gs => { nuevos.forEach(g => gs.push(g)); return semana ? { plan: semana } : null; });
+    if (!window.Fluido) return;
+    Fluido.aviso(semana ? 'Semana de ' + quien + ' aplicada' + nota : '"' + nuevos[0].nombre + '" añadido a tu rutina', 'Deshacer',
+      () => this.setState(st => ({
+        grupos: antes.grupos, plan: antes.plan, days: componerDias(antes.grupos, antes.plan, st.logs, st.days),
+      })), null);
+  }
+
+  rechazarRutina(inv) {
+    this.cerrarHoja('ver');
+    this.quitarInvitacion(inv.id);
+    if (window.Fluido) Fluido.aviso('Invitación rechazada');
+  }
+
+  /** Hoja de solo lectura: la rutina de un amigo o una invitación por responder. */
+  valsVer(s) {
+    const v = s.verRutina, self = this;
+    if (!v) return { verOn: false };
+    const inv = v.modo === 'inv' ? v.inv : null;
+    const datos = inv ? sanearRutina(inv.contenido) : v.datos;
+    const quien = inv ? self.nombreAmigo(inv) : v.nombre;
+    const base = {
+      verOn: true, vInv: !!inv,
+      vKicker: inv ? 'ENVIADA POR ' + quien.toUpperCase() : 'RUTINA DE',
+      vTitulo: inv ? (inv.tipo === 'semana' ? 'Su semana' : (datos.grupos[0] ? datos.grupos[0].nombre : 'Grupo')) : quien,
+      cerrarVer: () => self.cerrarHoja('ver'),
+      vCargando: !inv && v.estado === 'cargando',
+      vError: !inv && v.estado === 'error' ? v.error : '',
+      vReintentar: () => self.verRutinaAmigo({ id: v.id, nombre: v.nombre }),
+      vListo: !!datos,
+    };
+    if (!datos) return base;
+    const plan = datos.plan, porRef = {};
+    datos.grupos.forEach(g => { porRef[g.ref] = g; });
+    return Object.assign(base, {
+      vHaySemana: !!plan,
+      vSemana: plan ? DIAS_LUNES.map(wd => {
+        const g = porRef[plan[wd]];
+        return { dow: DOW_SH[wd], color: g ? g.color : '#28324A', abbr: g ? g.abbr.slice(0, 3) : 'LIBRE', fg: g ? '#fff' : '#4A566B' };
+      }) : [],
+      vGruposLabel: cuenta(datos.grupos.length, 'GRUPO', 'GRUPOS'),
+      vGrupos: datos.grupos.map(g => {
+        const dias = plan ? DIAS_LUNES.filter(wd => plan[wd] === g.ref).map(wd => DOW_SH[wd]) : [];
+        return {
+          nombre: g.nombre, color: g.color,
+          meta: cuenta(g.ejercicios.length, 'EJERCICIO', 'EJERCICIOS') + (plan ? ' · ' + (dias.length ? dias.join(', ') : 'SIN DÍAS') : ''),
+          ejercicios: g.ejercicios.map((e, k) => ({
+            num: String(k + 1).padStart(2, '0'), name: e.name,
+            meta: e.sets + '×' + e.reps + (e.drops ? ' + DESCENSOS' : '') + ' · ' + e.rest,
+          })),
+          sinEj: g.ejercicios.length === 0,
+        };
+      }),
+      vSinGrupos: datos.grupos.length === 0,
+      vNota: !inv ? '' : inv.tipo === 'semana'
+        ? 'Si la aceptas, tu semana pasa a ser esta y sus grupos se añaden a los tuyos como copia propia. Tus grupos actuales no se borran.'
+        : 'Si lo aceptas, se añade a tus grupos como copia propia. Luego lo asignas a un día manteniéndolo presionado en la semana.',
+      vAceptar: () => { if (inv) self.aceptarRutina(inv); },
+      vRechazar: () => { if (inv) self.rechazarRutina(inv); },
+    });
+  }
+
+  /** Tarjetas en Ejercicio para las rutinas que me enviaron. */
+  valsInv(s) {
+    const self = this;
+    return {
+      hayInv: s.invRutinas.length > 0,
+      invCards: s.invRutinas.map(inv => {
+        const c = sanearRutina(inv.contenido), g0 = c.grupos[0];
+        const quien = primerNombre(self.nombreAmigo(inv)), semana = inv.tipo === 'semana';
+        return {
+          dots: c.grupos.slice(0, 5).map(g => ({ color: g.color })),
+          titulo: semana ? quien + ' te envió su semana' : quien + ' te envió «' + (g0 ? g0.nombre : 'un grupo') + '»',
+          meta: semana ? cuenta(c.grupos.length, 'GRUPO', 'GRUPOS') : cuenta(g0 ? g0.ejercicios.length : 0, 'EJERCICIO', 'EJERCICIOS'),
+          ver: () => self.setState({ verRutina: { modo: 'inv', inv } }),
+        };
+      }),
+    };
+  }
+
   /* ── Respaldo ────────────────────────────────────────────────────── */
   // Dos pasos (preparar, luego descargar) porque el navegador solo deja
   // descargar o compartir justo después de un toque del usuario.
@@ -759,11 +993,7 @@ class Component extends DCLogic {
     this.setState({ respaldo: 'preparando', respaldoMsg: '' });
     try {
       // Que el respaldo incluya lo último que se escribió.
-      for (let i = 0; i < 6 && this.hayPendientes(); i++) {
-        await this.subir();
-        if (this.hayPendientes()) await new Promise(r => setTimeout(r, 700));
-      }
-      if (this.hayPendientes()) throw new Error('pendiente');
+      if (!(await this.alDia())) throw new Error('pendiente');
       const datos = await Nube.exportar(uid, usuario);
       if (uid !== this.uid) return;
       const texto = JSON.stringify(datos, null, 2);
@@ -1249,7 +1479,7 @@ class Component extends DCLogic {
     return {
       yes: true,
       appOn: true, authOn: false, loadOn: false,
-      ...self.valsRutina(s), ...self.valsMenu(s),
+      ...self.valsRutina(s), ...self.valsMenu(s), ...self.valsVer(s), ...self.valsInv(s),
       isHome: s.tab === 'home', isEjercicio: s.tab === 'ejercicio', isEstudio: s.tab === 'estudio', isFinanzas: s.tab === 'finanzas',
       editOn: s.edit, panelOn: s.panel, modalOn: !!m, restOn: s.restOn,
       goEjercicio: () => self.setState({ tab: 'ejercicio' }),
@@ -1455,7 +1685,10 @@ class Component extends DCLogic {
         const ok = a.estado === 'aceptada';
         return {
           nombre: a.nombre, codigo: a.codigo, inicial: (a.nombre || '?').charAt(0).toUpperCase(),
-          bg: i % 2 ? MINT : AMBER, estado: ok ? 'AMIGO' : 'ESPERANDO RESPUESTA', estadoColor: ok ? MINT : '#8E9AAE',
+          bg: i % 2 ? MINT : AMBER,
+          estado: ok ? 'VER SU RUTINA ›' : 'ESPERANDO RESPUESTA · ' + a.codigo, estadoColor: ok ? MINT : '#8E9AAE',
+          cursor: ok ? 'pointer' : 'default',
+          ver: () => { if (ok) self.verRutinaAmigo(a); },
           quitarTxt: ok ? 'QUITAR' : 'CANCELAR',
           quitar: () => {
             if (ok && !window.confirm('¿Quitar a ' + a.nombre + ' de tus amigos? Las libreticas que ya comparten se conservan.')) return;

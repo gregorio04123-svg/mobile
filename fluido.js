@@ -245,7 +245,9 @@
     if (avisoVencer) { var previo = avisoVencer; avisoVencer = null; clearTimeout(avisoTimer); previo(); }
     if (!aviso) crearAviso();
     aviso.querySelector('.fl-aviso-txt').textContent = texto;
-    aviso.querySelector('.fl-aviso-btn').textContent = accion;
+    var boton = aviso.querySelector('.fl-aviso-btn');
+    boton.textContent = accion || '';
+    boton.style.display = accion ? '' : 'none';   // aviso informativo, sin acción
     avisoDeshacer = alDeshacer; avisoVencer = alVencer;
     aviso.style.display = 'flex';
     colocarAviso();

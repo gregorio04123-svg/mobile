@@ -45,8 +45,10 @@ pilares/
 - **Amigos**: cada cuenta tiene un código (ej. `ANDRE-4F2A`, en el panel ⚙). Con él se envía una solicitud; al aceptarla:
   - **Agenda compartida**: al crear una actividad eliges *Para: Mí* o un amigo, y le aparece en su agenda marcada "DE …".
   - **Libreticas compartidas**: en la tarjeta, *Compartir con* un amigo. Los dos la ven, los dos registran **abonos** y pueden marcarla saldada; solo quien la creó cambia el monto o la borra. Se salda sola cuando los abonos cubren el total.
+  - **Rutinas compartidas**: en *Tu rutina*, *Compartir mi semana* o, dentro de un grupo, *Compartir este grupo*. Al amigo le llega una tarjeta en Ejercicio; la ve y la acepta o la rechaza. Aceptar crea una **copia propia** (lo que el otro cambie después no la afecta); la semana además reemplaza el plan, con *Deshacer*. Si ya existe un grupo con ese nombre, la copia lleva el nombre de quien la envió (ej. "Pierna · Martín"). Solo viaja la rutina: grupos, ejercicios, series × repeticiones y descanso; nunca pesos.
+  - **Ver la rutina de un amigo**: panel ⚙ → Amigos → tocar su nombre. Solo lectura.
 - **Persistencia**: todo se guarda en Supabase y además queda una copia en el teléfono, así abre al instante y funciona sin señal (lo pendiente se sube al volver la conexión). Seguridad por fila: nadie ve datos de otra cuenta salvo lo compartido.
-- **Tiempo real**: lo que haga un amigo (solicitud de amistad, actividad asignada, libretica compartida, abono) aparece en uno o dos segundos mientras la app está en pantalla. En segundo plano la conexión se suelta y al volver se lee lo que pasó. Plan gratis de Supabase: 200 conexiones simultáneas y 2 millones de mensajes al mes; un círculo de amigos queda muy por debajo.
+- **Tiempo real**: lo que haga un amigo (solicitud de amistad, actividad asignada, libretica compartida, abono, rutina enviada) aparece en uno o dos segundos mientras la app está en pantalla. En segundo plano la conexión se suelta y al volver se lee lo que pasó. Plan gratis de Supabase: 200 conexiones simultáneas y 2 millones de mensajes al mes; un círculo de amigos queda muy por debajo.
 - **Respaldo**: panel ⚙ → *Exportar mis datos* → *Guardar respaldo*. Descarga un `.json` con todo lo tuyo (perfil, amigos, cuadernos, actividades, todo el historial del gimnasio, libreticas y abonos). En iPhone se abre la hoja de compartir: elige *Guardar en Archivos*. El plan gratis no hace copias automáticas, así que conviene exportar de vez en cuando.
 - **Datos de antes de las cuentas**: si en un teléfono ya usabas la app, en el panel ⚙ aparece *Importar datos de este dispositivo* (una sola vez por dispositivo).
 
@@ -235,7 +237,7 @@ props: {
 }
 ```
 
-**Rutinas de gimnasio** — viven en Supabase: tabla `grupos` (cada grupo con sus ejercicios) y tabla `rutinas` (el plan de 7 días; índice 0 = domingo). La rutina base de las cuentas nuevas la crea la función `sembrar_rutina` de la base de datos. Cada persona la cambia desde la app. Para que un ejercicio nuevo tenga ícono propio, añade su trazado en `ICONS` (en `app.js`) con la misma clave del nombre; si no, usa una mancuerna genérica.
+**Rutinas de gimnasio** — viven en Supabase: tabla `grupos` (cada grupo con sus ejercicios) y tabla `rutinas` (el plan de 7 días; índice 0 = domingo). La rutina base de las cuentas nuevas la crea la función `sembrar_rutina` de la base de datos. Las rutinas enviadas entre amigos viven en `rutinas_compartidas` hasta que se aceptan o rechazan; solo se crean con la función `compartir_rutina` (que toma la foto en el servidor y exige amistad), y `rutina_de_amigo` da la vista de solo lectura. Cada persona la cambia desde la app. Para que un ejercicio nuevo tenga ícono propio, añade su trazado en `ICONS` (en `app.js`) con la misma clave del nombre; si no, usa una mancuerna genérica.
 
 **Supabase** — la URL del proyecto y la clave pública están al inicio de `nube.js`. La clave pública (`sb_publishable_…`) está hecha para ir en el navegador; lo que protege los datos son las políticas de seguridad por fila de la base de datos. **Nunca** pongas en este repo la clave `service_role` / `secret`.
 

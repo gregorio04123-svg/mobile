@@ -120,6 +120,8 @@
       sb.rpc('mis_conexiones'),
       sb.from('grupos').select('id,nombre,abbr,color,musculo,orden,ejercicios').eq('user_id', uid).order('orden').order('creado_en'),
       sb.from('rutinas').select('plan').eq('user_id', uid).maybeSingle(),
+      // Rutinas que un amigo me envió y aún no respondo.
+      sb.from('rutinas_compartidas').select('id,de_id,de_nombre,tipo,contenido,creado_en').eq('para_id', uid).order('creado_en'),
     ]);
     for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
 
@@ -175,6 +177,9 @@
       codigo: perfil.codigo || '',
       cuadernos: cuadernos, files: files, acts: acts, logs: logs, libs: libs,
       amigos: amigos, cuadAmigos: cuadAmigos, grupos: grupos, plan: plan,
+      invRutinas: (q[10].data || []).map(function (r) {
+        return { id: r.id, de: r.de_id, deNombre: r.de_nombre, tipo: r.tipo, contenido: r.contenido, creado: r.creado_en };
+      }),
     };
   }
 
@@ -353,6 +358,34 @@
   }
 
   /* ------------------------------------------------------------------
+   * Rutinas entre amigos
+   * ---------------------------------------------------------------- */
+  var ERRORES_RUTINA = {
+    no_amigos: 'Ya no son amigos.',
+    semana_vacia: 'Tu semana no tiene grupos asignados.',
+    sin_grupo: 'Ese grupo aún no está guardado. Intenta de nuevo en un momento.',
+  };
+
+  /** Envía mi semana (grupoId nulo) o uno de mis grupos. El servidor toma la
+   *  foto de lo guardado: solo grupos y ejercicios, nunca pesos. */
+  async function compartirRutina(amigoId, grupoId) {
+    var r = await sb.rpc('compartir_rutina', { p_para: amigoId, p_grupo: grupoId || null });
+    if (r.error) throw new Error(ERRORES_RUTINA[r.error.message] || mensajeDe(r.error));
+  }
+
+  async function rutinaDeAmigo(amigoId) {
+    var r = await sb.rpc('rutina_de_amigo', { p_amigo: amigoId });
+    if (r.error) throw new Error(ERRORES_RUTINA[r.error.message] || mensajeDe(r.error));
+    return r.data;
+  }
+
+  /** Aceptada o rechazada, la invitación se borra. */
+  async function borrarInvitacionRutina(id) {
+    var r = await sb.from('rutinas_compartidas').delete().eq('id', id);
+    if (r.error) throw new Error(mensajeDe(r.error));
+  }
+
+  /* ------------------------------------------------------------------
    * Tiempo real: aviso inmediato cuando un amigo cambia algo tuyo
    * ---------------------------------------------------------------- */
   // Solo lo que otra persona puede tocar. Los filtros hacen que cada quien
@@ -375,6 +408,8 @@
       ['libretas', 'DELETE'],
       ['abonos', 'INSERT'],
       ['abonos', 'DELETE'],
+      ['rutinas_compartidas', 'INSERT', de('para_id')],  // me envían una rutina
+      ['rutinas_compartidas', 'DELETE'],
     ];
     var canal = sb.channel('pilares-' + uid);
     enlaces.forEach(function (e) {
@@ -431,6 +466,7 @@
     sesion: sesion, entrar: entrar, crear: crear, salir: salir, alPerderSesion: alPerderSesion,
     cargar: cargar, sembrarRutina: sembrarRutina, filas: filas, pendientes: pendientes, sincronizar: sincronizar,
     buscarCodigo: buscarCodigo, invitar: invitar, aceptar: aceptar, borrarConexion: borrarConexion,
+    compartirRutina: compartirRutina, rutinaDeAmigo: rutinaDeAmigo, borrarInvitacionRutina: borrarInvitacionRutina,
     escuchar: escuchar, dejarDeEscuchar: dejarDeEscuchar, exportar: exportar,
   };
 })(window);
