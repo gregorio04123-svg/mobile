@@ -92,10 +92,11 @@
 <sc-if value="{{ appOn }}">
 
 <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
-<div style="flex:1;min-height:0;display:flex;flex-direction:column">
+<div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
+  <div data-cabecera data-vidrio="cabecera" style="position:absolute;top:0;left:0;right:0;z-index:30">
   <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 10px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
     <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:#4A566B">{{ todayLine }}</div>
-    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:.005em;color:#EDF1F7">Resumen</div>
+    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#EDF1F7">Resumen</div>
     <div style="font:500 12px/1.35 Manrope,sans-serif;color:#8E9AAE">{{ homeSub }}</div>
     <div sc-camel-on-click="{{ openPanel }}" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9AA6BA" stroke-linecap="round">
@@ -105,8 +106,9 @@
       <sc-if value="{{ hasSolicitudes }}"><div style="position:absolute;top:-3px;left:-3px;width:12px;height:12px;border-radius:50%;background:#57B9A0;border:2px solid #090C14"></div></sc-if>
     </div>
   </div>
+  </div>
 
-  <div style="flex:1;min-height:0;overflow:auto;padding:8px 14px 24px;display:flex;flex-direction:column;gap:12px">
+  <div data-desplaza style="flex:1;min-height:0;overflow:auto;padding:8px 14px calc(env(safe-area-inset-bottom,0px) + 112px);display:flex;flex-direction:column;gap:12px">
 
     <sc-if value="{{ hasNext }}" hint-placeholder-val="{{ true }}">
       <div sc-camel-on-click="{{ goNext }}" style="background:#121724;border:1px solid {{ nextBorder }};border-radius:16px;padding:16px">
@@ -191,10 +193,11 @@
 </sc-if>
 
 <sc-if value="{{ isEjercicio }}">
-<div style="flex:1;min-height:0;display:flex;flex-direction:column">
+<div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
+  <div data-cabecera data-vidrio="cabecera" style="position:absolute;top:0;left:0;right:0;z-index:30">
   <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
     <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:#4A566B">{{ dayHeader }}</div>
-    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:.005em;color:#EDF1F7;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ dayGroup }}</div>
+    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#EDF1F7;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ dayGroup }}</div>
     <div style="font:800 9.5px/1 Manrope,sans-serif;letter-spacing:.1em;color:{{ dayColor }};padding:5px 9px;border-radius:7px;background:{{ dayChipBg }}">DÍA {{ dayNum }} · {{ dayStateTxt }}</div>
     <div sc-camel-on-click="{{ openPanel }}" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
   <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9AA6BA" stroke-linecap="round">
@@ -205,8 +208,9 @@
       <sc-if value="{{ editOn }}"><div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#CE7F55;border:2px solid #090C14"></div></sc-if>
     </div>
   </div>
+  </div>
 
-  <div style="flex:1;min-height:0;overflow:auto;padding:0 0 24px">
+  <div data-desplaza style="flex:1;min-height:0;overflow:auto;padding:0 0 calc(env(safe-area-inset-bottom,0px) + 112px)">
     <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:0 14px 10px">
       <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
         <div sc-camel-on-click="{{ d.select }}" style="min-width:0;padding:7px 0 6px;border-radius:10px;cursor:pointer;text-align:center;background:{{ d.bg }};border:1px solid {{ d.border }}" style-active="transform:translateY(1px)">
@@ -218,6 +222,7 @@
       </sc-for>
     </div>
 
+    <div data-deslizar-dias>
     <div style="padding:0 14px">
       <div style="background:#121724;border:1px solid #1D2534;border-radius:14px;padding:12px 13px;display:flex;gap:11px;align-items:center">
         <div style="position:relative;width:50px;height:50px;flex:none">
@@ -326,15 +331,17 @@
         </div>
       </sc-if>
     </div>
+    </div>
   </div>
 </div>
 </sc-if>
 
 <sc-if value="{{ isEstudio }}">
-<div style="flex:1;min-height:0;display:flex;flex-direction:column">
+<div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
+  <div data-cabecera data-vidrio="cabecera" style="position:absolute;top:0;left:0;right:0;z-index:30">
   <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
     <div sc-camel-on-click="{{ backCuadernos }}" style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:{{ estudioKickerColor }};cursor:pointer">{{ estudioKicker }}</div>
-    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:.005em;color:#EDF1F7;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ estudioTitle }}</div>
+    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#EDF1F7;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ estudioTitle }}</div>
     <div style="display:flex;gap:9px;position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px">
       <sc-if value="{{ agendaOn }}">
         <div sc-camel-on-click="{{ openModal }}" style="width:44px;height:44px;border-radius:12px;background:rgba(206,127,85,.14);border:1px solid rgba(206,127,85,.34);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer">
@@ -361,8 +368,9 @@
       </sc-for>
     </div>
   </sc-if>
+  </div>
 
-  <div style="flex:1;min-height:0;overflow:auto;padding:2px 22px 24px">
+  <div data-desplaza style="flex:1;min-height:0;overflow:auto;padding:2px 22px calc(env(safe-area-inset-bottom,0px) + 112px)">
 
     <sc-if value="{{ agendaOn }}">
       <div style="background:#121724;border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:18px 16px">
@@ -502,10 +510,11 @@
 </sc-if>
 
 <sc-if value="{{ isFinanzas }}">
-<div style="flex:1;min-height:0;display:flex;flex-direction:column">
+<div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
+  <div data-cabecera data-vidrio="cabecera" style="position:absolute;top:0;left:0;right:0;z-index:30">
   <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
     <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:#4A566B">LIBRETICAS · COP</div>
-    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:.005em;color:#EDF1F7">Finanzas</div>
+    <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#EDF1F7">Finanzas</div>
     <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE;padding:5px 9px;border-radius:7px;background:rgba(255,255,255,.05)">{{ finanzasSummary }}</div>
     <div sc-camel-on-click="{{ openPanel }}" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
   <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9AA6BA" stroke-linecap="round">
@@ -515,10 +524,20 @@
       <sc-if value="{{ hasSolicitudes }}"><div style="position:absolute;top:-3px;left:-3px;width:12px;height:12px;border-radius:50%;background:#57B9A0;border:2px solid #090C14"></div></sc-if>
     </div>
   </div>
+  </div>
 
-  <div style="flex:1;min-height:0;overflow:auto;padding:6px 22px 24px;display:flex;flex-direction:column;gap:12px">
+  <div data-desplaza style="flex:1;min-height:0;overflow:auto;padding:6px 22px calc(env(safe-area-inset-bottom,0px) + 112px);display:flex;flex-direction:column;gap:12px">
     <sc-for list="{{ libs }}" as="l" hint-placeholder-count="4">
-      <div style="background:{{ l.bg }};border:1px solid {{ l.border }};border-radius:16px;padding:18px;opacity:{{ l.opacity }}">
+      <div style="position:relative">
+      <div data-accion="saldar" style="position:absolute;inset:0;border-radius:16px;background:rgba(87,185,160,.16);border:1px solid rgba(87,185,160,.42);display:flex;align-items:center;padding:0 22px;opacity:0">
+        <div style="font:800 10.5px/1 Manrope,sans-serif;letter-spacing:.14em;color:#57B9A0">SALDAR ✓</div>
+      </div>
+      <sc-if value="{{ l.editable }}">
+        <div data-accion="borrar" style="position:absolute;inset:0;border-radius:16px;background:rgba(196,100,97,.18);border:1px solid rgba(196,100,97,.45);display:flex;align-items:center;justify-content:flex-end;padding:0 22px;opacity:0">
+          <div style="font:800 10.5px/1 Manrope,sans-serif;letter-spacing:.14em;color:#E08A87">BORRAR</div>
+        </div>
+      </sc-if>
+      <div data-libreta="{{ l.id }}" data-borrable="{{ l.editable }}" style="position:relative;background-color:#090C14;background-image:linear-gradient({{ l.bg }},{{ l.bg }});border:1px solid {{ l.border }};border-radius:16px;padding:18px;opacity:{{ l.opacity }}">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
           <div sc-camel-on-click="{{ l.flip }}" style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;padding:6px 9px;border-radius:8px;cursor:pointer;background:{{ l.tint }};color:{{ l.color }}">{{ l.dirLabel }}</div>
           <div sc-camel-on-click="{{ l.togglePaid }}" style="display:flex;align-items:center;gap:9px;cursor:pointer">
@@ -621,6 +640,7 @@
           </div>
         </sc-if>
       </div>
+      </div>
     </sc-for>
 
     <div sc-camel-on-click="{{ addLib }}" style="margin-top:2px;padding:16px;border-radius:12px;cursor:pointer;background:rgba(206,127,85,.1);border:1px solid rgba(206,127,85,.32);font:700 13.5px/1 Manrope,sans-serif;color:#CE7F55;display:flex;align-items:center;justify-content:center;gap:9px" style-hover="background:rgba(206,127,85,.16)" style-active="transform:translateY(1px)"><div style="width:15px;height:15px;position:relative;display:flex;align-items:center;justify-content:center"><div style="position:absolute;width:13px;height:1.8px;border-radius:2px;background:#CE7F55"></div><div style="position:absolute;width:1.8px;height:13px;border-radius:2px;background:#CE7F55"></div></div>Nueva libretica</div>
@@ -659,7 +679,7 @@
 </div>
 </sc-if>
 
-<div style="flex:none;padding:10px 16px calc(env(safe-area-inset-bottom,0px) + 20px);background:rgba(9,12,20,.94);border-top:1px solid rgba(255,255,255,.06);display:flex;gap:6px;backdrop-filter:blur(12px)">
+<div data-vidrio="barra" style="position:absolute;left:0;right:0;bottom:0;z-index:40;padding:10px 16px calc(env(safe-area-inset-bottom,0px) + 20px);display:flex;gap:6px">
   <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
     <div sc-camel-on-click="{{ t.go }}" style="flex:1;padding:10px 4px 8px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;background:{{ t.bg }};border:1px solid {{ t.border }}" style-active="transform:translateY(1px)">
       <div style="height:18px;display:flex;align-items:flex-end;gap:3px">
@@ -693,8 +713,10 @@
 </sc-if>
 
 <sc-if value="{{ modalOn }}">
-  <div style="position:absolute;inset:0;z-index:90;background:rgba(9,12,20,.94);display:flex;align-items:flex-end;backdrop-filter:blur(6px)">
-    <div style="width:100%;max-height:92%;overflow:auto;background:#0E131F;border-top:1px solid rgba(255,255,255,.1);border-radius:28px 28px 0 0;padding:22px 22px calc(env(safe-area-inset-bottom,0px) + 30px)">
+  <div data-hoja-fondo="modal" style="position:absolute;inset:0;z-index:90;display:flex;align-items:flex-end">
+    <div data-hoja-velo style="position:absolute;inset:0;background:rgba(3,5,10,.62)"></div>
+    <div data-hoja="modal" style="position:relative;box-sizing:border-box;width:100%;max-height:calc(100% - env(safe-area-inset-top,0px) - 44px);overflow:auto;background:#0E131F;border-top:1px solid rgba(255,255,255,.1);border-radius:28px 28px 0 0;padding:10px 22px calc(env(safe-area-inset-bottom,0px) + 30px)">
+      <div style="width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.2);margin:0 auto 16px"></div>
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div style="font:800 20px/1.1 Manrope,sans-serif">{{ modalTitle }}</div>
         <div sc-camel-on-click="{{ closeModal }}" style="width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 16px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
@@ -767,8 +789,10 @@
 </sc-if>
 
 <sc-if value="{{ panelOn }}">
-  <div style="position:absolute;inset:0;z-index:95;background:rgba(9,12,20,.94);display:flex;align-items:flex-start;backdrop-filter:blur(6px)">
-    <div style="width:100%;max-height:100%;overflow:auto;background:#0E131F;border-bottom:1px solid rgba(255,255,255,.1);border-radius:0 0 28px 28px;padding:calc(env(safe-area-inset-top,0px) + 14px) 22px 26px">
+  <div data-hoja-fondo="panel" style="position:absolute;inset:0;z-index:95;display:flex;align-items:flex-end">
+    <div data-hoja-velo style="position:absolute;inset:0;background:rgba(3,5,10,.62)"></div>
+    <div data-hoja="panel" style="position:relative;box-sizing:border-box;width:100%;max-height:calc(100% - env(safe-area-inset-top,0px) - 44px);overflow:auto;background:#0E131F;border-top:1px solid rgba(255,255,255,.1);border-radius:28px 28px 0 0;padding:10px 22px calc(env(safe-area-inset-bottom,0px) + 30px)">
+      <div style="width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.2);margin:0 auto 16px"></div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between">
         <div>
           <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">PANEL DE CUSTOMIZACIÓN</div>
@@ -911,6 +935,7 @@
 <script src="viewport.js"></script>
 <script src="runtime.js"></script>
 <script src="nube.js"></script>
+<script src="fluido.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

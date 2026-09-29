@@ -173,7 +173,7 @@ class Component extends DCLogic {
       openCuaderno: null, estudioTab: 'agenda',
       month: NOW.getMonth(), year: NOW.getFullYear(), selDay: NOW.getDate(),
       modal: null,
-      showHist: false, openLib: null, abonoMonto: '',
+      showHist: false, openLib: null, abonoMonto: '', libBorrando: null,
     });
   }
 
@@ -328,8 +328,46 @@ class Component extends DCLogic {
       auth: 'fuera', authMode: 'entrar', aNombre: '', aClave: '', authErr: '', authBusy: false,
       me: null, codigo: '', amigos: [], cuadAmigos: {}, amigoCodigo: '', amigoMsg: '', importMsg: '',
       nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null,
-      activeDay: 1, expanded: null,
+      activeDay: 1, expanded: null, libBorrando: null,
     });
+  }
+
+  /* ── Lo que piden los gestos y animaciones (fluido.js) ───────────── */
+  cerrarHoja(tipo, yaAnimado) {
+    const cerrar = () => this.setState(st => tipo === 'modal' ? { modal: null } : {
+      panel: false,
+      respaldo: st.respaldo === 'preparando' ? 'preparando' : '',
+      respaldoMsg: st.respaldo === 'preparando' ? st.respaldoMsg : '',
+    });
+    if (yaAnimado || !window.Fluido) { cerrar(); return; }
+    Fluido.animarSalida(tipo).then(cerrar);
+  }
+
+  diaActivo() { return this.state.activeDay; }
+  totalDias() { return WEEK.length; }
+  cambiarDia(delta) {
+    const d = Math.max(0, Math.min(WEEK.length - 1, this.state.activeDay + delta));
+    this.setState({ activeDay: d, expanded: null, showDone: false });
+  }
+
+  saldarLibreta(id) {
+    const l = this.state.libs.find(x => x.id === id);
+    if (!l) return;
+    const alternar = () => this.setState(st => ({ libs: st.libs.map(x => x.id === id ? { ...x, paid: !x.paid } : x) }));
+    alternar();
+    if (window.Fluido) Fluido.aviso(l.paid ? 'Libretica reabierta' : 'Libretica saldada', 'Deshacer', alternar, null);
+  }
+
+  /** Se oculta al instante y se borra de verdad a los 5 s si no se deshace:
+   *  así "Deshacer" no depende de volver a crearla en el servidor. */
+  borrarLibreta(id) {
+    const borrar = () => this.setState(st => ({
+      libs: st.libs.filter(x => x.id !== id),
+      libBorrando: st.libBorrando === id ? null : st.libBorrando,
+    }));
+    if (!window.Fluido) { borrar(); return; }
+    this.setState({ libBorrando: id });
+    Fluido.aviso('Libretica borrada', 'Deshacer', () => this.setState({ libBorrando: null }), borrar);
   }
 
   /* ── Tiempo real ─────────────────────────────────────────────────── */
@@ -855,7 +893,7 @@ class Component extends DCLogic {
       const open = s.openLib === l.id;
       const n = (l.abonos || []).length;
       return {
-        deudor: l.deudor, prestamista: l.prestamista, monto: fmtMoney(l.monto),
+        id: l.id, deudor: l.deudor, prestamista: l.prestamista, monto: fmtMoney(l.monto),
         montoTxt: '$ ' + fmtMoney(l.monto), color: col,
         bg: green ? 'rgba(46,204,113,.09)' : 'rgba(196,100,97,.08)',
         border: green ? 'rgba(87,185,160,.32)' : 'rgba(196,100,97,.3)',
@@ -913,7 +951,9 @@ class Component extends DCLogic {
         vence: l.vence || '', onVence: ev => { const val = ev.target.value; setLib(l.id, x => ({ ...x, vence: val })); },
       };
     };
-    const activeLibs = s.libs.filter(l => !l.paid), paidL = s.libs.filter(l => l.paid);
+    // La que se acaba de borrar se oculta mientras dura el "Deshacer".
+    const visibles = s.libs.filter(l => l.id !== s.libBorrando);
+    const activeLibs = visibles.filter(l => !l.paid), paidL = visibles.filter(l => l.paid);
 
     const cobrar = activeLibs.filter(l => libView(l).meDeben), pagar = activeLibs.filter(l => !libView(l).meDeben);
     const sumMine = cobrar.reduce((t, l) => t + libView(l).saldo, 0);
@@ -972,7 +1012,7 @@ class Component extends DCLogic {
       goEstudio: () => self.setState({ tab: 'estudio', estudioTab: 'agenda', openCuaderno: null }),
       goFinanzas: () => self.setState({ tab: 'finanzas' }),
       openPanel: () => self.setState({ panel: true }),
-      closePanel: () => self.setState({ panel: false, respaldo: s.respaldo === 'preparando' ? 'preparando' : '', respaldoMsg: s.respaldo === 'preparando' ? s.respaldoMsg : '' }),
+      closePanel: () => self.cerrarHoja('panel'),
       toggleEdit: () => self.setState(st => ({ edit: !st.edit })),
 
       ringColor: pct >= 100 ? GREEN : ac, ringOffset: 188.5 * (1 - pct / 100), pctText: pct + '%',
@@ -1056,7 +1096,7 @@ class Component extends DCLogic {
       modalDe: !m ? '' : (m.id
         ? (mPara !== me ? 'En la agenda de ' + nombreDe(mPara) + '.' : (m.por ? 'Te la asignó ' + nombreDe(m.por) + '.' : ''))
         : (mPara !== me ? 'Aparecerá en la agenda de ' + nombreDe(mPara) + '.' : '')),
-      closeModal: () => self.setState({ modal: null }),
+      closeModal: () => self.cerrarHoja('modal'),
       modalTitle: m && m.id ? 'Editar actividad' : 'Nueva actividad',
       modalCuaderno: m ? ((mCuads.find(c => c.id === m.c) || {}).nombre || '') : '',
       modalCta: m && m.id ? 'Guardar' : 'Crear actividad',
@@ -1073,14 +1113,22 @@ class Component extends DCLogic {
         border: m && m.tipo === t ? '#fff' : 'rgba(255,255,255,.09)',
         fg: m && m.tipo === t ? '#090C14' : '#8E9AAE',
       })),
-      saveAct: () => self.setState(st => {
-        const mm = st.modal;
-        if (mm.id) return { acts: st.acts.map(a => a.id === mm.id ? { ...a, c: mm.c, tipo: mm.tipo, fecha: mm.fecha, asunto: mm.asunto } : a), modal: null };
-        const para = mm.para || me;
-        return { acts: st.acts.concat([{ id: Nube.uuid(), c: mm.c, tipo: mm.tipo, fecha: mm.fecha, asunto: mm.asunto.length ? mm.asunto : ['Sin temas'],
-                                          owner: para, por: para === me ? null : me, nota: '' }]), modal: null };
-      }),
-      deleteAct: () => self.setState(st => ({ acts: st.acts.filter(a => a.id !== st.modal.id), modal: null })),
+      // Se guarda al instante; la hoja se va con su animación y luego se cierra.
+      saveAct: () => {
+        self.setState(st => {
+          const mm = st.modal;
+          if (mm.id) return { acts: st.acts.map(a => a.id === mm.id ? { ...a, c: mm.c, tipo: mm.tipo, fecha: mm.fecha, asunto: mm.asunto } : a) };
+          const para = mm.para || me;
+          return { acts: st.acts.concat([{ id: Nube.uuid(), c: mm.c, tipo: mm.tipo, fecha: mm.fecha, asunto: mm.asunto.length ? mm.asunto : ['Sin temas'],
+                                            owner: para, por: para === me ? null : me, nota: '' }]) };
+        });
+        self.cerrarHoja('modal');
+      },
+      deleteAct: () => {
+        const id = s.modal && s.modal.id;
+        self.setState(st => ({ acts: st.acts.filter(a => a.id !== id) }));
+        self.cerrarHoja('modal');
+      },
 
       libs: activeLibs.map(mkLib), paidLibs: paidL.map(mkLib),
       hasPaid: paidL.length > 0, showHist: s.showHist,
@@ -1203,10 +1251,11 @@ class Component extends DCLogic {
 
 
 /* ── Arranque ──────────────────────────────────────────────────────── */
-Pilares.mount({
+const host = Pilares.mount({
   template: 'dc-template',
   root: 'screen',
   Component: Component,
+  onRender: () => { if (window.Fluido) Fluido.trasRender(); },
   props: {
     acento: 'Naranja',          // 'Naranja' | 'Menta'
     pantallaInicial: 'Home',    // 'Home' | 'Ejercicio' | 'Estudio' | 'Finanzas'
@@ -1214,3 +1263,5 @@ Pilares.mount({
     ocultarCompletados: true,
   },
 });
+// Por aquí fluido.js le pide a la app cerrar hojas, cambiar de día o saldar.
+window.PilaresApp = host.component;

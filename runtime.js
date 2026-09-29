@@ -233,6 +233,8 @@
               ? 'change' : 'input';
           }
           setHandler(el, type, fn);
+          // Marca lo tocable: styles.css le da respuesta inmediata al presionar.
+          if (type === 'click') el.setAttribute('data-toque', '');
         }
         continue;
       }
@@ -287,6 +289,11 @@
     for (i = oldEl.attributes.length - 1; i >= 0; i--) {
       attr = oldEl.attributes[i];
       if (!newEl.hasAttribute(attr.name)) oldEl.removeAttribute(attr.name);
+    }
+    // Estilos que pone una animación o un gesto en curso (fluido.js). Si no
+    // se reponen, cada redibujo devolvería el elemento a su sitio de golpe.
+    if (oldEl.__fijo) {
+      for (var prop in oldEl.__fijo) oldEl.style.setProperty(prop, oldEl.__fijo[prop]);
     }
   }
 

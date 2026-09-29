@@ -88,6 +88,72 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
   }
 }
 
+/* ── Interfaz fluida (fluido.js) ───────────────────────────────────── */
+
+/* El texto de la interfaz no se selecciona al arrastrar o mantener presionado. */
+#screen { -webkit-user-select: none; user-select: none; }
+#screen input, #screen textarea { -webkit-user-select: text; user-select: text; }
+
+[data-desplaza] { overscroll-behavior-y: contain; }
+[data-hoja] { will-change: transform; overscroll-behavior: contain; }
+[data-hoja-velo] { opacity: 0; }
+
+/* Respuesta inmediata al presionar (en el toque, no al soltar). */
+[data-toque] { transition: transform .22s cubic-bezier(.2, .8, .2, 1), opacity .22s cubic-bezier(.2, .8, .2, 1); }
+[data-toque]:active { transform: scale(.97); opacity: .88; transition-duration: .08s; }
+
+/* Vidrio: el contenido se ve difuminado al pasar por debajo. Las superficies
+   grandes (encabezados) llevan material más grueso que la barra. */
+[data-vidrio="cabecera"] {
+  background: rgba(9, 12, 20, .72);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  backdrop-filter: blur(24px) saturate(170%);
+}
+[data-vidrio="barra"] {
+  background: rgba(9, 12, 20, .62);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(255, 255, 255, .09);
+}
+
+/* Aviso inferior con "Deshacer". */
+.fl-aviso {
+  position: fixed; z-index: 1000; display: none; align-items: center; gap: 12px;
+  box-sizing: border-box; padding: 10px 10px 10px 16px; border-radius: 14px;
+  background: rgba(30, 36, 50, .86);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, .1);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .38);
+  color: #EDF1F7; font: 600 13px/1.3 Manrope, system-ui, sans-serif;
+  opacity: 0; will-change: transform, opacity;
+}
+.fl-aviso-txt { flex: 1; min-width: 0; }
+.fl-aviso-btn {
+  flex: none; border: 0; border-radius: 9px; padding: 10px 13px; cursor: pointer;
+  background: rgba(206, 127, 85, .16); color: #CE7F55;
+  font: 800 12.5px/1 Manrope, system-ui, sans-serif;
+  transition: transform .2s cubic-bezier(.2, .8, .2, 1);
+}
+.fl-aviso-btn:active { transform: scale(.95); transition-duration: .08s; }
+
+/* Indicador de jalar para actualizar. */
+.fl-jalar { position: fixed; z-index: 50; width: 28px; height: 28px; display: none; opacity: 0; pointer-events: none; }
+.fl-jalar svg { display: block; }
+.fl-jalar circle { fill: none; stroke-width: 2.6; stroke-linecap: round; }
+.fl-jalar-fondo { stroke: rgba(255, 255, 255, .1); }
+.fl-jalar-arco { stroke: #8E9AAE; stroke-dasharray: 62.83; stroke-dashoffset: 62.83; transition: stroke .15s; }
+.fl-jalar.fl-listo .fl-jalar-arco { stroke: #CE7F55; }
+.fl-jalar.fl-gira svg { animation: fl-girar .8s linear infinite; }
+.fl-jalar.fl-gira .fl-jalar-arco { stroke: #CE7F55; stroke-dashoffset: 22 !important; }
+@keyframes fl-girar { to { transform: rotate(360deg); } }
+
+/* Menos transparencia: superficies sólidas, sin desenfoque. */
+@media (prefers-reduced-transparency: reduce) {
+  [data-vidrio] { background: #0B0F19 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  .fl-aviso { background: #1E2432; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }

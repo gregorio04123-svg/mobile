@@ -13,6 +13,7 @@ pilares/
 ├── index.html              ← punto de entrada (DEBE quedar en la raíz del repo)
 ├── app.js                  ← lógica: rutinas, agenda, finanzas, amigos
 ├── nube.js                 ← cuentas y guardado en Supabase
+├── fluido.js               ← animaciones y gestos (estilo Apple)
 ├── runtime.js              ← motor que interpreta la plantilla del diseño
 ├── styles.css              ← estilos base + marco de teléfono en escritorio
 ├── viewport.js             ← corrige el alto de pantalla en la PWA instalada
@@ -32,6 +33,12 @@ pilares/
 - **Ejercicio**: la semana se genera desde la fecha real del dispositivo; el ciclo de rutinas (espalda → pecho → pierna → hombro) queda anclado al calendario. Marcar series, anotar pesos y descensos, cronómetro de descanso, renombrar ejercicios y cambiar series/repeticiones desde *Modo edición*.
 - **Estudio**: calendario del mes con código de urgencia por color, crear/editar/eliminar actividades, cuadernos y archivos por materia.
 - **Finanzas**: libreticas de quién debe a quién, marcar como saldada, historial y totales.
+- **Movimiento y gestos** (criterios de *Designing Fluid Interfaces* de Apple, en `fluido.js`): resortes que arrancan desde donde está cada cosa y heredan la velocidad del dedo; sin rebote salvo cuando se lanza algo con impulso.
+  - La ventana de nueva actividad y el panel ⚙ suben desde abajo y se cierran arrastrando hacia abajo o tocando el área oscura.
+  - En Ejercicio se desliza a los lados para pasar de día.
+  - Una libretica deslizada a la derecha se salda; a la izquierda se borra. Las dos acciones ofrecen *Deshacer* durante 5 segundos.
+  - Jalar hacia abajo desde el tope actualiza con la nube.
+  - Barra de pestañas y encabezados de vidrio translúcido; el contenido pasa difuminado por debajo. Respeta *Reducir movimiento* y *Reducir transparencia* del sistema.
 - **Cuentas**: cada persona entra con **usuario y contraseña, sin correo**. La cuenta se crea desde la función `registro` de Supabase ya confirmada, así que nunca se envía un correo (no hay costo de dominio ni de envío). Sin correo no hay "olvidé mi contraseña": hay que guardarla bien.
 - **Amigos**: cada cuenta tiene un código (ej. `ANDRE-4F2A`, en el panel ⚙). Con él se envía una solicitud; al aceptarla:
   - **Agenda compartida**: al crear una actividad eliges *Para: Mí* o un amigo, y le aparece en su agenda marcada "DE …".
