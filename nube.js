@@ -113,15 +113,22 @@
       sb.from('archivos').select('id,cuaderno_id,nombre,tamano,creado_en').eq('user_id', uid).order('creado_en'),
       // Las mias y las que yo asigne a amigos.
       sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota').order('fecha'),
-      sb.from('sesiones').select('fecha,grupo,abbr,dia,ejercicios').eq('user_id', uid).gte('fecha', haceDias(120)),
+      sb.from('sesiones').select('fecha,grupo,abbr,dia,ejercicios,grupo_id').eq('user_id', uid).gte('fecha', haceDias(120)),
       // Las que cree y las que otra persona compartio conmigo.
       sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,nota,vence_el,creado_en').order('creado_en', { ascending: false }),
       sb.from('abonos').select('id,libreta_id,monto,nota,registrado_por,creado_en').order('creado_en'),
       sb.rpc('mis_conexiones'),
+      sb.from('grupos').select('id,nombre,abbr,color,musculo,orden,ejercicios').eq('user_id', uid).order('orden').order('creado_en'),
+      sb.from('rutinas').select('plan').eq('user_id', uid).maybeSingle(),
     ]);
     for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
 
     var perfil = q[0].data || {};
+    var grupos = (q[8].data || []).map(function (g) {
+      return { id: g.id, nombre: g.nombre, abbr: g.abbr, color: g.color, musculo: g.musculo, ejercicios: g.ejercicios || [] };
+    });
+    var plan = (q[9].data && Array.isArray(q[9].data.plan) && q[9].data.plan.length === 7)
+      ? q[9].data.plan : [null, null, null, null, null, null, null];
     var cuadernos = [], cuadAmigos = {};
     q[1].data.forEach(function (c) {
       var item = { id: c.id, nombre: c.nombre };
@@ -141,7 +148,7 @@
 
     var logs = {};
     q[4].data.forEach(function (s) {
-      logs[s.fecha] = { fecha: s.fecha, group: s.grupo, abbr: s.abbr, dia: s.dia, ex: s.ejercicios || [] };
+      logs[s.fecha] = { fecha: s.fecha, gid: s.grupo_id, group: s.grupo, abbr: s.abbr, dia: s.dia, ex: s.ejercicios || [] };
     });
 
     var abonos = {};
@@ -167,16 +174,22 @@
       profile: { nombre: perfil.nombre || '', altura: perfil.altura || '', peso: perfil.peso || '', sexo: perfil.sexo || '' },
       codigo: perfil.codigo || '',
       cuadernos: cuadernos, files: files, acts: acts, logs: logs, libs: libs,
-      amigos: amigos, cuadAmigos: cuadAmigos,
+      amigos: amigos, cuadAmigos: cuadAmigos, grupos: grupos, plan: plan,
     };
+  }
+
+  /** Crea la rutina base si a la cuenta le falta (no hace nada si ya tiene). */
+  async function sembrarRutina() {
+    var r = await sb.rpc('sembrar_mi_rutina');
+    if (r.error) throw r.error;
   }
 
   /* ------------------------------------------------------------------
    * Escritura: estado de la app -> filas -> diferencias -> Supabase
    * ---------------------------------------------------------------- */
-  var TABLAS = ['perfiles', 'cuadernos', 'archivos', 'actividades', 'sesiones', 'libretas', 'abonos'];
+  var TABLAS = ['perfiles', 'cuadernos', 'archivos', 'actividades', 'sesiones', 'libretas', 'abonos', 'grupos', 'rutinas'];
   // Altas y cambios de padres a hijos; bajas de hijos a padres.
-  var ORDEN_BAJAS = ['abonos', 'libretas', 'sesiones', 'actividades', 'archivos', 'cuadernos'];
+  var ORDEN_BAJAS = ['abonos', 'libretas', 'sesiones', 'actividades', 'archivos', 'cuadernos', 'grupos'];
 
   /** d = { profile, cuadernos, files, acts, sesiones, libs } */
   function filas(d, uid) {
@@ -205,8 +218,17 @@
     Object.keys(d.sesiones || {}).forEach(function (fecha) {
       var s = d.sesiones[fecha];
       t.sesiones[fecha] = { user_id: uid, fecha: fecha, grupo: s.group || '', abbr: s.abbr || '',
-                            dia: s.dia || 0, ejercicios: s.ex || [] };
+                            dia: s.dia || 0, ejercicios: s.ex || [], grupo_id: s.gid || null };
     });
+
+    // Grupos y plan solo cuentan si ya se leyeron del servidor (ver app.js).
+    if (d.rutinaLista) {
+      (d.grupos || []).forEach(function (g, i) {
+        t.grupos[g.id] = { id: g.id, user_id: uid, nombre: g.nombre || '', abbr: g.abbr || '', color: g.color || '#57B9A0',
+                           musculo: g.musculo || '', orden: i, ejercicios: g.ejercicios || [] };
+      });
+      if (Array.isArray(d.plan) && d.plan.length === 7) t.rutinas[uid] = { user_id: uid, plan: d.plan };
+    }
 
     (d.libs || []).forEach(function (l) {
       t.libretas[l.id] = { id: l.id, user_id: l.owner || uid, contraparte_id: l.contra || null,
@@ -253,6 +275,8 @@
       r = op.tipo === 'baja'
         ? await sb.from('sesiones').delete().eq('user_id', uid).eq('fecha', op.id)
         : await sb.from('sesiones').upsert(fila, { onConflict: 'user_id,fecha' });
+    } else if (t === 'rutinas') {
+      r = await sb.from('rutinas').upsert(fila, { onConflict: 'user_id' });
     } else if (op.tipo === 'alta') {
       r = await sb.from(t).insert(fila);
     } else if (op.tipo === 'cambio') {
@@ -382,6 +406,8 @@
       sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,pagado_en,nota,vence_el,creado_en,actualizado_en').order('creado_en'),
       sb.from('abonos').select('id,libreta_id,monto,nota,registrado_por,creado_en').order('creado_en'),
       sb.rpc('mis_conexiones'),
+      sb.from('grupos').select('id,nombre,abbr,color,musculo,orden,ejercicios').eq('user_id', uid).order('orden'),
+      sb.from('rutinas').select('plan').eq('user_id', uid).maybeSingle(),
     ]);
     for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
 
@@ -394,13 +420,16 @@
       }),
       cuadernos: q[1].data, archivos: q[2].data, actividades: q[3].data,
       sesiones_gimnasio: q[4].data, libreticas: q[5].data, abonos: q[6].data,
+      grupos_rutina: q[8].data,
+      // Índice 0 = domingo … 6 = sábado; null = descanso.
+      plan_semanal: q[9].data ? q[9].data.plan : null,
     };
   }
 
   global.Nube = {
     cliente: sb, uuid: uuid, usuarioDe: usuarioDe,
     sesion: sesion, entrar: entrar, crear: crear, salir: salir, alPerderSesion: alPerderSesion,
-    cargar: cargar, filas: filas, pendientes: pendientes, sincronizar: sincronizar,
+    cargar: cargar, sembrarRutina: sembrarRutina, filas: filas, pendientes: pendientes, sincronizar: sincronizar,
     buscarCodigo: buscarCodigo, invitar: invitar, aceptar: aceptar, borrarConexion: borrarConexion,
     escuchar: escuchar, dejarDeEscuchar: dejarDeEscuchar, exportar: exportar,
   };

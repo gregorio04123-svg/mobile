@@ -159,6 +159,29 @@
     });
   }
 
+  /* ── Menú contextual: crece desde el día que se mantuvo presionado ─── */
+  function ponerMenu(m, p) {
+    m.__p = p;
+    fijar(m, { opacity: String(Math.max(0, Math.min(1, p))), transform: 'scale(' + (0.86 + 0.14 * p).toFixed(4) + ')' });
+  }
+
+  function abrirMenusNuevos() {
+    Array.prototype.forEach.call(doc.querySelectorAll('[data-menu]'), function (m) {
+      if (m.__vivo) return;
+      m.__vivo = true;
+      ponerMenu(m, 0);
+      animar(m, { desde: 0, hasta: 1, amortiguamiento: 1, respuesta: 0.28, tolerancia: 0.002, paso: function (p) { ponerMenu(m, p); } });
+    });
+  }
+
+  function cerrarMenu() {
+    return new Promise(function (listo) {
+      var m = doc.querySelector('[data-menu]');
+      if (!m) { listo(); return; }
+      animar(m, { desde: m.__p === undefined ? 1 : m.__p, hasta: 0, amortiguamiento: 1, respuesta: 0.2, tolerancia: 0.002, paso: function (p) { ponerMenu(m, p); }, fin: listo });
+    });
+  }
+
   /* ------------------------------------------------------------------
    * 3. Encabezados de vidrio: el contenido arranca debajo de ellos
    * ---------------------------------------------------------------- */
@@ -283,6 +306,7 @@
    * ---------------------------------------------------------------- */
   var gesto = null;
   var UMBRAL = 10;
+  var RETRASO_LEVANTAR = 420;   // lo que dura "mantener presionado"
   var suprimirClick = false, ultimoToque = 0;
 
   function ignorable(t) {
@@ -291,15 +315,19 @@
 
   function empezar(x, y, target, tactil) {
     if (ignorable(target)) { gesto = null; return; }
+    if (gesto && gesto.timer) clearTimeout(gesto.timer);
     var hoja = target.closest('[data-hoja]');
-    gesto = {
+    var g = gesto = {
       x0: x, y0: y, tactil: tactil, estado: 'duda', r: rastreador(),
       hoja: hoja,
       libreta: hoja ? null : target.closest('[data-libreta]'),
       dias: hoja ? null : target.closest('[data-deslizar-dias]'),
       zona: hoja ? null : target.closest('[data-desplaza]'),
+      dia: hoja ? null : target.closest('[data-dia]'),
     };
-    gesto.r.agregar(x, y, ahora());
+    g.r.agregar(x, y, ahora());
+    // Un día de la semana: si el dedo se queda quieto, se "levanta".
+    if (g.dia) g.timer = setTimeout(function () { levantarDia(g); }, RETRASO_LEVANTAR);
   }
 
   function mover(x, y, ev) {
@@ -314,6 +342,8 @@
       // que iOS no haga su propio rebote.
       if (alTope && dy > 4 && ady > adx * 1.2 && ev && ev.cancelable) ev.preventDefault();
       if (Math.max(adx, ady) < UMBRAL) return;
+      // Se movió antes de tiempo: no era mantener presionado.
+      if (g.timer) { clearTimeout(g.timer); g.timer = null; }
 
       if (g.hoja && dy > 0 && ady > adx && g.hoja.scrollTop <= 0) empezarHoja(g);
       else if (g.libreta && adx > ady) empezarLibreta(g);
@@ -328,6 +358,7 @@
   function terminar(cancelado) {
     var g = gesto;
     gesto = null;
+    if (g && g.timer) { clearTimeout(g.timer); g.timer = null; }
     if (!g || g.estado !== 'activo') return;
     // El dedo se levantó sobre algún botón: ese toque no cuenta.
     suprimirClick = true;
@@ -491,6 +522,68 @@
     };
   }
 
+  /* ── Día de la semana: arrastrar intercambia, soltar quieto abre menú ── */
+  function levantarDia(g) {
+    if (gesto !== g || g.estado !== 'duda' || !app()) return;
+    var a = app(), cel = g.dia;
+    var i = +cel.getAttribute('data-dia');
+    var celdas = Array.prototype.slice.call(doc.querySelectorAll('[data-dia]'));
+    var objetivo = null, movido = false, escala = 1, dx = 0, dy = 0;
+    g.estado = 'activo';
+    g.timer = null;
+
+    function poner() {
+      fijar(cel, { transform: 'translate3d(' + dx.toFixed(1) + 'px,' + (dy * 0.25).toFixed(1) + 'px,0) scale(' + escala.toFixed(4) + ')' });
+    }
+    function marcar(nuevo) {
+      if (objetivo === nuevo) return;
+      if (objetivo) fijar(objetivo, { outline: null, 'outline-offset': null });
+      objetivo = nuevo;
+      if (objetivo) fijar(objetivo, { outline: '2px solid rgba(206,127,85,.85)', 'outline-offset': '2px' });
+    }
+    function soltar() {
+      fijar(cel, { transform: null, 'z-index': null, 'box-shadow': null });
+    }
+
+    // Se levanta: crece un poco y proyecta sombra, como en iOS.
+    fijar(cel, { 'z-index': '5', 'box-shadow': '0 12px 26px rgba(0,0,0,.5)' });
+    animar(cel, { desde: 1, hasta: 1.1, amortiguamiento: 1, respuesta: 0.22, tolerancia: 0.002, paso: function (s) { escala = s; poner(); } });
+
+    g.mover = function (mx, my) {
+      dx = mx; dy = my;
+      if (Math.abs(mx) > 8 || Math.abs(my) > 8) movido = true;
+      poner();
+      var r = cel.getBoundingClientRect(), cx = r.left + r.width / 2, hallado = null;
+      celdas.forEach(function (c) {
+        if (c === cel) return;
+        var rc = c.getBoundingClientRect();
+        if (cx >= rc.left && cx <= rc.right) hallado = c;
+      });
+      marcar(movido ? hallado : null);
+    };
+    g.fin = function () {
+      var destino = objetivo;
+      marcar(null);
+      if (destino) {
+        if (cel.__anim) cel.__anim.parar();
+        a.intercambiarDias(i, +destino.getAttribute('data-dia'));
+        trasRedibujo(soltar);
+      } else if (!movido) {
+        if (cel.__anim) cel.__anim.parar();
+        soltar();
+        a.abrirMenuDia(i, cel.getBoundingClientRect());
+      } else {
+        // Se soltó en ningún lado: vuelve a su sitio.
+        var x0 = dx, y0 = dy;
+        animar(cel, {
+          desde: 1, hasta: 0, amortiguamiento: LANZADO.amortiguamiento, respuesta: 0.3, tolerancia: 0.002,
+          paso: function (p) { dx = x0 * p; dy = y0 * p; escala = 1 + 0.1 * p; poner(); },
+          fin: soltar,
+        });
+      }
+    };
+  }
+
   /* ── Jalar para actualizar ───────────────────────────────────────── */
   function empezarJalar(g) {
     var zona = g.zona, a = app();
@@ -533,6 +626,7 @@
   function trasRender() {
     medirCabeceras();
     abrirHojasNuevas();
+    abrirMenusNuevos();
   }
 
   global.addEventListener('resize', function () { if (aviso && aviso.style.display === 'flex') colocarAviso(); });
@@ -540,6 +634,7 @@
   global.Fluido = {
     trasRender: trasRender,
     animarSalida: animarSalida,
+    cerrarMenu: cerrarMenu,
     aviso: mostrarAviso,
   };
 })(window);

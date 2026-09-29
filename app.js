@@ -1,44 +1,5 @@
 const MINT = '#57B9A0', MINT_D = '#5EA37D', GREEN = '#5EA37D', AMBER = '#CE7F55', RED = '#C46461', GREY = '#8E9AAE';
 
-const ROUTINES = {
-  E: { dia: 1, group: 'Espalda', abbr: 'ESPALD', ex: [
-    { name: 'Dominadas', group: 'ESPALDA', type: 'COMPUESTO', sets: 4, reps: 8, rest: '3:00', drops: false, desc: 'Agarre prono ancho. Lleva el esternón a la barra y baja con control, escápulas deprimidas.' },
-    { name: 'Remo en T', group: 'ESPALDA', type: 'COMPUESTO', sets: 4, reps: 8, rest: '3:00', drops: false, desc: 'Torso firme, sin balanceo. Tira hacia el abdomen bajo y aprieta un segundo arriba.' },
-    { name: 'Jalón al Pecho', group: 'ESPALDA', type: 'COMPUESTO', sets: 3, reps: 8, rest: '2:00', drops: true, desc: 'Pecho arriba, codos hacia las caderas. Los descensos bajan el peso sin descanso al fallar.' },
-    { name: 'Remo en Polea', group: 'ESPALDA', type: 'COMPUESTO', sets: 4, reps: 8, rest: '2:00', drops: true, desc: 'Espalda neutra, recorrido completo. Estira al frente sin redondear la lumbar.' },
-    { name: 'Pull Over', group: 'ESPALDA', type: 'AISLAMIENTO', sets: 3, reps: 8, rest: '1:30', drops: true, desc: 'Codos semirrígidos. Siente el dorsal estirarse arriba y cierra hasta el muslo.' },
-    { name: 'Hombro Posterior', group: 'HOMBRO', type: 'AISLAMIENTO', sets: 3, reps: 8, rest: '1:00', drops: true, desc: 'Codos a la altura del hombro, sin trapecio. Peso ligero y contracción marcada.' },
-  ] },
-  P: { dia: 2, group: 'Pecho', abbr: 'PECHO', ex: [
-    { name: 'Inclinado en Smith', group: 'PECHO', type: 'COMPUESTO', sets: 4, reps: 8, rest: '3:00', drops: false, desc: 'Banco a 30°, escápulas retraídas. Barra a la clavícula, codos a 45° del torso.' },
-    { name: 'Inclinado Mancuernas', group: 'PECHO', type: 'COMPUESTO', sets: 2, reps: 8, rest: '2:30', drops: false, desc: 'Recorrido completo sin choque arriba. Controla la bajada tres segundos.' },
-    { name: 'Fondos', group: 'PECHO', type: 'COMPUESTO', sets: 4, reps: 8, rest: '2:30', drops: false, desc: 'Torso inclinado al frente para cargar pecho. Baja hasta sentir estiramiento.' },
-    { name: 'Aperturas', group: 'PECHO', type: 'AISLAMIENTO', sets: 4, reps: 8, rest: '1:30', drops: true, desc: 'Codo fijo y ligeramente flexionado. Junta por delante del pecho, no de la cara.' },
-    { name: 'Press Militar en Smith', group: 'HOMBRO', type: 'COMPUESTO', sets: 4, reps: 8, rest: '2:30', drops: false, desc: 'Core y glúteo activos. Barra sobre la línea media al bloquear.' },
-    { name: 'Elevaciones Laterales Polea', group: 'HOMBRO', type: 'AISLAMIENTO', sets: 4, reps: 8, rest: '1:15', drops: true, desc: 'Sube hasta la línea del hombro, muñeca neutra. Sin impulso de cadera.' },
-    { name: 'Extensión desde Abajo', group: 'TRÍCEP', type: 'AISLAMIENTO', sets: 3, reps: 8, rest: '1:00', drops: true, desc: 'Codos pegados al costado. Extensión completa y retorno controlado.' },
-  ] },
-  L: { dia: 3, group: 'Pierna', abbr: 'PIERNA', ex: [
-    { name: 'Peso Muerto', group: 'PIERNA', type: 'COMPUESTO', sets: 3, reps: 8, rest: '3:30', drops: false, desc: 'Cadera atrás, espalda neutra, barra pegada a la pierna. Sin redondear la lumbar.' },
-    { name: 'Sentadilla en Hack', group: 'PIERNA', type: 'COMPUESTO', sets: 3, reps: 8, rest: '3:00', drops: false, desc: 'Pies a la anchura de hombros, baja hasta paralela. Rodillas siguiendo la punta del pie.' },
-    { name: 'Extensiones de Cuádricep', group: 'PIERNA', type: 'AISLAMIENTO', sets: 3, reps: 8, rest: '1:30', drops: true, desc: 'Pausa de un segundo arriba. Los descensos bajan el peso sin descanso al fallar.' },
-    { name: 'Curl Acostado', group: 'PIERNA', type: 'AISLAMIENTO', sets: 3, reps: 8, rest: '1:30', drops: true, desc: 'Cadera pegada al banco. Aprieta el isquio arriba y baja lento.' },
-    { name: 'Aducción', group: 'PIERNA', type: 'AISLAMIENTO', sets: 4, reps: 8, rest: '1:00', drops: true, desc: 'Rango completo sin rebote. Mantén la espalda apoyada.' },
-    { name: 'Pantorrilla', group: 'PIERNA', type: 'AISLAMIENTO', sets: 4, reps: 8, rest: '1:00', drops: true, desc: 'Estiramiento máximo abajo, pausa arriba. Sin rebotar con el tendón.' },
-    { name: 'Abdomen Rueda', group: 'ABDOMEN', type: 'COMPUESTO', sets: 4, reps: 8, rest: '45s', drops: false, desc: 'Pelvis en retroversión, sin arquear la lumbar. Avanza solo lo que puedas controlar.' },
-  ] },
-  H: { dia: 4, group: 'Hombro', abbr: 'HOMBRO', ex: [
-    { name: 'Press Militar en Máquina', group: 'HOMBRO', type: 'COMPUESTO', sets: 4, reps: 8, rest: '2:30', drops: false, desc: 'Espalda apoyada, recorrido completo sin bloquear de golpe.' },
-    { name: 'Elevaciones Laterales Máquina', group: 'HOMBRO', type: 'AISLAMIENTO', sets: 4, reps: 8, rest: '1:15', drops: true, desc: 'Codo guía el movimiento hasta la línea del hombro. Sin encoger el trapecio.' },
-    { name: 'Elevaciones Lateral en Polea', group: 'HOMBRO', type: 'AISLAMIENTO', sets: 4, reps: 8, rest: '1:15', drops: true, desc: 'Polea por detrás del cuerpo, tensión constante en todo el rango.' },
-    { name: 'Hombro Posterior', group: 'HOMBRO', type: 'AISLAMIENTO', sets: 3, reps: 8, rest: '1:00', drops: true, desc: 'Codos a la altura del hombro. Contracción marcada, peso ligero.' },
-    { name: 'Polea a la Frente', group: 'HOMBRO', type: 'AISLAMIENTO', sets: 4, reps: 8, rest: '1:00', drops: true, desc: 'Sube a la altura de los ojos sin balanceo. Deltoides anterior.' },
-    { name: 'Extensión desde Arriba', group: 'TRÍCEP', type: 'AISLAMIENTO', sets: 4, reps: 8, rest: '1:30', drops: true, desc: 'Codos apuntando al frente y fijos. Estira la cabeza larga del tríceps.' },
-    { name: 'Extensión desde Abajo', group: 'TRÍCEP', type: 'AISLAMIENTO', sets: 3, reps: 8, rest: '1:00', drops: true, desc: 'Codos al costado, extensión completa y retorno controlado.' },
-    { name: 'Curl Martillo', group: 'BÍCEP', type: 'AISLAMIENTO', sets: 4, reps: 8, rest: '1:15', drops: false, desc: 'Agarre neutro para braquial. Sin balanceo de cadera.' },
-  ] },
-};
-
 const ICONS = {
   'Dominadas': [['p','M3 4h16',1.8],['c',11,8,2],['p','M11 10v5l-2 4M11 15l2 4'],['p','M7 6v5M15 6v5']],
   'Remo en T': [['p','M3 11h10',1.8],['c',16,8,2],['p','M16 10v4'],['p','M13 11l3-3M16 14l2 3'],['p','M3 9l10 2-10 2']],
@@ -85,8 +46,13 @@ const MONTHS_SH = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP'
 const DOW_SH = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
 const TIPOS = ['Quiz', 'Seguimiento', 'Parcial', 'Final', 'Tarea'];
 
-// Ciclo de rutinas anclado al calendario: espalda → pecho → pierna → hombro.
-const ROT = ['E', 'P', 'L', 'H'];
+const DIA_LARGO = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+// Colores para grupos nuevos (los 4 primeros son los de siempre).
+const PALETA = ['#4B7BE5', '#E05C5C', '#5EA37D', '#9B6BD6', '#CE7F55', '#57B9A0', '#D4A843', '#8E9AAE'];
+// Plan semanal: índice = día de la semana (0 domingo … 6 sábado), valor = id del grupo o null (descanso).
+const PLAN_VACIO = [null, null, null, null, null, null, null];
+const TIPOS_EJ = ['Compuesto', 'Máquina', 'Aislamiento'];
+const ICONO_GENERICO = [['p', 'M5 11h12', 1.8], ['p', 'M5 7v8M17 7v8', 2.2], ['p', 'M3 9v4M19 9v4', 1.8]];
 
 function iso(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
 function isoOf(d) { return iso(d.getFullYear(), d.getMonth(), d.getDate()); }
@@ -105,7 +71,7 @@ const WEEK = Array.from({ length: 7 }, (_, i) => {
     n: date.getDate(),
     mes: MONTHS_SH[date.getMonth()],
     fecha: isoOf(date),
-    r: ROT[((dayIndex(date) % 4) + 4) % 4],
+    wd: date.getDay(),
   };
 });
 function fmtMoney(v) {
@@ -113,13 +79,14 @@ function fmtMoney(v) {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
-/** Sesión en blanco para un día de la tira semanal. */
-function freshDay(w) {
-  const r = ROUTINES[w.r];
+/** Sesión en blanco para un día: sale del grupo que el plan le asigna
+ *  (n = número del grupo, el "DÍA n"). Sin grupo es día de descanso. */
+function freshDay(w, g, n) {
+  if (!g) return { fecha: w.fecha, gid: null, group: 'Descanso', abbr: 'LIBRE', dia: 0, color: GREY, musculo: '', ex: [] };
   return {
-    fecha: w.fecha, group: r.group, abbr: r.abbr, dia: r.dia,
-    ex: r.ex.map((e, j) => ({
-      id: w.fecha + '-' + j, name: e.name, group: e.group, type: e.type,
+    fecha: w.fecha, gid: g.id, group: g.nombre, abbr: g.abbr, dia: n, color: g.color, musculo: g.musculo,
+    ex: (g.ejercicios || []).map((e, j) => ({
+      id: w.fecha + '-' + j, tid: e.id, name: e.name, group: e.group, type: e.type,
       sets: e.sets, reps: e.reps, rest: e.rest, drops: e.drops, desc: e.desc,
       done: Array(e.sets).fill(false),
       weights: Array(e.sets).fill(''),
@@ -127,10 +94,33 @@ function freshDay(w) {
     })),
   };
 }
+function frescoPara(w, grupos, plan) {
+  const id = (plan || PLAN_VACIO)[w.wd];
+  const k = id ? grupos.findIndex(g => g.id === id) : -1;
+  return k >= 0 ? freshDay(w, grupos[k], k + 1) : freshDay(w, null);
+}
+function conProgreso(d) {
+  return !!d && (d.ex || []).some(e =>
+    (e.done || []).some(Boolean) || (e.weights || []).some(v => v) || (e.d1 || []).some(v => v) || (e.d2 || []).some(v => v));
+}
+/** Los 7 días de la tira. Lo ya empezado y el pasado registrado se respetan
+ *  (nunca se pierden series); todo lo demás sale del plan y los grupos. */
+function componerDias(grupos, plan, logs, actuales) {
+  return WEEK.map((w, i) => {
+    const actual = actuales && actuales[i] && actuales[i].fecha === w.fecha ? actuales[i] : null;
+    const previa = actual || (logs || {})[w.fecha];
+    if (previa && Array.isArray(previa.ex) && (conProgreso(previa) || (w.fecha < TODAY && previa.ex.length))) return previa;
+    return frescoPara(w, grupos, plan);
+  });
+}
+function cap(t) { t = String(t || ''); return t ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : ''; }
+// Los ejercicios de siempre guardan el tipo en mayúsculas; su etiqueta fina vive en TIER.
+function tierDe(e) { return /^[A-ZÁÉÍÓÚ]+$/.test(e.type || '') ? (TIER[e.name] || cap(e.type)) : (e.type || ''); }
+function abreviar(nombre) { return String(nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 6) || 'GRUPO'; }
+function cuenta(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
 
 // Partes del estado que son datos del usuario (lo demás es interfaz).
-const DATA_KEYS = ['logs', 'days', 'cuadernos', 'files', 'acts', 'libs', 'profile'];
-const FRESH_JSON = WEEK.map(w => JSON.stringify(freshDay(w)));
+const DATA_KEYS = ['logs', 'days', 'cuadernos', 'files', 'acts', 'libs', 'profile', 'grupos', 'plan'];
 const USUARIO_OK = /^[a-z0-9._-]{3,24}$/;
 const NUBE_TXT = {
   ok: ['Guardado', MINT], guardando: ['Guardando…', AMBER],
@@ -139,8 +129,9 @@ const NUBE_TXT = {
 
 function vacio() {
   return {
-    logs: {}, days: WEEK.map(freshDay), cuadernos: [], files: {}, acts: [], libs: [],
+    logs: {}, days: componerDias([], PLAN_VACIO, {}, null), cuadernos: [], files: {}, acts: [], libs: [],
     profile: { nombre: '', altura: '', peso: '', sexo: '' },
+    grupos: [], plan: PLAN_VACIO.slice(), rutinaLista: false,
   };
 }
 function norm(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
@@ -174,6 +165,7 @@ class Component extends DCLogic {
       month: NOW.getMonth(), year: NOW.getFullYear(), selDay: NOW.getDate(),
       modal: null,
       showHist: false, openLib: null, abonoMonto: '', libBorrando: null,
+      menuDia: null, rutinaOn: false, rGrupo: null, rEj: null,
     });
   }
 
@@ -182,12 +174,17 @@ class Component extends DCLogic {
     // Las sesiones se guardan por fecha, no por posición: así la semana
     // puede correrse un día sin arrastrar el entrenamiento anterior.
     const logs = d.logs || {};
+    // Una copia local de la versión anterior no trae grupos ni plan: hasta
+    // leerlos del servidor no se recalcula la semana ni se sube nada de rutina
+    // (subir un plan vacío borraría el de verdad).
+    const lista = Array.isArray(d.grupos);
+    const grupos = lista ? d.grupos : [];
+    const plan = Array.isArray(d.plan) && d.plan.length === 7 ? d.plan : PLAN_VACIO.slice();
     return {
-      logs,
-      days: WEEK.map(w => {
-        const prev = logs[w.fecha];
-        return (prev && Array.isArray(prev.ex) && prev.ex.length) ? prev : freshDay(w);
-      }),
+      logs, grupos, plan, rutinaLista: lista,
+      days: lista
+        ? componerDias(grupos, plan, logs, null)
+        : WEEK.map(w => { const p = logs[w.fecha]; return (p && Array.isArray(p.ex) && p.ex.length) ? p : freshDay(w, null); }),
       cuadernos: d.cuadernos || [], files: d.files || {}, acts: d.acts || [], libs: d.libs || [],
       profile: Object.assign({ nombre: '', altura: '', peso: '', sexo: '' }, d.profile),
     };
@@ -200,9 +197,10 @@ class Component extends DCLogic {
     const sesiones = Object.assign({}, s.logs);
     WEEK.forEach((w, i) => {
       const d = s.days[i];
-      if (d && (s.logs[w.fecha] || JSON.stringify(d) !== FRESH_JSON[i])) sesiones[w.fecha] = d;
+      if (d && (s.logs[w.fecha] || JSON.stringify(d) !== JSON.stringify(frescoPara(w, s.grupos, s.plan)))) sesiones[w.fecha] = d;
     });
-    return { profile: s.profile, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, sesiones };
+    return { profile: s.profile, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, sesiones,
+             grupos: s.grupos, plan: s.plan, rutinaLista: s.rutinaLista };
   }
   huella() { return this.uid ? JSON.stringify(Nube.filas(this.snapshot(), this.uid)) : ''; }
   hayPendientes() {
@@ -215,7 +213,8 @@ class Component extends DCLogic {
     const s = this.state;
     try {
       localStorage.setItem('pilares.nube.' + this.uid, JSON.stringify({
-        data: { profile: s.profile, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, logs: this.snapshot().sesiones },
+        data: { profile: s.profile, cuadernos: s.cuadernos, files: s.files, acts: s.acts, libs: s.libs, logs: this.snapshot().sesiones,
+                grupos: s.grupos, plan: s.plan },
         base: this.base, codigo: s.codigo, amigos: s.amigos, cuadAmigos: s.cuadAmigos,
       }));
     } catch (e) {}
@@ -320,7 +319,7 @@ class Component extends DCLogic {
 
   cerrarLocal() {
     this.desconectarTiempoReal();
-    this.uid = null; this.base = null; this.__sig = null; this.respaldoArchivo = null;
+    this.uid = null; this.base = null; this.__sig = null; this.respaldoArchivo = null; this.sembrada = false;
   }
 
   estadoFuera() {
@@ -329,16 +328,269 @@ class Component extends DCLogic {
       me: null, codigo: '', amigos: [], cuadAmigos: {}, amigoCodigo: '', amigoMsg: '', importMsg: '',
       nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null,
       activeDay: 1, expanded: null, libBorrando: null,
+      menuDia: null, rutinaOn: false, rGrupo: null, rEj: null,
+    });
+  }
+
+  /* ── Rutina: plan semanal y grupos ───────────────────────────────── */
+
+  /** Aplica un cambio a grupos y/o plan y recompone la semana. */
+  mutGrupos(fn) {
+    this.setState(st => {
+      const grupos = JSON.parse(JSON.stringify(st.grupos));
+      let plan = st.plan.slice();
+      const r = fn(grupos, plan) || {};
+      if (r.plan) plan = r.plan;
+      return Object.assign({ grupos, plan, days: componerDias(grupos, plan, st.logs, st.days) }, r.extra || {});
+    });
+  }
+
+  /** Modo edición en una tarjeta: el cambio va a la sesión del día y al
+   *  ejercicio del grupo, así las próximas semanas ya salen corregidas. */
+  editarEjercicioDia(i, sesId, cambio) {
+    this.setState(st => {
+      const days = JSON.parse(JSON.stringify(st.days));
+      const d = days[i], x = d && d.ex.find(q => q.id === sesId);
+      if (!x) return null;
+      const antes = x.name;
+      cambio(x);
+      let grupos = st.grupos;
+      if (d.gid) {
+        grupos = st.grupos.map(g => g.id !== d.gid ? g : {
+          ...g,
+          ejercicios: g.ejercicios.map(t => (t.id === x.tid || (!x.tid && t.name === antes))
+            ? { ...t, name: x.name, sets: x.sets, reps: x.reps, rest: x.rest } : t),
+        });
+      }
+      return { grupos, days: componerDias(grupos, st.plan, st.logs, days) };
+    });
+  }
+
+  /** Cambia el plan (para todas las semanas) con opción de deshacer. */
+  cambiarPlan(nuevo, texto) {
+    const previo = this.state.plan.slice();
+    const aplicar = plan => this.setState(st => ({ plan, days: componerDias(st.grupos, plan, st.logs, st.days) }));
+    aplicar(nuevo);
+    if (window.Fluido) Fluido.aviso(texto, 'Deshacer', () => aplicar(previo), null);
+  }
+
+  /** Aviso cuando un día afectado ya tiene series: ese día se respeta. */
+  notaSiEmpezado(indices) {
+    const hay = indices.some(k => WEEK[k].fecha >= TODAY && conProgreso(this.state.days[k]));
+    return hay ? ' · Un día ya tenía series: ese cambia desde la próxima semana.' : '';
+  }
+
+  intercambiarDias(i, j) {
+    const a = WEEK[i].wd, b = WEEK[j].wd;
+    if (a === b) return;
+    const plan = this.state.plan.slice();
+    const t = plan[a]; plan[a] = plan[b]; plan[b] = t;
+    const nota = this.notaSiEmpezado([i, j]);
+    this.cambiarPlan(plan, cap(DIA_LARGO[a]) + ' y ' + DIA_LARGO[b] + ' intercambiados' + nota);
+  }
+
+  asignarDia(i, gid) {
+    const wd = WEEK[i].wd;
+    if ((this.state.plan[wd] || null) === (gid || null)) return;
+    const plan = this.state.plan.slice();
+    plan[wd] = gid || null;
+    const g = gid ? this.state.grupos.find(x => x.id === gid) : null;
+    const nota = this.notaSiEmpezado([i]);
+    this.cambiarPlan(plan, cap(DIA_LARGO[wd]) + ': ' + (g ? g.nombre : 'descanso') + nota);
+  }
+
+  /** El menú aparece justo debajo del día que se mantuvo presionado. */
+  abrirMenuDia(i, rect) {
+    const cont = document.querySelector('[data-pantalla="ejercicio"]');
+    if (!cont) return;
+    const c = cont.getBoundingClientRect(), ancho = 224;
+    const cx = rect.left + rect.width / 2 - c.left;
+    const x = Math.max(12, Math.min(c.width - ancho - 12, cx - ancho / 2));
+    const y = rect.bottom - c.top + 8;
+    this.setState({ menuDia: { i, x: Math.round(x), y: Math.round(y), origen: Math.round(cx - x) + 'px 0px' } });
+  }
+
+  cerrarMenuDia() {
+    if (!window.Fluido) { this.setState({ menuDia: null }); return; }
+    Fluido.cerrarMenu().then(() => this.setState({ menuDia: null }));
+  }
+
+  elegirMenuDia(gid) {
+    const md = this.state.menuDia;
+    if (!md) return;
+    this.cerrarMenuDia();
+    this.asignarDia(md.i, gid);
+  }
+
+  abrirRutina(grupoId) { this.setState({ rutinaOn: true, rGrupo: grupoId || null, rEj: null, menuDia: null }); }
+
+  nuevoGrupo() {
+    const id = Nube.uuid();
+    this.mutGrupos(gs => {
+      const usados = gs.map(g => g.color);
+      const color = PALETA.find(c => !usados.includes(c)) || PALETA[gs.length % PALETA.length];
+      gs.push({ id, nombre: 'Grupo nuevo', abbr: 'GRUPO', color, musculo: 'GRUPO NUEVO', ejercicios: [] });
+      return { extra: { rGrupo: id, rEj: null } };
+    });
+  }
+
+  renombrarGrupo(id, nombre) {
+    this.mutGrupos(gs => {
+      const g = gs.find(x => x.id === id);
+      if (!g) return;
+      // Los ejercicios del músculo principal siguen al nombre nuevo (así no
+      // quedan marcados como "secundarios" por un simple cambio de nombre).
+      const mus = String(nombre || '').trim().toUpperCase();
+      g.ejercicios.forEach(e => { if (e.group === g.musculo) e.group = mus; });
+      g.nombre = nombre; g.musculo = mus; g.abbr = abreviar(nombre);
+    });
+  }
+
+  borrarGrupo(id) {
+    const g = this.state.grupos.find(x => x.id === id);
+    if (!g) return;
+    const antes = { grupos: this.state.grupos, plan: this.state.plan };
+    this.mutGrupos((gs, plan) => {
+      gs.splice(gs.findIndex(x => x.id === id), 1);
+      return { plan: plan.map(p => p === id ? null : p), extra: { rGrupo: null, rEj: null } };
+    });
+    if (window.Fluido) {
+      Fluido.aviso('Grupo "' + (g.nombre || 'sin nombre') + '" borrado', 'Deshacer', () => this.setState(st => ({
+        grupos: antes.grupos, plan: antes.plan, days: componerDias(antes.grupos, antes.plan, st.logs, st.days),
+      })), null);
+    }
+  }
+
+  agregarEjercicio(gid) {
+    const eid = Nube.uuid();
+    this.mutGrupos(gs => {
+      const g = gs.find(x => x.id === gid);
+      if (!g) return;
+      g.ejercicios.push({ id: eid, name: 'Ejercicio nuevo', group: g.musculo, type: 'Compuesto', sets: 3, reps: 10, rest: '1:30', drops: false, desc: '' });
+      return { extra: { rEj: eid } };
+    });
+  }
+
+  editarEj(gid, eid, fn) {
+    this.mutGrupos(gs => {
+      const g = gs.find(x => x.id === gid), e = g && g.ejercicios.find(x => x.id === eid);
+      if (e) fn(e);
+    });
+  }
+
+  moverEj(gid, eid, dir) {
+    this.mutGrupos(gs => {
+      const g = gs.find(x => x.id === gid);
+      if (!g) return;
+      const k = g.ejercicios.findIndex(x => x.id === eid), j = k + dir;
+      if (k < 0 || j < 0 || j >= g.ejercicios.length) return;
+      const t = g.ejercicios[k]; g.ejercicios[k] = g.ejercicios[j]; g.ejercicios[j] = t;
+    });
+  }
+
+  quitarEj(gid, eid) {
+    const g = this.state.grupos.find(x => x.id === gid);
+    const e = g && g.ejercicios.find(x => x.id === eid);
+    if (!e) return;
+    const pos = g.ejercicios.indexOf(e);
+    this.mutGrupos(gs => { const gg = gs.find(x => x.id === gid); gg.ejercicios.splice(pos, 1); return { extra: { rEj: null } }; });
+    if (window.Fluido) {
+      Fluido.aviso('"' + (e.name || 'Ejercicio') + '" quitado', 'Deshacer', () => this.mutGrupos(gs => {
+        const gg = gs.find(x => x.id === gid);
+        if (gg && !gg.ejercicios.some(x => x.id === eid)) gg.ejercicios.splice(Math.min(pos, gg.ejercicios.length), 0, e);
+      }), null);
+    }
+  }
+
+  valsMenu(s) {
+    const md = s.menuDia, self = this;
+    if (!md) return { menuOn: false };
+    const wd = WEEK[md.i].wd, actual = s.plan[wd] || null;
+    return {
+      menuOn: true, menuX: md.x, menuY: md.y, menuOrigen: md.origen,
+      menuTitulo: DIA_LARGO[wd].toUpperCase() + ' · TODAS LAS SEMANAS',
+      menuOpciones: s.grupos.map(g => ({ t: g.nombre || 'Sin nombre', color: g.color, check: actual === g.id ? '✓' : '', elegir: () => self.elegirMenuDia(g.id) }))
+        .concat([{ t: 'Descanso', color: '#4A566B', check: actual ? '' : '✓', elegir: () => self.elegirMenuDia(null) }]),
+      cerrarMenu: () => self.cerrarMenuDia(),
+      menuEditar: () => { self.setState({ menuDia: null }); self.abrirRutina(); },
+    };
+  }
+
+  valsRutina(s) {
+    const self = this;
+    if (!s.rutinaOn) return { rutinaOn: false };
+    const g = s.rGrupo ? s.grupos.find(x => x.id === s.rGrupo) : null;
+    const base = {
+      rutinaOn: true, rListaOn: !g, rEditOn: !!g,
+      rKicker: g ? '‹ TU RUTINA' : 'TU RUTINA', rKickerColor: g ? AMBER : '#8E9AAE',
+      rTitulo: g ? (g.nombre || 'Sin nombre') : 'Grupos y semana',
+      rVolver: () => { if (g) self.setState({ rGrupo: null, rEj: null }); },
+      cerrarRutina: () => self.cerrarHoja('rutina'),
+    };
+    if (!g) {
+      const diasDe = id => s.plan.filter(p => p === id).length;
+      return Object.assign(base, {
+        rSemana: [1, 2, 3, 4, 5, 6, 0].map(wd => {
+          const gg = s.grupos.find(x => x.id === s.plan[wd]);
+          return { dow: DOW_SH[wd], color: gg ? gg.color : '#28324A', abbr: gg ? (gg.abbr || '').slice(0, 3) : 'LIBRE', fg: gg ? '#fff' : '#4A566B' };
+        }),
+        rGrupos: s.grupos.map(gg => {
+          const d = diasDe(gg.id);
+          return {
+            nombre: gg.nombre || 'Sin nombre', color: gg.color,
+            meta: cuenta(gg.ejercicios.length, 'EJERCICIO', 'EJERCICIOS') + ' · ' + (d ? cuenta(d, 'DÍA', 'DÍAS') + ' A LA SEMANA' : 'SIN DÍAS ASIGNADOS'),
+            abrir: () => self.setState({ rGrupo: gg.id, rEj: null }),
+          };
+        }),
+        rSinGrupos: s.grupos.length === 0,
+        rNuevoGrupo: () => self.nuevoGrupo(),
+      });
+    }
+    const chip = on => ({ bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE' });
+    return Object.assign(base, {
+      rNombre: g.nombre,
+      onRNombre: ev => { const v = ev.target.value; self.renombrarGrupo(g.id, v); },
+      rColores: PALETA.map(c => ({
+        color: c, anillo: c === g.color ? '0 0 0 2px #0E131F, 0 0 0 4px ' + c : 'none',
+        elegir: () => self.mutGrupos(gs => { gs.find(x => x.id === g.id).color = c; }),
+      })),
+      rEjLabel: 'EJERCICIOS · ' + g.ejercicios.length,
+      rSinEj: g.ejercicios.length === 0,
+      rEjercicios: g.ejercicios.map((e, k) => {
+        const abierto = s.rEj === e.id, ed = fn => self.editarEj(g.id, e.id, fn);
+        return {
+          num: String(k + 1).padStart(2, '0'), name: e.name || 'Sin nombre',
+          meta: e.sets + '×' + e.reps + (e.drops ? ' + DESCENSOS' : '') + ' · ' + (e.rest || '—'),
+          abierto, giro: abierto ? '135deg' : '45deg',
+          alternar: () => self.setState({ rEj: abierto ? null : e.id }),
+          nombre: e.name, onNombre: ev => { const v = ev.target.value; ed(x => { x.name = v; }); },
+          sets: String(e.sets), onSets: ev => { const v = Math.max(1, Math.min(10, parseInt(ev.target.value, 10) || 1)); ed(x => { x.sets = v; }); },
+          reps: String(e.reps), onReps: ev => { const v = Math.max(1, Math.min(50, parseInt(ev.target.value, 10) || 1)); ed(x => { x.reps = v; }); },
+          rest: e.rest, onRest: ev => { const v = ev.target.value; ed(x => { x.rest = v; }); },
+          desc: e.desc || '', onDesc: ev => { const v = ev.target.value; ed(x => { x.desc = v; }); },
+          tipos: TIPOS_EJ.map(t => Object.assign({ t, pick: () => ed(x => { x.type = t; }) }, chip(tierDe(e) === t))),
+          dropsBg: e.drops ? AMBER : 'rgba(255,255,255,.1)', dropsJustify: e.drops ? 'flex-end' : 'flex-start',
+          dropsKnob: e.drops ? '#090C14' : '#8E9AAE',
+          alternarDrops: () => ed(x => { x.drops = !x.drops; }),
+          subirColor: k > 0 ? '#B8C2D2' : '#3A4458', bajarColor: k < g.ejercicios.length - 1 ? '#B8C2D2' : '#3A4458',
+          subir: () => self.moverEj(g.id, e.id, -1), bajar: () => self.moverEj(g.id, e.id, 1),
+          quitar: () => self.quitarEj(g.id, e.id),
+        };
+      }),
+      rAgregarEj: () => self.agregarEjercicio(g.id),
+      rBorrarGrupo: () => self.borrarGrupo(g.id),
     });
   }
 
   /* ── Lo que piden los gestos y animaciones (fluido.js) ───────────── */
   cerrarHoja(tipo, yaAnimado) {
-    const cerrar = () => this.setState(st => tipo === 'modal' ? { modal: null } : {
-      panel: false,
-      respaldo: st.respaldo === 'preparando' ? 'preparando' : '',
-      respaldoMsg: st.respaldo === 'preparando' ? st.respaldoMsg : '',
-    });
+    const cerrar = () => this.setState(st => tipo === 'modal' ? { modal: null }
+      : tipo === 'rutina' ? { rutinaOn: false, rGrupo: null, rEj: null }
+      : {
+        panel: false,
+        respaldo: st.respaldo === 'preparando' ? 'preparando' : '',
+        respaldoMsg: st.respaldo === 'preparando' ? st.respaldoMsg : '',
+      });
     if (yaAnimado || !window.Fluido) { cerrar(); return; }
     Fluido.animarSalida(tipo).then(cerrar);
   }
@@ -451,8 +703,15 @@ class Component extends DCLogic {
         if (this.hayPendientes()) { this.releerTrasSubir = true; return; }   // no pisar lo local
       }
       const antes = this.huella();
-      const d = await Nube.cargar(uid);
+      let d = await Nube.cargar(uid);
       if (uid !== this.uid) return;                 // cerró sesión mientras tanto
+      // Cuenta sin rutina (no debería pasar: el servidor la siembra al crearla).
+      if (!d.grupos.length && !this.sembrada) {
+        this.sembrada = true;
+        await Nube.sembrarRutina();
+        d = await Nube.cargar(uid);
+        if (uid !== this.uid) return;
+      }
       if (this.base && this.huella() !== antes) { this.releer = true; return; }   // editaron mientras llegaba
       this.setState(Object.assign(this.desdeDatos(d), {
         auth: 'dentro', cargaError: '', codigo: d.codigo, amigos: d.amigos, cuadAmigos: d.cuadAmigos, nube: 'ok',
@@ -670,8 +929,7 @@ class Component extends DCLogic {
   gcolor(g) { return (g === 'TRÍCEP' || g === 'BÍCEP' || g === 'ABDOMEN') ? AMBER : MINT; }
   accent() { return (this.props.acento === 'Menta') ? MINT : AMBER; }
   icon(name, color) {
-    const d = ICONS[name];
-    if (!d) return null;
+    const d = ICONS[name] || ICONO_GENERICO;
     const kids = d.map((it, i) => it[0] === 'c'
       ? React.createElement('circle', { key: i, cx: it[1], cy: it[2], r: it[3], stroke: 'currentColor', strokeWidth: it[4] || 1.5, fill: 'none' })
       : React.createElement('path', { key: i, d: it[1], stroke: 'currentColor', strokeWidth: it[2] || 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' }));
@@ -722,6 +980,10 @@ class Component extends DCLogic {
     };
     const day = s.days[s.activeDay];
     const w = WEEK[s.activeDay];
+    const esDescanso = !day.gid && !day.ex.length;
+    const grupoVacio = !!day.gid && !day.ex.length;
+    const grupoHoy = day.gid ? s.grupos.find(g => g.id === day.gid) : null;
+    const diaColor = esDescanso ? GREY : (day.color || (grupoHoy && grupoHoy.color) || DAY_COLOR[day.group] || ac);
     const totalSets = day.ex.reduce((t, e) => t + e.sets, 0);
     const doneSets = day.ex.reduce((t, e) => t + e.done.filter(Boolean).length, 0);
     const pct = totalSets ? Math.round(doneSets / totalSets * 100) : 0;
@@ -734,10 +996,11 @@ class Component extends DCLogic {
 
     const exList = shown.map(e => {
       const dc = e.done.filter(Boolean).length;
-      const sec = e.group !== day.group.toUpperCase();
+      // Músculo secundario (p. ej. tríceps en día de pecho) va en ámbar.
+      const sec = !!e.group && e.group !== (day.musculo || String(day.group || '').toUpperCase());
       const col = sec ? AMBER : MINT;
       const full = dc >= e.sets;
-      const tier = TIER[e.name] || e.type;
+      const tier = tierDe(e);
       return {
         id: e.id, name: e.name, group: e.group, type: e.type, desc: e.desc, rest: e.rest,
         sets: String(e.sets), reps: String(e.reps), drops: e.drops,
@@ -774,17 +1037,19 @@ class Component extends DCLogic {
           const secs = p.length > 1 ? (+p[0]) * 60 + (+p[1]) : parseInt(e.rest, 10) || 60;
           self.setState({ rest: secs, restTotal: secs, restName: e.name, restOn: true });
         },
-        onName: ev => { const v = ev.target.value; self.mut(d => { d[s.activeDay].ex.find(q => q.id === e.id).name = v; }); },
-        onSets: ev => { const v = Math.max(1, Math.min(10, parseInt(ev.target.value, 10) || 1)); self.mut(d => { const x = d[s.activeDay].ex.find(q => q.id === e.id); const old = x.sets; x.sets = v; const fit = (arr, f) => { while (arr.length < v) arr.push(f); while (arr.length > v) arr.pop(); }; fit(x.done, false); fit(x.weights, x.weights[old - 1] || ''); fit(x.d1, ''); fit(x.d2, ''); }); },
-        onReps: ev => { const v = Math.max(1, Math.min(50, parseInt(ev.target.value, 10) || 1)); self.mut(d => { d[s.activeDay].ex.find(q => q.id === e.id).reps = v; }); },
-        onRest: ev => { const v = ev.target.value; self.mut(d => { d[s.activeDay].ex.find(q => q.id === e.id).rest = v; }); },
+        // Modo edición: queda en el grupo para siempre (y en la sesión de hoy).
+        onName: ev => { const v = ev.target.value; self.editarEjercicioDia(s.activeDay, e.id, x => { x.name = v; }); },
+        onSets: ev => { const v = Math.max(1, Math.min(10, parseInt(ev.target.value, 10) || 1)); self.editarEjercicioDia(s.activeDay, e.id, x => { const old = x.sets; x.sets = v; const fit = (arr, f) => { while (arr.length < v) arr.push(f); while (arr.length > v) arr.pop(); }; fit(x.done, false); fit(x.weights, x.weights[old - 1] || ''); fit(x.d1, ''); fit(x.d2, ''); }); },
+        onReps: ev => { const v = Math.max(1, Math.min(50, parseInt(ev.target.value, 10) || 1)); self.editarEjercicioDia(s.activeDay, e.id, x => { x.reps = v; }); },
+        onRest: ev => { const v = ev.target.value; self.editarEjercicioDia(s.activeDay, e.id, x => { x.rest = v; }); },
       };
     });
 
     const week = WEEK.map((d, i) => {
-      const on = i === s.activeDay;
+      const on = i === s.activeDay, sd = s.days[i];
       return {
-        dow: d.dow, n: String(d.n), abbr: (s.days[i].abbr || '').slice(0, 3),
+        i, dow: d.dow, n: String(d.n),
+        abbr: (sd.gid || sd.ex.length) ? (sd.abbr || '').slice(0, 3) : 'LIBRE',
         bg: on ? '#1C332C' : '#121724', border: on ? 'rgba(87,185,160,.5)' : (i === 1 ? 'rgba(87,185,160,.33)' : '#1D2534'),
         fg: on ? '#9FD8C6' : '#fff', sub: on ? 'rgba(159,216,198,.7)' : '#8E9AAE',
         abbrColor: on ? 'rgba(159,216,198,.75)' : (i === 1 ? ac : '#4A566B'),
@@ -1006,6 +1271,7 @@ class Component extends DCLogic {
     return {
       yes: true,
       appOn: true, authOn: false, loadOn: false,
+      ...self.valsRutina(s), ...self.valsMenu(s),
       isHome: s.tab === 'home', isEjercicio: s.tab === 'ejercicio', isEstudio: s.tab === 'estudio', isFinanzas: s.tab === 'finanzas',
       editOn: s.edit, panelOn: s.panel, modalOn: !!m, restOn: s.restOn,
       goEjercicio: () => self.setState({ tab: 'ejercicio' }),
@@ -1016,15 +1282,18 @@ class Component extends DCLogic {
       toggleEdit: () => self.setState(st => ({ edit: !st.edit })),
 
       ringColor: pct >= 100 ? GREEN : ac, ringOffset: 188.5 * (1 - pct / 100), pctText: pct + '%',
-      dayColor: DAY_COLOR[day.group] || ac,
-      dayChipBg: (DAY_COLOR[day.group] || ac) + '1F',
+      dayColor: diaColor,
+      dayChipBg: diaColor + '1F',
+      dayChip: esDescanso ? 'DÍA LIBRE' : 'DÍA ' + (day.dia || '·') + ' · ' + (pct >= 100 ? 'COMPLETO' : (doneSets > 0 ? pct + '% HECHO' : 'SIN EMPEZAR')),
+      esDescanso, grupoVacio, hayRutina: day.ex.length > 0,
+      abrirRutina: () => self.abrirRutina(),
       dayStateTxt: pct >= 100 ? 'COMPLETO' : (doneSets > 0 ? pct + '% HECHO' : 'SIN EMPEZAR'),
       finanzasSummary: cobrar.length + ' POR COBRAR · ' + pagar.length + ' POR PAGAR',
       canReset: doneSets > 0,
       resetDay: () => self.mut(d => d[s.activeDay].ex.forEach(e => { e.done = e.done.map(() => false); })),
       dayGroup: day.group, dayHeader: w.dow + ' ' + w.n + ' ' + w.mes, dayNum: String(day.dia),
       seriesText: doneSets + ' de ' + totalSets + ' series',
-      exCountText: day.ex.length + ' ej · ' + (pct >= 100 ? 'Sesión completa' : 'Compuestos 1º'),
+      exCountText: esDescanso ? 'Día de descanso' : day.ex.length + ' ej · ' + (pct >= 100 ? 'Sesión completa' : 'Compuestos 1º'),
       week, exList,
       hasDone: allDoneEx.length > 0 && hideDone,
       doneLabel: allDoneEx.length + ' completado' + (allDoneEx.length === 1 ? '' : 's'),

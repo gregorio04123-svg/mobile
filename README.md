@@ -30,7 +30,10 @@ pilares/
 ### Funciona de verdad, no es una maqueta
 
 - **Resumen** (pantalla de inicio): lo próximo a entregar, contadores de pendientes / esta semana / cuadernos, las próximas entregas ordenadas por urgencia, la carga por semana y accesos directos a gimnasio y libreticas.
-- **Ejercicio**: la semana se genera desde la fecha real del dispositivo; el ciclo de rutinas (espalda → pecho → pierna → hombro) queda anclado al calendario. Marcar series, anotar pesos y descensos, cronómetro de descanso, renombrar ejercicios y cambiar series/repeticiones desde *Modo edición*.
+- **Ejercicio**: plan semanal fijo por cuenta (base: lun Espalda, mar Pecho, mié Pierna, jue Hombro, vie Espalda, sáb Pecho, dom descanso). Marcar series, anotar pesos y descensos, cronómetro de descanso.
+  - **Cambiar días**: mantener presionado un día de la tira semanal. Si se arrastra sobre otro, se intercambian; si se suelta sin mover, sale un menú con los grupos y *Descanso*. El cambio aplica a todas las semanas y se puede deshacer. Un día que ya tiene series anotadas nunca se pierde: ese cambia desde la semana siguiente.
+  - **Tu rutina** (botón de la mancuerna, arriba a la izquierda): crear, renombrar, recolorear y borrar grupos; añadir, editar, reordenar y quitar ejercicios.
+  - *Modo edición* sobre una tarjeta cambia el ejercicio en su grupo para siempre (los pesos siguen siendo de cada día).
 - **Estudio**: calendario del mes con código de urgencia por color, crear/editar/eliminar actividades, cuadernos y archivos por materia.
 - **Finanzas**: libreticas de quién debe a quién, marcar como saldada, historial y totales.
 - **Movimiento y gestos** (criterios de *Designing Fluid Interfaces* de Apple, en `fluido.js`): resortes que arrancan desde donde está cada cosa y heredan la velocidad del dedo; sin rebote salvo cuando se lanza algo con impulso.
@@ -233,7 +236,7 @@ props: {
 }
 ```
 
-**Rutinas de gimnasio** — constante `ROUTINES` al inicio de `app.js`. Cada ejercicio define `sets`, `reps`, `rest` (descanso) y `drops` (descensos). Si agregas un ejercicio nuevo y quieres que tenga ícono, añade su trazado en `ICONS` con la misma clave del nombre.
+**Rutinas de gimnasio** — viven en Supabase: tabla `grupos` (cada grupo con sus ejercicios) y tabla `rutinas` (el plan de 7 días; índice 0 = domingo). La rutina base de las cuentas nuevas la crea la función `sembrar_rutina` de la base de datos. Cada persona la cambia desde la app. Para que un ejercicio nuevo tenga ícono propio, añade su trazado en `ICONS` (en `app.js`) con la misma clave del nombre; si no, usa una mancuerna genérica.
 
 **Supabase** — la URL del proyecto y la clave pública están al inicio de `nube.js`. La clave pública (`sb_publishable_…`) está hecha para ir en el navegador; lo que protege los datos son las políticas de seguridad por fila de la base de datos. **Nunca** pongas en este repo la clave `service_role` / `secret`.
 
