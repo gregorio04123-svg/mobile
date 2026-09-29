@@ -147,8 +147,6 @@ function hace(ts) {
   if (isoOf(d) === isoOf(addDays(new Date(), -1))) return 'AYER';
   return d.getDate() + ' ' + MONTHS_SH[d.getMonth()];
 }
-function horaTxt(h) { return (h % 12 === 0 ? 12 : h % 12) + ':00 ' + (h < 12 ? 'a. m.' : 'p. m.'); }
-const HORAS = Array.from({ length: 24 }, (_, h) => ({ v: String(h), t: horaTxt(h) }));
 
 /** Rutina que llega de otra persona (invitación o vista de un amigo): solo
  *  se copian los campos conocidos, con límites, antes de mostrarla o guardarla. */
@@ -1179,7 +1177,6 @@ class Component extends DCLogic {
       pushTitulo: P[0], pushTexto: P[1], pushBtn: P[2], pushBtnOn: !!P[2],
       pushGo: () => { if (s.push === 'activo') self.probarNotificacion(); else if (s.push === 'pedir') self.activarNotificaciones(); },
       pushMsg: s.pushMsg,
-      horas: HORAS,
       horaSel: String(typeof s.profile.hora === 'number' ? s.profile.hora : 19),
       onHora: ev => {
         const v = parseInt(ev.target.value, 10);
