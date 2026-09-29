@@ -376,7 +376,7 @@
 <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
   <div data-cabecera data-vidrio="cabecera" style="position:absolute;top:0;left:0;right:0;z-index:30">
   <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
-    <div sc-camel-on-click="{{ backCuadernos }}" style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:{{ estudioKickerColor }};cursor:pointer">{{ estudioKicker }}</div>
+    <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:#8E9AAE">{{ estudioKicker }}</div>
     <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#EDF1F7;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ estudioTitle }}</div>
     <div style="display:flex;gap:9px;position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px">
       <sc-if value="{{ agendaOn }}">
@@ -384,6 +384,11 @@
           <div style="width:18px;height:2px;border-radius:2px;background:#CE7F55"></div>
           <div style="width:12px;height:2px;border-radius:2px;background:#CE7F55"></div>
           <div style="width:18px;height:2px;border-radius:2px;background:#CE7F55"></div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ fileOn }}">
+        <div sc-camel-on-click="{{ cerrarCuaderno }}" role="button" aria-label="Cerrar cuaderno" style="width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#9AA6BA" stroke-width="2.2" stroke-linecap="round"><path d="M3 3 L13 13 M13 3 L3 13"></path></svg>
         </div>
       </sc-if>
     </div>
@@ -564,16 +569,7 @@
 
   <div data-desplaza style="flex:1;min-height:0;overflow:auto;padding:6px 22px calc(env(safe-area-inset-bottom,0px) + 112px);display:flex;flex-direction:column;gap:12px">
     <sc-for list="{{ libs }}" as="l" hint-placeholder-count="4">
-      <div style="position:relative">
-      <div data-accion="saldar" style="position:absolute;inset:0;border-radius:16px;background:rgba(87,185,160,.16);border:1px solid rgba(87,185,160,.42);display:flex;align-items:center;padding:0 22px;opacity:0">
-        <div style="font:800 10.5px/1 Manrope,sans-serif;letter-spacing:.14em;color:#57B9A0">SALDAR ✓</div>
-      </div>
-      <sc-if value="{{ l.editable }}">
-        <div data-accion="borrar" style="position:absolute;inset:0;border-radius:16px;background:rgba(196,100,97,.18);border:1px solid rgba(196,100,97,.45);display:flex;align-items:center;justify-content:flex-end;padding:0 22px;opacity:0">
-          <div style="font:800 10.5px/1 Manrope,sans-serif;letter-spacing:.14em;color:#E08A87">BORRAR</div>
-        </div>
-      </sc-if>
-      <div data-libreta="{{ l.id }}" data-borrable="{{ l.editable }}" style="position:relative;background-color:#090C14;background-image:linear-gradient({{ l.bg }},{{ l.bg }});border:1px solid {{ l.border }};border-radius:16px;padding:18px;opacity:{{ l.opacity }}">
+      <div style="background:{{ l.bg }};border:1px solid {{ l.border }};border-radius:16px;padding:18px;opacity:{{ l.opacity }}">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
           <div sc-camel-on-click="{{ l.flip }}" style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;padding:6px 9px;border-radius:8px;cursor:pointer;background:{{ l.tint }};color:{{ l.color }}">{{ l.dirLabel }}</div>
           <div sc-camel-on-click="{{ l.togglePaid }}" style="display:flex;align-items:center;gap:9px;cursor:pointer">
@@ -675,7 +671,6 @@
             </div>
           </div>
         </sc-if>
-      </div>
       </div>
     </sc-for>
 

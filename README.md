@@ -34,12 +34,11 @@ pilares/
   - **Cambiar días**: mantener presionado un día de la tira semanal. Si se arrastra sobre otro, se intercambian; si se suelta sin mover, sale un menú con los grupos y *Descanso*. El cambio aplica a todas las semanas y se puede deshacer. Un día que ya tiene series anotadas nunca se pierde: ese cambia desde la semana siguiente.
   - **Tu rutina** (botón de la mancuerna, arriba a la izquierda): crear, renombrar, recolorear y borrar grupos; añadir, editar, reordenar y quitar ejercicios.
   - *Modo edición* sobre una tarjeta cambia el ejercicio en su grupo para siempre (los pesos siguen siendo de cada día).
-- **Estudio**: calendario del mes con código de urgencia por color, crear/editar/eliminar actividades, cuadernos y archivos por materia.
-- **Finanzas**: libreticas de quién debe a quién, marcar como saldada, historial y totales.
+- **Estudio**: calendario del mes con código de urgencia por color, crear/editar/eliminar actividades, cuadernos y archivos por materia. Un cuaderno abierto se cierra con la **X** de arriba a la izquierda.
+- **Finanzas**: libreticas de quién debe a quién, marcar como saldada con el botón *Saldar*, historial y totales. Las saldadas pasan al historial, donde se pueden borrar.
 - **Movimiento y gestos** (criterios de *Designing Fluid Interfaces* de Apple, en `fluido.js`): resortes que arrancan desde donde está cada cosa y heredan la velocidad del dedo; sin rebote salvo cuando se lanza algo con impulso.
   - La ventana de nueva actividad y el panel ⚙ suben desde abajo y se cierran arrastrando hacia abajo o tocando el área oscura.
   - En Ejercicio se desliza a los lados para pasar de día.
-  - Una libretica deslizada a la derecha se salda; a la izquierda se borra. Las dos acciones ofrecen *Deshacer* durante 5 segundos.
   - Jalar hacia abajo desde el tope actualiza con la nube.
   - Barra de pestañas y encabezados de vidrio translúcido; el contenido pasa difuminado por debajo. Respeta *Reducir movimiento* y *Reducir transparencia* del sistema.
 - **Cuentas**: cada persona entra con **usuario y contraseña, sin correo**. La cuenta se crea desde la función `registro` de Supabase ya confirmada, así que nunca se envía un correo (no hay costo de dominio ni de envío). Sin correo no hay "olvidé mi contraseña": hay que guardarla bien.

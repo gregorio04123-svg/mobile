@@ -164,7 +164,7 @@ class Component extends DCLogic {
       openCuaderno: null, estudioTab: 'agenda',
       month: NOW.getMonth(), year: NOW.getFullYear(), selDay: NOW.getDate(),
       modal: null,
-      showHist: false, openLib: null, abonoMonto: '', libBorrando: null,
+      showHist: false, openLib: null, abonoMonto: '',
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null,
     });
   }
@@ -327,7 +327,7 @@ class Component extends DCLogic {
       auth: 'fuera', authMode: 'entrar', aNombre: '', aClave: '', authErr: '', authBusy: false,
       me: null, codigo: '', amigos: [], cuadAmigos: {}, amigoCodigo: '', amigoMsg: '', importMsg: '',
       nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null,
-      activeDay: 1, expanded: null, libBorrando: null,
+      activeDay: 1, expanded: null,
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null,
     });
   }
@@ -600,26 +600,6 @@ class Component extends DCLogic {
   cambiarDia(delta) {
     const d = Math.max(0, Math.min(WEEK.length - 1, this.state.activeDay + delta));
     this.setState({ activeDay: d, expanded: null, showDone: false });
-  }
-
-  saldarLibreta(id) {
-    const l = this.state.libs.find(x => x.id === id);
-    if (!l) return;
-    const alternar = () => this.setState(st => ({ libs: st.libs.map(x => x.id === id ? { ...x, paid: !x.paid } : x) }));
-    alternar();
-    if (window.Fluido) Fluido.aviso(l.paid ? 'Libretica reabierta' : 'Libretica saldada', 'Deshacer', alternar, null);
-  }
-
-  /** Se oculta al instante y se borra de verdad a los 5 s si no se deshace:
-   *  así "Deshacer" no depende de volver a crearla en el servidor. */
-  borrarLibreta(id) {
-    const borrar = () => this.setState(st => ({
-      libs: st.libs.filter(x => x.id !== id),
-      libBorrando: st.libBorrando === id ? null : st.libBorrando,
-    }));
-    if (!window.Fluido) { borrar(); return; }
-    this.setState({ libBorrando: id });
-    Fluido.aviso('Libretica borrada', 'Deshacer', () => this.setState({ libBorrando: null }), borrar);
   }
 
   /* ── Tiempo real ─────────────────────────────────────────────────── */
@@ -1216,9 +1196,7 @@ class Component extends DCLogic {
         vence: l.vence || '', onVence: ev => { const val = ev.target.value; setLib(l.id, x => ({ ...x, vence: val })); },
       };
     };
-    // La que se acaba de borrar se oculta mientras dura el "Deshacer".
-    const visibles = s.libs.filter(l => l.id !== s.libBorrando);
-    const activeLibs = visibles.filter(l => !l.paid), paidL = visibles.filter(l => l.paid);
+    const activeLibs = s.libs.filter(l => !l.paid), paidL = s.libs.filter(l => l.paid);
 
     const cobrar = activeLibs.filter(l => libView(l).meDeben), pagar = activeLibs.filter(l => !libView(l).meDeben);
     const sumMine = cobrar.reduce((t, l) => t + libView(l).saldo, 0);
@@ -1312,10 +1290,9 @@ class Component extends DCLogic {
       agendaOn: !s.openCuaderno && s.estudioTab === 'agenda',
       cuadListOn: !s.openCuaderno && s.estudioTab === 'cuadernos',
       fileOn: !!s.openCuaderno, segOn: !s.openCuaderno,
-      estudioKicker: s.openCuaderno ? '‹ CUADERNOS' : 'ESTUDIO · ' + misActs.length + ' ACTIVIDADES',
-      estudioKickerColor: s.openCuaderno ? '#CE7F55' : '#8E9AAE',
+      estudioKicker: s.openCuaderno ? 'ESTUDIO · CUADERNO' : 'ESTUDIO · ' + misActs.length + ' ACTIVIDADES',
       estudioTitle: openC ? openC.nombre : 'Estudio',
-      backCuadernos: () => { if (s.openCuaderno) self.setState({ openCuaderno: null }); },
+      cerrarCuaderno: () => self.setState({ openCuaderno: null }),
       segs: [['Agenda', 'agenda'], ['Cuadernos', 'cuadernos']].map(([t, k]) => {
         const on = s.estudioTab === k;
         return { t, bg: on ? '#CE7F55' : 'rgba(255,255,255,.06)', border: on ? '#CE7F55' : 'rgba(255,255,255,.12)', fg: on ? '#0A0E1A' : '#8E9AAE', go: () => self.setState({ estudioTab: k, openCuaderno: null }) };

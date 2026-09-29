@@ -320,7 +320,6 @@
     var g = gesto = {
       x0: x, y0: y, tactil: tactil, estado: 'duda', r: rastreador(),
       hoja: hoja,
-      libreta: hoja ? null : target.closest('[data-libreta]'),
       dias: hoja ? null : target.closest('[data-deslizar-dias]'),
       zona: hoja ? null : target.closest('[data-desplaza]'),
       dia: hoja ? null : target.closest('[data-dia]'),
@@ -346,7 +345,6 @@
       if (g.timer) { clearTimeout(g.timer); g.timer = null; }
 
       if (g.hoja && dy > 0 && ady > adx && g.hoja.scrollTop <= 0) empezarHoja(g);
-      else if (g.libreta && adx > ady) empezarLibreta(g);
       else if (g.dias && adx > ady) empezarDias(g);
       else if (alTope && dy > 0 && ady > adx) empezarJalar(g);
       else { gesto = null; return; }
@@ -417,57 +415,6 @@
       } else {
         moverHoja(h, 0, v.y, v.y < -50 || Math.abs(v.y) > 300 ? LANZADO : SUAVE);
       }
-    };
-  }
-
-  /* ── Libretica: a la derecha salda, a la izquierda borra ─────────── */
-  function empezarLibreta(g) {
-    var tarjeta = g.libreta, carril = tarjeta.parentElement;
-    var id = tarjeta.getAttribute('data-libreta');
-    var borrable = tarjeta.getAttribute('data-borrable') === 'true';
-    var verde = carril.querySelector(':scope > [data-accion="saldar"]');
-    var rojo = carril.querySelector(':scope > [data-accion="borrar"]');
-    var ancho = tarjeta.offsetWidth || 1;
-    g.estado = 'activo';
-    if (tarjeta.__anim) tarjeta.__anim.parar();
-    var base = tarjeta.__x || 0;
-
-    function poner(x) {
-      tarjeta.__x = x;
-      fijar(tarjeta, { transform: 'translate3d(' + x.toFixed(2) + 'px,0,0)' });
-      if (verde) fijar(verde, { opacity: String(Math.max(0, Math.min(1, x / 70))) });
-      if (rojo) fijar(rojo, { opacity: String(Math.max(0, Math.min(1, -x / 70))) });
-    }
-    function limpiar() {
-      tarjeta.__x = 0;
-      fijar(tarjeta, { transform: null });
-      // Las capas de acción nacen con opacity:0 en la plantilla: se deja ese
-      // valor en vez de borrarlo (borrarlo las mostraría hasta el redibujo).
-      [verde, rojo].forEach(function (capa) {
-        if (!capa) return;
-        capa.style.opacity = '0';
-        if (capa.__fijo) delete capa.__fijo.opacity;
-      });
-    }
-    // Tras la acción la lista cambia; se limpia justo después de redibujar
-    // para que la tarjeta vecina no herede el desplazamiento.
-    function salirYHacer(hasta, v, accion) {
-      animar(tarjeta, {
-        desde: tarjeta.__x, hasta: hasta, velocidad: v, amortiguamiento: 1, respuesta: 0.28, paso: poner,
-        fin: function () { accion(); trasRedibujo(limpiar); },
-      });
-    }
-
-    g.mover = function (dx) {
-      var x = base + dx;
-      if (x < 0 && !borrable) x = goma(x, ancho) * 0.35;
-      poner(x);
-    };
-    g.fin = function (v) {
-      var x = tarjeta.__x || 0, destino = x + proyectar(v.x);
-      if (destino > ancho * 0.4 && app()) salirYHacer(ancho * 1.1, v.x, function () { app().saldarLibreta(id); });
-      else if (destino < -ancho * 0.4 && borrable && app()) salirYHacer(-ancho * 1.1, v.x, function () { app().borrarLibreta(id); });
-      else animar(tarjeta, { desde: x, hasta: 0, velocidad: v.x, amortiguamiento: LANZADO.amortiguamiento, respuesta: LANZADO.respuesta, paso: poner, fin: limpiar });
     };
   }
 
