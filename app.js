@@ -44,7 +44,11 @@ const DAY_COLOR = { Espalda: '#4B7BE5', Pecho: '#E05C5C', Pierna: '#5EA37D', Hom
 const MONTHS = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
 const MONTHS_SH = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
 const DOW_SH = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
-const TIPOS = ['Quiz', 'Seguimiento', 'Parcial', 'Final', 'Tarea'];
+// Tipos de actividad de una cuenta nueva. Cada quien crea, renombra o borra los suyos.
+const TIPOS_BASE = [
+  { nombre: 'Quiz', urgencia: true }, { nombre: 'Seguimiento', urgencia: true }, { nombre: 'Parcial', urgencia: true },
+  { nombre: 'Final', urgencia: true }, { nombre: 'Tarea', urgencia: false },
+];
 
 const DIA_LARGO = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 // Colores para grupos nuevos (los 4 primeros son los de siempre).
@@ -118,6 +122,21 @@ function cap(t) { t = String(t || ''); return t ? t.charAt(0).toUpperCase() + t.
 function tierDe(e) { return /^[A-ZÁÉÍÓÚ]+$/.test(e.type || '') ? (TIER[e.name] || cap(e.type)) : (e.type || ''); }
 function abreviar(nombre) { return String(nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 6) || 'GRUPO'; }
 function cuenta(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
+/** Lista de tipos del perfil, limpia (sin repetidos ni vacíos); la base si no hay. */
+function tiposDe(p) {
+  const x = p && Array.isArray(p.tipos) ? p.tipos : null;
+  if (!x) return TIPOS_BASE;
+  const vistos = new Set(), out = [];
+  x.forEach(t => {
+    const nombre = t && typeof t.nombre === 'string' ? t.nombre.trim().slice(0, 30) : '';
+    if (!nombre || vistos.has(norm(nombre))) return;
+    vistos.add(norm(nombre));
+    out.push({ nombre, urgencia: t.urgencia !== false });
+  });
+  return out.length ? out.slice(0, 30) : TIPOS_BASE;
+}
+/** ¿La actividad usa colores de urgencia? (una copia vieja no lo trae: la Tarea no). */
+function conUrg(a) { return a.urg === undefined ? a.tipo !== 'Tarea' : a.urg !== false; }
 function primerNombre(n) { return String(n || '').trim().split(/\s+/)[0] || 'tu amigo'; }
 // Semana empezando en lunes (índices de día: 0 = domingo).
 const DIAS_LUNES = [1, 2, 3, 4, 5, 6, 0];
@@ -221,6 +240,7 @@ class Component extends DCLogic {
       invRutinas: [], verRutina: null,
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false,
       push: '', pushBusy: false, pushMsg: '',
+      tipoEd: null,   // editor de un tipo de actividad (Modo edición)
     });
     this.invPorBorrar = new Set();
     // Si la app se abrió desde una notificación, a dónde hay que ir.
@@ -697,7 +717,7 @@ class Component extends DCLogic {
 
   /* ── Lo que piden los gestos y animaciones (fluido.js) ───────────── */
   cerrarHoja(tipo, yaAnimado) {
-    const cerrar = () => this.setState(st => tipo === 'modal' ? { modal: null }
+    const cerrar = () => this.setState(st => tipo === 'modal' ? { modal: null, tipoEd: null }
       : tipo === 'rutina' ? { rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null }
       : tipo === 'ver' ? { verRutina: null }
       : {
@@ -1185,6 +1205,125 @@ class Component extends DCLogic {
     };
   }
 
+  /* ── Tipos de actividad propios ──────────────────────────────────── */
+
+  tipoError(error) { this.setState(st => st.tipoEd ? { tipoEd: { ...st.tipoEd, error } } : null); }
+
+  /** Crea el tipo o guarda el nombre y la urgencia de uno existente. Un
+   *  cambio de nombre o urgencia también llega a mis actividades de ese tipo. */
+  guardarTipo() {
+    const s = this.state, te = s.tipoEd, me = this.uid;
+    if (!te) return;
+    const nombre = te.nombre.trim().replace(/\s+/g, ' ');
+    const lista = tiposDe(s.profile);
+    if (!nombre) return this.tipoError('Escribe un nombre para el tipo.');
+    if (nombre.length > 30) return this.tipoError('Máximo 30 letras.');
+    const igual = lista.find(x => norm(x.nombre) === norm(nombre) && x.nombre !== te.original);
+    if (igual) return this.tipoError('Ya tienes un tipo llamado «' + igual.nombre + '».');
+    const aviso = (txt, deshacer) => { if (window.Fluido) Fluido.aviso(txt, deshacer ? 'Deshacer' : '', deshacer || null, null); };
+
+    if (te.modo === 'nuevo') {
+      if (lista.length >= 30) return this.tipoError('Puedes tener hasta 30 tipos.');
+      const tipos = lista.concat([{ nombre, urgencia: te.urgencia }]);
+      this.setState(st => ({
+        profile: { ...st.profile, tipos },
+        modal: st.modal ? { ...st.modal, tipo: nombre, urg: te.urgencia } : st.modal,
+        tipoEd: { modo: 'editar', original: nombre, nombre, urgencia: te.urgencia, error: '' },
+      }));
+      aviso('Tipo «' + nombre + '» creado');
+      return;
+    }
+
+    const orig = te.original, antes = lista.find(x => x.nombre === orig);
+    if (!antes) { this.setState({ tipoEd: null }); return; }
+    if (antes.nombre === nombre && antes.urgencia === te.urgencia) return this.tipoError('No hay cambios para guardar.');
+    const tipos = lista.map(x => x.nombre === orig ? { nombre, urgencia: te.urgencia } : x);
+    const mias = a => a.tipo === orig && (!a.owner || a.owner === me);
+    const previas = s.acts.filter(mias).map(a => ({ id: a.id, tipo: a.tipo, urg: a.urg }));
+    this.setState(st => ({
+      profile: { ...st.profile, tipos },
+      acts: st.acts.map(a => mias(a) ? { ...a, tipo: nombre, urg: te.urgencia } : a),
+      modal: st.modal && st.modal.tipo === orig ? { ...st.modal, tipo: nombre, urg: te.urgencia } : st.modal,
+      tipoEd: { modo: 'editar', original: nombre, nombre, urgencia: te.urgencia, error: '' },
+    }));
+    aviso('Tipo actualizado' + (previas.length ? ' · ' + cuenta(previas.length, 'actividad', 'actividades') : ''), () => {
+      const prev = {};
+      previas.forEach(p => { prev[p.id] = p; });
+      this.setState(st => ({
+        profile: { ...st.profile, tipos: lista },
+        acts: st.acts.map(a => prev[a.id] ? { ...a, tipo: prev[a.id].tipo, urg: prev[a.id].urg } : a),
+        modal: st.modal && st.modal.tipo === nombre ? { ...st.modal, tipo: orig, urg: antes.urgencia } : st.modal,
+        tipoEd: null,
+      }));
+    });
+  }
+
+  /** Borra el tipo de la lista; las actividades que ya lo usan lo conservan. */
+  borrarTipo(nombre) {
+    const lista = tiposDe(this.state.profile);
+    if (lista.length <= 1 || !lista.some(x => x.nombre === nombre)) return;
+    const tipos = lista.filter(x => x.nombre !== nombre);
+    this.setState(st => ({
+      profile: { ...st.profile, tipos },
+      tipoEd: null,
+      // Una actividad nueva pasa al primer tipo; una existente conserva el suyo.
+      modal: st.modal && !st.modal.id && st.modal.tipo === nombre ? { ...st.modal, tipo: tipos[0].nombre, urg: tipos[0].urgencia } : st.modal,
+    }));
+    if (window.Fluido) {
+      Fluido.aviso('Tipo «' + nombre + '» borrado', 'Deshacer', () => this.setState(st => ({ profile: { ...st.profile, tipos: lista } })), null);
+    }
+  }
+
+  /** Fila Tipo de la ventana de actividad; con Modo edición, más su editor. */
+  valsTipos(s) {
+    const self = this, m = s.modal;
+    if (!m) return { tipos: [], tipoNuevoOn: false, tipoEdOn: false };
+    const lista = tiposDe(s.profile);
+    const chips = lista.slice();
+    // Un tipo que ya no está en mi lista (borrado, o de un amigo) sigue visible en su actividad.
+    if (m.tipo && !lista.some(x => x.nombre === m.tipo)) chips.push({ nombre: m.tipo, urgencia: m.urg !== false, ajeno: true });
+    const edit = !!s.edit, te = edit ? s.tipoEd : null;
+    const chip = on => ({ bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE' });
+    const vals = {
+      tiposLabel: edit ? 'TIPO · TOCA UNO PARA EDITARLO' : 'TIPO',
+      tipos: chips.map(x => Object.assign({
+        t: x.nombre,
+        pick: () => self.setState(st => ({
+          modal: { ...st.modal, tipo: x.nombre, urg: x.urgencia },
+          tipoEd: st.edit && !x.ajeno ? { modo: 'editar', original: x.nombre, nombre: x.nombre, urgencia: x.urgencia, error: '' } : null,
+        })),
+      }, chip(m.tipo === x.nombre))),
+      tipoNuevoOn: edit,
+      tipoNuevo: () => self.setState({ tipoEd: { modo: 'nuevo', original: null, nombre: '', urgencia: true, error: '' } }),
+      tipoNuevoBorde: te && te.modo === 'nuevo' ? 'rgba(206,127,85,.7)' : 'rgba(206,127,85,.38)',
+      tipoEdOn: !!te,
+    };
+    if (!te) return vals;
+    const antes = te.modo === 'editar' ? lista.find(x => x.nombre === te.original) : null;
+    const listo = te.modo === 'nuevo'
+      ? !!te.nombre.trim()
+      : !!antes && !!te.nombre.trim() && (te.nombre.trim() !== antes.nombre || te.urgencia !== antes.urgencia);
+    return Object.assign(vals, {
+      tipoEdTitulo: te.modo === 'nuevo' ? 'NUEVO TIPO' : 'EDITAR «' + te.original.toUpperCase() + '»',
+      tipoEdNombre: te.nombre,
+      onTipoEdNombre: ev => { const v = ev.target.value; self.setState(st => st.tipoEd ? { tipoEd: { ...st.tipoEd, nombre: v, error: '' } } : null); },
+      tipoUrgOpciones: [['Con urgencia', true], ['Sin urgencia', false]].map(([t, v]) => Object.assign({
+        t, pick: () => self.setState(st => st.tipoEd ? { tipoEd: { ...st.tipoEd, urgencia: v, error: '' } } : null),
+      }, chip(te.urgencia === v))),
+      tipoEdNota: te.urgencia
+        ? 'Se colorea según qué tan cerca está la fecha, como un Quiz.'
+        : 'Siempre en gris, sin importar la fecha, como una Tarea.',
+      tipoEdCta: te.modo === 'nuevo' ? 'Crear tipo' : 'Guardar',
+      tipoEdCtaBg: listo ? '#CE7F55' : 'rgba(206,127,85,.18)',
+      tipoEdCtaFg: listo ? '#0A0E1A' : 'rgba(206,127,85,.6)',
+      tipoEdGuardar: () => self.guardarTipo(),
+      tipoEdBorrarOn: te.modo === 'editar' && lista.length > 1,
+      tipoEdBorrar: () => self.borrarTipo(te.original),
+      tipoEdCerrar: () => self.setState({ tipoEd: null }),
+      tipoEdError: te.error,
+    });
+  }
+
   /* ── Respaldo ────────────────────────────────────────────────────── */
   // Dos pasos (preparar, luego descargar) porque el navegador solo deja
   // descargar o compartir justo después de un toque del usuario.
@@ -1275,8 +1414,8 @@ class Component extends DCLogic {
     });
 
     const nuevasActs = (v.acts || [])
-      .filter(a => TIPOS.includes(a.tipo) && /^\d{4}-\d{2}-\d{2}$/.test(a.fecha))
-      .map(a => ({ id: Nube.uuid(), c: mapa[a.c] || null, tipo: a.tipo, fecha: a.fecha,
+      .filter(a => typeof a.tipo === 'string' && a.tipo.trim() && /^\d{4}-\d{2}-\d{2}$/.test(a.fecha))
+      .map(a => ({ id: Nube.uuid(), c: mapa[a.c] || null, tipo: a.tipo.trim().slice(0, 30), urg: a.tipo !== 'Tarea', fecha: a.fecha,
                    asunto: a.asunto || [], owner: uid, por: null, nota: '' }));
 
     const nuevasLibs = (v.libs || []).map(l => ({
@@ -1351,11 +1490,11 @@ class Component extends DCLogic {
     const d = this.state.days[i], t = d.ex.reduce((a, e) => a + e.sets, 0);
     return t ? d.ex.reduce((a, e) => a + e.done.filter(Boolean).length, 0) / t : 0;
   }
-  impor(tipo) { return (tipo === 'Final' || tipo === 'Parcial') ? 'ALTA' : (tipo === 'Tarea' ? 'BAJA' : 'MEDIA'); }
+  impor(a) { return !conUrg(a) ? 'BAJA' : ((a.tipo === 'Final' || a.tipo === 'Parcial') ? 'ALTA' : 'MEDIA'); }
 
-  urg(tipo, fecha) {
-    if (tipo === 'Tarea') return { color: GREY, tint: 'rgba(142,154,174,.14)', label: 'TAREA' };
-    const d = dayDiff(TODAY, fecha);
+  urg(a) {
+    if (!conUrg(a)) return { color: GREY, tint: 'rgba(142,154,174,.14)', label: 'SIN URGENCIA' };
+    const d = dayDiff(TODAY, a.fecha);
     if (d <= 2) return { color: RED, tint: 'rgba(196,100,97,.14)', label: 'CRÍTICO' };
     if (d <= 4) return { color: AMBER, tint: 'rgba(206,127,85,.14)', label: 'PRÓXIMO' };
     if (d <= 10) return { color: MINT_D, tint: 'rgba(46,204,113,.14)', label: '1 SEMANA' };
@@ -1497,7 +1636,7 @@ class Component extends DCLogic {
       const sel = s.selDay === d;
       const isToday = dISO === TODAY;
       cells.push({
-        n: String(d), dots: dayActs.slice(0, 3).map(a => ({ c: self.urg(a.tipo, a.fecha).color })),
+        n: String(d), dots: dayActs.slice(0, 3).map(a => ({ c: self.urg(a).color })),
         bg: sel ? 'rgba(255,255,255,.1)' : (dayActs.length ? 'rgba(255,255,255,.04)' : 'transparent'),
         border: sel ? 'rgba(255,255,255,.35)' : (isToday ? 'rgba(87,185,160,.5)' : 'transparent'),
         fg: isToday ? MINT : (dayActs.length ? '#fff' : '#8E9AAE'),
@@ -1505,24 +1644,24 @@ class Component extends DCLogic {
       });
     }
     const acts = monthAll.slice().sort((a, b) => a.fecha < b.fecha ? -1 : 1).map(a => {
-      const u = self.urg(a.tipo, a.fecha);
-      const ajena = a.owner && a.owner !== me;
+      const u = self.urg(a);
+      const ajena = a.owner && a.owner !== me, cn = cuadNombre(a);
       return {
         tipo: a.tipo.toUpperCase(), color: u.color, tint: u.tint,
-        plazo: a.tipo === 'Tarea' ? 'TAREA' : self.plazo(a.fecha),
+        plazo: self.plazo(a.fecha),
         fechaTxt: self.fechaTxt(a.fecha) + ' · ' + s.year,
         asuntos: a.asunto.map(t => ({ t })),
-        cuad: cuadNombre(a),
+        cuad: cn ? '· ' + cn : '',
         tag: ajena ? 'PARA ' + nombreDe(a.owner).toUpperCase() : (a.por ? 'DE ' + nombreDe(a.por).toUpperCase() : ''),
         op: ajena ? 0.6 : 1,
-        edit: () => self.setState({ modal: { id: a.id, c: a.c, tipo: a.tipo, fecha: a.fecha, asunto: a.asunto.slice(), tema: '', para: a.owner || me, por: a.por } }),
+        edit: () => self.setState({ tipoEd: null, modal: { id: a.id, c: a.c, tipo: a.tipo, urg: conUrg(a), fecha: a.fecha, asunto: a.asunto.slice(), tema: '', para: a.owner || me, por: a.por } }),
       };
     });
 
     const m = s.modal;
     const mPara = m ? (m.para || me) : me;
     const mCuads = mPara === me ? s.cuadernos : (s.cuadAmigos[mPara] || []);
-    let mCells = [], mUrg = { color: GREY, tint: 'rgba(142,154,174,.14)', label: 'TAREA' };
+    let mCells = [], mUrg = { color: GREY, tint: 'rgba(142,154,174,.14)', label: 'SIN URGENCIA' };
     if (m) {
       const mp = m.fecha.split('-'), my = +mp[0], mm = +mp[1] - 1;
       const ml = (new Date(my, mm, 1).getDay() + 6) % 7, mdim = new Date(my, mm + 1, 0).getDate();
@@ -1535,10 +1674,10 @@ class Component extends DCLogic {
           select: () => self.setState(st => ({ modal: { ...st.modal, fecha: dISO } })),
         });
       }
-      mUrg = self.urg(m.tipo, m.fecha);
+      mUrg = self.urg({ tipo: m.tipo, fecha: m.fecha, urg: m.urg });
     }
     const urgNotes = {
-      TAREA: 'Las tareas siempre se muestran en gris, sin importar la fecha.',
+      'SIN URGENCIA': 'Este tipo se muestra en gris, sin importar la fecha.',
       CRÍTICO: '2 días o menos de anticipación. Rojo.',
       PRÓXIMO: '4 días de anticipación. Naranja.',
       '1 SEMANA': '1 semana de anticipación. Verde oscuro.',
@@ -1636,12 +1775,12 @@ class Component extends DCLogic {
     const pendAll = misActs.filter(a => dayDiff(TODAY, a.fecha) >= 0);
     const impRank = { ALTA: 0, MEDIA: 1, BAJA: 2 };
     const urgentAcad = pendAll.slice()
-      .sort((a, b) => (dayDiff(TODAY, a.fecha) - dayDiff(TODAY, b.fecha)) || (impRank[self.impor(a.tipo)] - impRank[self.impor(b.tipo)]))
+      .sort((a, b) => (dayDiff(TODAY, a.fecha) - dayDiff(TODAY, b.fecha)) || (impRank[self.impor(a)] - impRank[self.impor(b)]))
       .slice(0, 4)
       .map(a => {
-        const u = self.urg(a.tipo, a.fecha), cn = (s.cuadernos.find(c => c.id === a.c) || {}).nombre || '';
+        const u = self.urg(a), cn = (s.cuadernos.find(c => c.id === a.c) || {}).nombre || '';
         return {
-          badge: a.tipo.toUpperCase(), color: u.color, tint: u.tint, imp: 'IMP. ' + self.impor(a.tipo),
+          badge: a.tipo.toUpperCase(), color: u.color, tint: u.tint, imp: 'IMP. ' + self.impor(a),
           title: a.asunto[0] || 'Sin temas', meta: cn.toUpperCase(),
           right: self.fechaTxt(a.fecha), plazo: self.plazo(a.fecha),
           go: () => self.setState({ tab: 'estudio', estudioTab: 'agenda', openCuaderno: null, month: +a.fecha.split('-')[1] - 1, selDay: +a.fecha.split('-')[2] }),
@@ -1670,10 +1809,10 @@ class Component extends DCLogic {
       b.fg = b.i === 0 ? AMBER : '#8E9AAE';
     });
     const nextUp = pendAll.slice().sort((a, b) => dayDiff(TODAY, a.fecha) - dayDiff(TODAY, b.fecha))[0];
-    const nUrg = nextUp ? self.urg(nextUp.tipo, nextUp.fecha) : { color: GREY, tint: 'rgba(142,154,174,.14)' };
-    const nextA = misActs.filter(a => a.tipo !== 'Tarea' && dayDiff(TODAY, a.fecha) >= 0)
+    const nUrg = nextUp ? self.urg(nextUp) : { color: GREY, tint: 'rgba(142,154,174,.14)' };
+    const nextA = misActs.filter(a => conUrg(a) && dayDiff(TODAY, a.fecha) >= 0)
       .sort((a, b) => dayDiff(TODAY, a.fecha) - dayDiff(TODAY, b.fecha))[0];
-    const nu = nextA ? self.urg(nextA.tipo, nextA.fecha) : { color: GREY, tint: 'rgba(142,154,174,.14)' };
+    const nu = nextA ? self.urg(nextA) : { color: GREY, tint: 'rgba(142,154,174,.14)' };
     const nc = nextA ? s.cuadernos.find(c => c.id === nextA.c) : null;
 
     const tabDefs = [[ 'Ejercicio', 'ejercicio', ['8px','14px','18px'] ], [ 'Estudio', 'estudio', ['16px','16px','16px'] ], [ 'Finanzas', 'finanzas', ['18px','10px','14px'] ]];
@@ -1747,10 +1886,13 @@ class Component extends DCLogic {
       actsLabel: monthActs.length + ' ACTIVIDADES · ' + MONTHS_SH[s.month],
       prevMonth: () => self.setState(st => ({ month: st.month === 0 ? 11 : st.month - 1, year: st.month === 0 ? st.year - 1 : st.year })),
       nextMonth: () => self.setState(st => ({ month: st.month === 11 ? 0 : st.month + 1, year: st.month === 11 ? st.year + 1 : st.year })),
-      legend: [{ c: '#7FD3BC', t: '+1.5 sem' }, { c: MINT_D, t: '1 sem' }, { c: AMBER, t: '4 días' }, { c: RED, t: '≤2 días' }, { c: GREY, t: 'Tarea' }].map(x => x),
+      legend: [{ c: '#7FD3BC', t: '+1.5 sem' }, { c: MINT_D, t: '1 sem' }, { c: AMBER, t: '4 días' }, { c: RED, t: '≤2 días' }, { c: GREY, t: 'Sin urgencia' }].map(x => x),
 
-      openModal: () => self.setState({ modal: { id: null, c: s.cuadernos[0] ? s.cuadernos[0].id : null, tipo: 'Quiz', fecha: iso(s.year, s.month, s.selDay), asunto: [], tema: '', para: me, por: null } }),
-      modalCuads: mCuads.map(c => ({
+      openModal: () => {
+        const t0 = tiposDe(s.profile)[0];
+        self.setState({ tipoEd: null, modal: { id: null, c: s.cuadernos[0] ? s.cuadernos[0].id : null, tipo: t0.nombre, urg: t0.urgencia, fecha: iso(s.year, s.month, s.selDay), asunto: [], tema: '', para: me, por: null } });
+      },
+      modalCuads: mCuads.concat([{ id: null, nombre: 'Sin cuaderno' }]).map(c => ({
         t: c.nombre, pick: () => self.setState(st => ({ modal: { ...st.modal, c: c.id } })),
         bg: m && m.c === c.id ? '#fff' : 'rgba(255,255,255,.05)',
         border: m && m.c === c.id ? '#fff' : 'rgba(255,255,255,.09)',
@@ -1758,8 +1900,8 @@ class Component extends DCLogic {
       })),
       modalSinCuads: !!m && mCuads.length === 0,
       modalSinCuadsTxt: mPara === me
-        ? 'Aún no tienes cuadernos. Puedes crearla así o crear uno en Estudio › Cuadernos.'
-        : nombreDe(mPara) + ' no tiene cuadernos; la actividad quedará sin cuaderno.',
+        ? 'Aún no tienes cuadernos. Puedes crear uno en Estudio › Cuadernos.'
+        : nombreDe(mPara) + ' no tiene cuadernos.',
       modalParaOn: !!(m && !m.id && amigosOk.length),
       modalPara: [{ t: 'Mí', id: me }].concat(amigosOk.map(a => ({ t: a.nombre, id: a.id }))).map(p => {
         const on = mPara === p.id;
@@ -1785,19 +1927,14 @@ class Component extends DCLogic {
       modalTema: m ? m.tema : '', modalTemas: m ? m.asunto.map((t, i) => ({ t, remove: () => self.setState(st => ({ modal: { ...st.modal, asunto: st.modal.asunto.filter((_, k) => k !== i) } })) })) : [],
       onTema: ev => { const v = ev.target.value; self.setState(st => ({ modal: { ...st.modal, tema: v } })); },
       addTema: () => self.setState(st => st.modal.tema.trim() ? ({ modal: { ...st.modal, asunto: st.modal.asunto.concat([st.modal.tema.trim()]), tema: '' } }) : null),
-      tipos: TIPOS.map(t => ({
-        t, pick: () => self.setState(st => ({ modal: { ...st.modal, tipo: t } })),
-        bg: m && m.tipo === t ? '#fff' : 'rgba(255,255,255,.05)',
-        border: m && m.tipo === t ? '#fff' : 'rgba(255,255,255,.09)',
-        fg: m && m.tipo === t ? '#090C14' : '#8E9AAE',
-      })),
+      ...self.valsTipos(s),
       // Se guarda al instante; la hoja se va con su animación y luego se cierra.
       saveAct: () => {
         self.setState(st => {
           const mm = st.modal;
-          if (mm.id) return { acts: st.acts.map(a => a.id === mm.id ? { ...a, c: mm.c, tipo: mm.tipo, fecha: mm.fecha, asunto: mm.asunto } : a) };
+          if (mm.id) return { acts: st.acts.map(a => a.id === mm.id ? { ...a, c: mm.c, tipo: mm.tipo, urg: mm.urg !== false, fecha: mm.fecha, asunto: mm.asunto } : a) };
           const para = mm.para || me;
-          return { acts: st.acts.concat([{ id: Nube.uuid(), c: mm.c, tipo: mm.tipo, fecha: mm.fecha, asunto: mm.asunto.length ? mm.asunto : ['Sin temas'],
+          return { acts: st.acts.concat([{ id: Nube.uuid(), c: mm.c, tipo: mm.tipo, urg: mm.urg !== false, fecha: mm.fecha, asunto: mm.asunto.length ? mm.asunto : ['Sin temas'],
                                             owner: para, por: para === me ? null : me, nota: '' }]) };
         });
         self.cerrarHoja('modal');

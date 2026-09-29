@@ -109,12 +109,12 @@
    * ---------------------------------------------------------------- */
   async function cargar(uid) {
     var q = await Promise.all([
-      sb.from('perfiles').select('nombre,altura,peso,sexo,codigo,hora_recordatorio,zona_horaria,avisos_leidos_hasta').eq('id', uid).single(),
+      sb.from('perfiles').select('nombre,altura,peso,sexo,codigo,hora_recordatorio,zona_horaria,avisos_leidos_hasta,tipos_actividad').eq('id', uid).single(),
       // Trae mis cuadernos y los de mis amigos (para asignarles actividades).
       sb.from('cuadernos').select('id,user_id,nombre,orden,creado_en').order('orden').order('creado_en'),
       sb.from('archivos').select('id,cuaderno_id,nombre,tamano,creado_en').eq('user_id', uid).order('creado_en'),
       // Las mias y las que yo asigne a amigos.
-      sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota').order('fecha'),
+      sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,con_urgencia').order('fecha'),
       sb.from('sesiones').select('fecha,grupo,abbr,dia,ejercicios,grupo_id').eq('user_id', uid).gte('fecha', haceDias(120)),
       // Las que cree y las que otra persona compartio conmigo.
       sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,nota,vence_el,creado_en').order('creado_en', { ascending: false }),
@@ -150,7 +150,7 @@
 
     var acts = q[3].data.map(function (a) {
       return { id: a.id, c: a.cuaderno_id, tipo: a.tipo, fecha: a.fecha, asunto: a.asunto || [],
-               owner: a.user_id, por: a.asignado_por, nota: a.nota || '' };
+               owner: a.user_id, por: a.asignado_por, nota: a.nota || '', urg: a.con_urgencia !== false };
     });
 
     var logs = {};
@@ -179,7 +179,8 @@
 
     return {
       profile: { nombre: perfil.nombre || '', altura: perfil.altura || '', peso: perfil.peso || '', sexo: perfil.sexo || '',
-                 hora: perfil.hora_recordatorio == null ? 19 : perfil.hora_recordatorio, zona: perfil.zona_horaria || '' },
+                 hora: perfil.hora_recordatorio == null ? 19 : perfil.hora_recordatorio, zona: perfil.zona_horaria || '',
+                 tipos: Array.isArray(perfil.tipos_actividad) ? perfil.tipos_actividad : null },
       avisosLeidos: perfil.avisos_leidos_hasta || null,
       avisos: (q[11].data || []).map(function (a) {
         return { id: a.id, tipo: a.tipo, titulo: a.titulo, cuerpo: a.cuerpo || '', ref: a.ref, fecha: a.fecha, creado: a.creado_en };
@@ -217,6 +218,7 @@
     // (una copia local vieja no las trae y no debe pisar las de verdad).
     if (typeof p.hora === 'number') perfil.hora_recordatorio = p.hora;
     if (p.zona) perfil.zona_horaria = p.zona;
+    if (Array.isArray(p.tipos) && p.tipos.length) perfil.tipos_actividad = p.tipos;
     t.perfiles[uid] = perfil;
 
     (d.cuadernos || []).forEach(function (c, i) {
@@ -233,6 +235,9 @@
     (d.acts || []).forEach(function (a) {
       t.actividades[a.id] = { id: a.id, user_id: a.owner || uid, cuaderno_id: a.c || null, tipo: a.tipo,
                               fecha: a.fecha, asunto: a.asunto || [], asignado_por: a.por || null, nota: a.nota || '' };
+      // La urgencia solo viaja si se leyó del servidor o se eligió aquí: una copia
+      // local vieja no la trae y no debe pisar la que el servidor ya tiene.
+      if (a.urg !== undefined) t.actividades[a.id].con_urgencia = !!a.urg;
     });
 
     Object.keys(d.sesiones || {}).forEach(function (fecha) {
@@ -553,7 +558,7 @@
       sb.from('perfiles').select('nombre,altura,peso,sexo,codigo,creado_en').eq('id', uid).single(),
       sb.from('cuadernos').select('id,nombre,orden,creado_en').eq('user_id', uid).order('orden'),
       sb.from('archivos').select('id,cuaderno_id,nombre,tamano,creado_en').eq('user_id', uid).order('creado_en'),
-      sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,creado_en').order('fecha'),
+      sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,con_urgencia,creado_en').order('fecha'),
       // Todo el historial del gimnasio, no solo los ultimos 120 dias.
       sb.from('sesiones').select('fecha,grupo,abbr,dia,ejercicios,actualizado_en').eq('user_id', uid).order('fecha'),
       sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,pagado_en,nota,vence_el,creado_en,actualizado_en').order('creado_en'),

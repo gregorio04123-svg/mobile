@@ -485,7 +485,7 @@
             </div>
             <div style="display:flex;align-items:baseline;gap:9px;margin-top:11px">
               <div style="font:700 14px/1.2 Manrope,sans-serif">{{ a.fechaTxt }}</div>
-              <div style="font:600 11px/1.2 Manrope,sans-serif;color:#8E9AAE;min-width:0">· {{ a.cuad }}</div>
+              <div style="font:600 11px/1.2 Manrope,sans-serif;color:#8E9AAE;min-width:0">{{ a.cuad }}</div>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
               <sc-for list="{{ a.asuntos }}" as="t" hint-placeholder-count="2">
@@ -799,12 +799,39 @@
       <sc-if value="{{ modalSinCuads }}">
         <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE">{{ modalSinCuadsTxt }}</div>
       </sc-if>
-      <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:20px 0 10px">TIPO</div>
+      <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:20px 0 10px">{{ tiposLabel }}</div>
       <div style="display:flex;flex-wrap:wrap;gap:7px">
         <sc-for list="{{ tipos }}" as="tp" hint-placeholder-count="5">
           <div sc-camel-on-click="{{ tp.pick }}" style="padding:12px 14px;border-radius:11px;cursor:pointer;font:700 12px/1 Manrope,sans-serif;background:{{ tp.bg }};border:1px solid {{ tp.border }};color:{{ tp.fg }}" style-active="transform:translateY(1px)">{{ tp.t }}</div>
         </sc-for>
+        <sc-if value="{{ tipoNuevoOn }}">
+          <div sc-camel-on-click="{{ tipoNuevo }}" style="padding:12px 14px;border-radius:11px;cursor:pointer;font:700 12px/1 Manrope,sans-serif;background:rgba(206,127,85,.08);border:1px dashed {{ tipoNuevoBorde }};color:#CE7F55">+ Nuevo tipo</div>
+        </sc-if>
       </div>
+      <sc-if value="{{ tipoEdOn }}">
+        <div style="margin-top:12px;padding:14px;border-radius:14px;background:rgba(206,127,85,.07);border:1px solid rgba(206,127,85,.26)">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <div style="min-width:0;font:700 9px/1.3 Manrope,sans-serif;letter-spacing:.14em;color:#CE7F55;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tipoEdTitulo }}</div>
+            <div sc-camel-on-click="{{ tipoEdCerrar }}" aria-label="Cerrar editor de tipo" style="flex:none;width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 14px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
+          </div>
+          <input value="{{ tipoEdNombre }}" sc-camel-on-change="{{ onTipoEdNombre }}" maxlength="30" placeholder="ej. Salida a comer" autocomplete="off" style="margin-top:10px;width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;font:700 16px Manrope,sans-serif;padding:11px 12px">
+          <div style="display:flex;gap:6px;margin-top:10px">
+            <sc-for list="{{ tipoUrgOpciones }}" as="tu" hint-placeholder-count="2">
+              <div sc-camel-on-click="{{ tu.pick }}" style="flex:1;padding:11px 8px;border-radius:10px;text-align:center;cursor:pointer;font:700 12px/1 Manrope,sans-serif;background:{{ tu.bg }};border:1px solid {{ tu.border }};color:{{ tu.fg }}">{{ tu.t }}</div>
+            </sc-for>
+          </div>
+          <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:8px">{{ tipoEdNota }}</div>
+          <sc-if value="{{ tipoEdError }}">
+            <div style="font:600 11.5px/1.45 Manrope,sans-serif;color:#E08A87;margin-top:8px">{{ tipoEdError }}</div>
+          </sc-if>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <sc-if value="{{ tipoEdBorrarOn }}">
+              <div sc-camel-on-click="{{ tipoEdBorrar }}" style="flex:1;padding:13px;border-radius:10px;text-align:center;cursor:pointer;background:rgba(196,100,97,.08);border:1px solid rgba(196,100,97,.28);font:700 12.5px/1 Manrope,sans-serif;color:#C46461">Borrar tipo</div>
+            </sc-if>
+            <div sc-camel-on-click="{{ tipoEdGuardar }}" style="flex:1.4;padding:13px;border-radius:10px;text-align:center;cursor:pointer;background:{{ tipoEdCtaBg }};font:800 12.5px/1 Manrope,sans-serif;color:{{ tipoEdCtaFg }}">{{ tipoEdCta }}</div>
+          </div>
+        </div>
+      </sc-if>
 
       <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:20px 0 10px">FECHA · {{ modalMonth }}</div>
       <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
@@ -870,7 +897,7 @@
             <div style="flex:1;min-width:0">
               <div style="font:700 13.5px/1.3 Manrope,sans-serif;color:#EDF1F7;text-wrap:pretty">{{ av.titulo }}</div>
               <sc-if value="{{ av.hayCuerpo }}">
-                <div style="font:500 12px/1.4 Manrope,sans-serif;color:#9AA6BA;margin-top:4px;text-wrap:pretty">{{ av.cuerpo }}</div>
+                <div style="font:500 12px/1.45 Manrope,sans-serif;color:#9AA6BA;margin-top:4px;white-space:pre-line;text-wrap:pretty">{{ av.cuerpo }}</div>
               </sc-if>
               <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.1em;color:#4A566B;margin-top:8px">{{ av.cuando }}</div>
             </div>

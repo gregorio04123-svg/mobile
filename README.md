@@ -36,6 +36,8 @@ pilares/
   - **Tu rutina** (botón de la mancuerna, arriba a la izquierda): crear, renombrar, recolorear y borrar grupos; añadir, editar, reordenar y quitar ejercicios.
   - *Modo edición* sobre una tarjeta cambia el ejercicio en su grupo para siempre (los pesos siguen siendo de cada día).
 - **Estudio**: calendario del mes con código de urgencia por color, crear/editar/eliminar actividades, cuadernos y archivos por materia. Un cuaderno abierto se cierra con la **X** de arriba a la izquierda.
+  - **Tipos propios**: además de Quiz, Seguimiento, Parcial, Final y Tarea, cada quien crea los suyos (Cine, Salida a comer, Reunión…). Con *Modo edición* activo, en la fila Tipo de la ventana de actividad: *+ Nuevo tipo*, o tocar uno para renombrarlo, cambiar su urgencia o borrarlo (con *Deshacer*). "Con urgencia" se colorea según qué tan cerca está la fecha; "sin urgencia" va siempre en gris. Renombrar un tipo también cambia tus actividades de ese tipo; borrarlo no toca las que ya lo usan.
+  - El cuaderno es opcional: *Sin cuaderno*.
 - **Finanzas**: libreticas de quién debe a quién, marcar como saldada con el botón *Saldar*, historial y totales. Las saldadas pasan al historial, donde se pueden borrar.
 - **Movimiento y gestos** (criterios de *Designing Fluid Interfaces* de Apple, en `fluido.js`): resortes que arrancan desde donde está cada cosa y heredan la velocidad del dedo; sin rebote salvo cuando se lanza algo con impulso.
   - La ventana de nueva actividad y el panel ⚙ suben desde abajo y se cierran arrastrando hacia abajo o tocando el área oscura.
@@ -50,7 +52,7 @@ pilares/
   - **Ver la rutina de un amigo**: panel ⚙ → Amigos → tocar su nombre. Solo lectura.
 - **Persistencia**: todo se guarda en Supabase y además queda una copia en el teléfono, así abre al instante y funciona sin señal (lo pendiente se sube al volver la conexión). Seguridad por fila: nadie ve datos de otra cuenta salvo lo compartido.
 - **Tiempo real**: lo que haga un amigo (solicitud de amistad, actividad asignada, libretica compartida, abono, rutina enviada) aparece en uno o dos segundos mientras la app está en pantalla. En segundo plano la conexión se suelta y al volver se lee lo que pasó. Plan gratis de Supabase: 200 conexiones simultáneas y 2 millones de mensajes al mes; un círculo de amigos queda muy por debajo.
-- **Avisos y notificaciones**: el botón ⚙ muestra un número rojo con los avisos nuevos, y el panel los lista arriba (tocar uno lleva a su sección). Avisan de:
+- **Avisos y notificaciones**: el botón ⚙ muestra un número rojo con los avisos nuevos, y el panel los lista arriba (tocar uno lleva a su sección). El título es quién lo envía y abajo va de qué se trata (tipo, materia, día y temas; monto y concepto de la libretica; lo que queda por pagar o cobrar tras un abono). Avisan de:
   - **Estudio**: un amigo te asigna una actividad, y un recordatorio el día anterior a cada entrega a la hora que elijas en el panel (por defecto 7:00 p. m.).
   - **Finanzas**: te comparten una libretica, o alguien registra un abono en una compartida.
   - **Ejercicio**: un amigo te envía una rutina.
