@@ -14,8 +14,8 @@ self.addEventListener('push', function (e) {
     // Todo push debe mostrarse (iOS retira el permiso si llegan push "mudos").
     self.registration.showNotification(d.titulo || 'Pilares', {
       body: d.cuerpo || '',
-      icon: 'icon-192.png',
-      badge: 'icon-192.png',
+      icon: 'icon-192.png?v=2',
+      badge: 'icon-192.png?v=2',
       tag: d.id || undefined,
       data: { url: d.url || './' },
     }),
