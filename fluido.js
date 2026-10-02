@@ -277,17 +277,36 @@
   /* ------------------------------------------------------------------
    * 5. Indicador de "jalar para actualizar"
    * ---------------------------------------------------------------- */
-  var indicador = null;
-  var UMBRAL_JALAR = 64, REPOSO_JALAR = 52;
+  // Una orbe (orbe.js): mientras se jala gira con el dedo y crece; al pasar
+  // el umbral arranca a girar sola (ya se puede soltar) y sigue así hasta
+  // que termina de actualizar. Si se devuelve el dedo, vuelve a seguirlo
+  // desde donde va, sin saltos.
+  var indicador = null, orbe = null, baseOrbe = 0;
+  var UMBRAL_JALAR = 64, REPOSO_JALAR = 52, TAM_ORBE = 32, PX_POR_SEG = 45;
 
   function crearIndicador() {
     indicador = doc.createElement('div');
     indicador.className = 'fl-jalar';
     indicador.setAttribute('aria-hidden', 'true');
-    indicador.innerHTML = '<svg viewBox="0 0 28 28" width="28" height="28">' +
-      '<circle cx="14" cy="14" r="10" class="fl-jalar-fondo"></circle>' +
-      '<circle cx="14" cy="14" r="10" class="fl-jalar-arco" transform="rotate(-90 14 14)"></circle></svg>';
+    orbe = doc.createElement('pilares-orbe');
+    orbe.setAttribute('tam', String(TAM_ORBE));
+    orbe.setAttribute('estado', 'searching');
+    orbe.tiempo = 0;
+    indicador.appendChild(orbe);
     doc.body.appendChild(indicador);
+  }
+
+  function ocultarIndicador() {
+    indicador.style.display = 'none';
+    indicador.classList.remove('fl-gira');
+    baseOrbe = 0;
+    orbe.tiempo = 0;
+  }
+
+  function girarIndicador() {
+    indicador.classList.add('fl-gira');
+    indicador.style.transform = '';
+    orbe.tiempo = null;   // corre sola desde donde la dejó el dedo
   }
 
   function colocarIndicador(zona) {
@@ -296,17 +315,19 @@
     var rz = zona.getBoundingClientRect();
     var tope = cab ? cab.getBoundingClientRect().bottom : rz.top;
     indicador.__tope = tope;
-    indicador.style.left = (rz.left + rz.width / 2 - 14) + 'px';
+    indicador.style.left = (rz.left + rz.width / 2 - TAM_ORBE / 2) + 'px';
     indicador.style.display = 'block';
   }
 
   function ponerIndicador(d) {
     var p = Math.max(0, Math.min(1, d / UMBRAL_JALAR));
-    indicador.style.top = (indicador.__tope + Math.max(0, d / 2 - 14)).toFixed(1) + 'px';
+    indicador.style.top = (indicador.__tope + Math.max(0, d / 2 - TAM_ORBE / 2)).toFixed(1) + 'px';
     indicador.style.opacity = String(Math.min(1, d / 28));
-    var arco = indicador.querySelector('.fl-jalar-arco');
-    if (!indicador.classList.contains('fl-gira')) arco.style.strokeDashoffset = String(62.83 * (1 - p * 0.85));
-    indicador.classList.toggle('fl-listo', p >= 1);
+    if (indicador.classList.contains('fl-gira')) return;
+    indicador.style.transform = 'scale(' + (0.55 + 0.45 * p).toFixed(3) + ')';
+    if (p >= 1) { orbe.tiempo = null; return; }                       // lista: gira sola
+    if (orbe.tiempo == null) baseOrbe = orbe.instante - d / PX_POR_SEG;  // retoma sin saltar
+    orbe.tiempo = baseOrbe + d / PX_POR_SEG;                            // gira al ritmo del dedo
   }
 
   /* ------------------------------------------------------------------
@@ -556,7 +577,7 @@
     function volver() {
       animar(zona, {
         desde: zona.__d || 0, hasta: 0, amortiguamiento: 1, respuesta: 0.35, paso: poner,
-        fin: function () { indicador.style.display = 'none'; indicador.classList.remove('fl-gira', 'fl-listo'); zona.__actualizando = false; },
+        fin: function () { ocultarIndicador(); zona.__actualizando = false; },
       });
     }
 
@@ -566,7 +587,7 @@
       if (d < UMBRAL_JALAR) { volver(); return; }
       zona.__actualizando = true;
       animar(zona, { desde: d, hasta: REPOSO_JALAR, amortiguamiento: 1, respuesta: 0.3, paso: poner });
-      indicador.classList.add('fl-gira');
+      girarIndicador();
       var inicio = Date.now();
       Promise.resolve()
         .then(function () { return a.refrescar(); })

@@ -430,6 +430,13 @@ class Component extends DCLogic {
         this.enviarMensaje();
       }
     });
+    // El desplazamiento no burbujea: se escucha en captura y se filtra la lista del chat.
+    document.addEventListener('scroll', e => {
+      const t = e.target;
+      if (!t || !t.matches || !t.matches('[data-chat-lista]')) return;
+      this.chatMovidoEn = Date.now();
+      this.revisarAnteriores();
+    }, { capture: true, passive: true });
     if (window.visualViewport) {
       const ajustar = () => this.ajustarTeclado();
       window.visualViewport.addEventListener('resize', ajustar);
@@ -454,6 +461,12 @@ class Component extends DCLogic {
   componentWillUnmount() { clearInterval(this.timer); clearInterval(this.poll); this.desconectarTiempoReal(); }
 
   componentDidUpdate() {
+    if (this.anclaChat != null) {
+      const el = document.querySelector('[data-chat-lista]');
+      if (el) el.scrollTop += el.scrollHeight - this.anclaChat;
+      this.anclaChat = null;
+      setTimeout(() => this.revisarAnteriores(), 0);   // si aún se ve el principio, sigue trayendo
+    }
     if (this.bajarPend) {
       const el = document.querySelector('[data-chat-lista]');
       if (el) { el.scrollTop = el.scrollHeight; this.bajarPend = false; }
@@ -1413,32 +1426,56 @@ class Component extends DCLogic {
         } } };
       });
       if (abajo || !previo || cerca) this.bajarChat(true);
+      setTimeout(() => { if (this.hiloAbierto() === clave) this.revisarAnteriores(); }, 260);
     } catch (e) {
       this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [clave]: { lista: [], hayMas: false, ...(st.chatMsgs[clave] || {}), cargando: false,
         error: navigator.onLine === false ? 'Sin conexión: no se pudieron cargar los mensajes.' : 'No se pudieron cargar los mensajes.' } } }));
     }
   }
 
+  /** Al subir cerca del principio del chat se traen solos los mensajes anteriores (con una orbe arriba). */
+  revisarAnteriores() {
+    const el = document.querySelector('[data-chat-lista]');
+    if (el && el.scrollTop < 400 && !this.bajarPend) this.cargarAnteriores();
+  }
+
   async cargarAnteriores() {
     const clave = this.hiloAbierto(), hilo = clave && this.state.chatMsgs[clave];
-    if (!hilo || !hilo.hayMas || hilo.cargando) return;
+    if (!hilo || !hilo.hayMas || hilo.cargando || this.anteriores) return;
+    if (Date.now() - (this.anterioresFallo || 0) < 5000) return;   // tras un fallo, no insistir en cada movimiento
     const primero = hilo.lista.find(m => !m.estado);
     if (!primero) return;
-    const el = document.querySelector('[data-chat-lista]');
-    const alto0 = el ? el.scrollHeight : 0, arriba0 = el ? el.scrollTop : 0;
     this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [clave]: { ...st.chatMsgs[clave], cargando: true } } }));
     try {
       const r = await this.traerMensajes(clave, primero.en);
-      this.setState(st => {
-        const h = st.chatMsgs[clave], ids = new Set(h.lista.map(m => m.id));
-        return { chatMsgs: { ...st.chatMsgs, [clave]: { ...h, lista: r.lista.filter(m => !ids.has(m.id)).concat(h.lista), hayMas: r.hayMas, cargando: false } } };
-      });
-      // Que lo que se estaba leyendo no salte.
-      setTimeout(() => { const e = document.querySelector('[data-chat-lista]'); if (e) e.scrollTop = arriba0 + (e.scrollHeight - alto0); }, 60);
+      this.anteriores = { clave, r };
+      this.ponerAnteriores();
     } catch (e) {
+      this.anterioresFallo = Date.now();
       this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [clave]: { ...st.chatMsgs[clave], cargando: false } } }));
       if (window.Fluido) Fluido.aviso('No se pudieron cargar los mensajes anteriores');
     }
+  }
+
+  /** Mete los mensajes anteriores cuando la lista está quieta: así no se corta la inercia del dedo. */
+  ponerAnteriores() {
+    const p = this.anteriores;
+    if (!p) return;
+    const el = this.hiloAbierto() === p.clave ? document.querySelector('[data-chat-lista]') : null;
+    const quieto = Date.now() - (this.chatMovidoEn || 0);
+    if (el && quieto < 140) {
+      clearTimeout(this.tAnteriores);
+      this.tAnteriores = setTimeout(() => this.ponerAnteriores(), 150 - quieto);
+      return;
+    }
+    this.anteriores = null;
+    const h = this.state.chatMsgs[p.clave];
+    if (!h) return;
+    const ids = new Set(h.lista.map(m => m.id));
+    if (el) this.anclaChat = el.scrollHeight;   // componentDidUpdate deja a la vista lo que se estaba leyendo
+    this.setState(st => ({ chatMsgs: { ...st.chatMsgs, [p.clave]: {
+      ...st.chatMsgs[p.clave], lista: p.r.lista.filter(m => !ids.has(m.id)).concat(st.chatMsgs[p.clave].lista), hayMas: p.r.hayMas, cargando: false,
+    } } }));
   }
 
   /** Mensaje nuevo por tiempo real (de un amigo, o el eco de uno mío). */
@@ -1813,8 +1850,6 @@ class Component extends DCLogic {
       chatCargando: !!hilo.cargando && !hilo.lista.length,
       chatError: hilo.error || '',
       chatHayMas: !!hilo.hayMas,
-      chatMasTxt: hilo.cargando ? 'Cargando…' : 'Ver mensajes anteriores',
-      chatCargarMas: () => self.cargarAnteriores(),
       chatTexto: s.chatTexto,
       onChatTexto: ev => { const v = ev.target.value; self.setState({ chatTexto: v }); },
       chatEnviar: () => self.enviarMensaje(),

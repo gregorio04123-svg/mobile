@@ -137,16 +137,14 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
 }
 .fl-aviso-btn:active { transform: scale(.95); transition-duration: .08s; }
 
-/* Indicador de jalar para actualizar. */
-.fl-jalar { position: fixed; z-index: 50; width: 28px; height: 28px; display: none; opacity: 0; pointer-events: none; }
-.fl-jalar svg { display: block; }
-.fl-jalar circle { fill: none; stroke-width: 2.6; stroke-linecap: round; }
-.fl-jalar-fondo { stroke: rgba(255, 255, 255, .1); }
-.fl-jalar-arco { stroke: #8E9AAE; stroke-dasharray: 62.83; stroke-dashoffset: 62.83; transition: stroke .15s; }
-.fl-jalar.fl-listo .fl-jalar-arco { stroke: #CE7F55; }
-.fl-jalar.fl-gira svg { animation: fl-girar .8s linear infinite; }
-.fl-jalar.fl-gira .fl-jalar-arco { stroke: #CE7F55; stroke-dashoffset: 22 !important; }
-@keyframes fl-girar { to { transform: rotate(360deg); } }
+/* Indicador de jalar para actualizar: una orbe (orbe.js). */
+.fl-jalar { position: fixed; z-index: 50; width: 32px; height: 32px; display: none; opacity: 0; pointer-events: none; }
+.fl-jalar pilares-orbe { display: block; }
+
+/* Orbes de "cargando": aparecen con un instante de espera, así una carga
+   rápida no alcanza a parpadear. */
+.orbe-carga { animation: orbe-aparece .3s ease .18s both; }
+@keyframes orbe-aparece { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
 
 /* Menos transparencia: superficies sólidas, sin desenfoque. */
 @media (prefers-reduced-transparency: reduce) {

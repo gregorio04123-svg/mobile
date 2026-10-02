@@ -14,6 +14,8 @@ pilares/
 ├── app.js                  ← lógica: rutinas, agenda, finanzas, amigos y chat
 ├── nube.js                 ← cuentas y guardado en Supabase
 ├── fluido.js               ← animaciones y gestos (estilo Apple)
+├── orbe.js                 ← <pilares-orbe>: el indicador de "cargando"
+├── orbes-motor.js          ← motor de las orbes (thinking-orbs, licencia MIT)
 ├── runtime.js              ← motor que interpreta la plantilla del diseño
 ├── styles.css              ← estilos base + marco de teléfono en escritorio
 ├── viewport.js             ← corrige el alto de pantalla en la PWA instalada
@@ -42,11 +44,12 @@ pilares/
 - **Movimiento y gestos** (criterios de *Designing Fluid Interfaces* de Apple, en `fluido.js`): resortes que arrancan desde donde está cada cosa y heredan la velocidad del dedo; sin rebote salvo cuando se lanza algo con impulso.
   - La ventana de nueva actividad y el panel ⚙ suben desde abajo y se cierran arrastrando hacia abajo o tocando el área oscura.
   - En Ejercicio se desliza a los lados para pasar de día.
-  - Jalar hacia abajo desde el tope actualiza con la nube.
+  - Jalar hacia abajo desde el tope actualiza con la nube. El indicador es una orbe: gira con el dedo y crece; cuando ya se puede soltar arranca a girar sola, y así sigue hasta que termina.
+  - **Orbes de carga** (de [Libraries.dev](https://libraries.dev/orbs), `thinking-orbs` 0.3.2, licencia MIT, de Jakub Antalik): también en *Cargando tus datos*, *Cargando mensajes…* y *Cargando su rutina…*. La app no usa React, así que se usa solo su motor de dibujo (`orbes-motor.js`, copia sin cambios con su licencia) dentro de `orbe.js`. Se descarga aparte cuando el teléfono está libre, una sola animación sirve a todas, solo se mueve la que está en pantalla y con *Reducir movimiento* queda quieta.
   - Barra de pestañas y encabezados de vidrio translúcido; el contenido pasa difuminado por debajo. Respeta *Reducir movimiento* y *Reducir transparencia* del sistema.
 - **Cuentas**: cada persona entra con **usuario y contraseña, sin correo**. La cuenta se crea desde la función `registro` de Supabase ya confirmada, así que nunca se envía un correo (no hay costo de dominio ni de envío). Sin correo no hay "olvidé mi contraseña": hay que guardarla bien.
 - **Amigos** (cuarta pestaña): cada cuenta tiene un código (ej. `ANDRE-4F2A`). El botón de arriba a la izquierda muestra el tuyo y agrega a alguien con el suyo; al aceptar la solicitud aparece en la lista.
-  - **Chat**: tocar a un amigo abre la conversación (solo texto, sin confirmaciones de lectura). La lista va ordenada por el último mensaje y muestra cuántos no has leído; la pestaña lleva la suma. El **+** junto al campo de texto adjunta:
+  - **Chat**: tocar a un amigo abre la conversación (solo texto, sin confirmaciones de lectura). La lista va ordenada por el último mensaje y muestra cuántos no has leído; la pestaña lleva la suma. Al subir, los mensajes anteriores se cargan solos (una orbe arriba mientras llegan) y lo que estabas leyendo no se mueve. El **+** junto al campo de texto adjunta:
     - **Rutina**: tu semana o uno de tus grupos. Al amigo le llega como tarjeta en el chat con *Ver y aceptar*.
     - **Libretica**: *Me debe* o *Le debo*, monto y concepto. Se envía al instante y llega con el monto.
     - **Actividad**: abre la ventana de actividad ya dirigida a ese amigo.
