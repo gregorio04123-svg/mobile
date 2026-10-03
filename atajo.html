@@ -63,7 +63,7 @@
     <li>Abre <b>Atajos</b>, toca <b>+</b> y ponle de nombre <span class="txt">Gasto</span>.</li>
     <li>Agrega <span class="accion">Pedir entrada</span>. Cambia <b>Texto</b> por <b>Número</b> y en la pregunta escribe <span class="txt">¿Cuánto gastaste?</span></li>
     <li>Agrega otra <span class="accion">Pedir entrada</span> (esta queda en <b>Texto</b>) y escribe <span class="txt">¿En qué gastaste?</span></li>
-    <li>Agrega una tercera <span class="accion">Pedir entrada</span>. Cambia <b>Texto</b> por <b>Fecha</b>, escribe <span class="txt">¿Cuándo fue ese gasto?</span> y, en la flecha, pon como respuesta predeterminada <span class="var">Fecha actual</span>: así, si fue hoy, solo tocas <b>OK</b>.</li>
+    <li>Agrega una tercera <span class="accion">Solicitar</span> (o <b>Pedir entrada</b>) de tipo <b>Fecha</b> con la pregunta <span class="txt">¿Cuándo?</span> Nada más.</li>
     <li>Agrega <span class="accion">Obtener contenido de URL</span>. En la URL pega <b>la dirección</b> de arriba. Toca la flecha para ver más:
       <div class="dentro">
         <p>Método: <span class="txt">POST</span> · Cuerpo de la solicitud: <span class="txt">JSON</span></p>
@@ -71,7 +71,7 @@
         <p><span class="txt">clave</span> → pega tu clave de Pilares</p>
         <p><span class="txt">monto</span> → toca <b>Seleccionar variable</b> y luego la respuesta del paso 2 (<span class="var">Entrada proporcionada</span>)</p>
         <p><span class="txt">motivo</span> → igual, pero la respuesta del paso 3</p>
-        <p><span class="txt">fecha</span> → la respuesta del paso 4. Tócala otra vez y elige <b>Formato de fecha: ISO 8601</b> (sin hora)</p>
+        <p><span class="txt">fecha</span> → la respuesta del paso 4, tal cual. No hace falta cambiarle el formato.</p>
       </div>
     </li>
     <li>Agrega <span class="accion">Obtener valor del diccionario</span>: obtener <b>Valor</b> de <span class="txt">mensaje</span> en <span class="var">Contenido de URL</span>.</li>
