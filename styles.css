@@ -157,10 +157,13 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
 }
 
 /* Rueda de gastos: al abrirla, cada color crece desde su inicio; si cambian los
-   montos o el mes, los arcos se acomodan desde donde estaban. */
+   montos o el mes, los arcos se acomodan desde donde estaban.
+   La rueda va en su propia capa y empieza a dibujarse cuando la hoja ya subió:
+   así, mientras la hoja se mueve, no hay que volver a pintarla entera en cada cuadro. */
+[data-rueda] { will-change: transform; contain: layout paint; }
 [data-arco] {
   transition: stroke-dasharray .7s cubic-bezier(.22, 1, .36, 1), stroke-dashoffset .7s cubic-bezier(.22, 1, .36, 1), stroke-opacity .25s ease;
-  animation: arco-entra .9s cubic-bezier(.22, 1, .36, 1) .08s backwards;
+  animation: arco-entra .75s cubic-bezier(.22, 1, .36, 1) .38s backwards;
 }
 @keyframes arco-entra { from { stroke-dasharray: 0.001 528; } }
 [data-tipo-gasto] { transition: background-color .18s ease, border-color .18s ease, color .18s ease; }

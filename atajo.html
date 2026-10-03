@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #090C14; --card: #121724; --line: rgba(255,255,255,.08); --txt: #EDF1F7; --sub: #8E9AAE; --mint: #57B9A0; --amber: #CE7F55; --var: #3B82F6; }
+  :root { --bg: #090C14; --card: #121724; --line: rgba(255,255,255,.08); --txt: #EDF1F7; --sub: #8E9AAE; --mint: #57B9A0; --bone: #EDE4D3; --amber: #CE7F55; --var: #3B82F6; }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body { margin: 0; background: var(--bg); color: var(--txt); font: 500 15px/1.55 Manrope, system-ui, sans-serif; }
@@ -25,7 +25,7 @@
   .card + .card { margin-top: 10px; }
   .copiar { display: flex; gap: 10px; align-items: center; }
   .copiar code { flex: 1; min-width: 0; font: 600 12px/1.4 ui-monospace, Menlo, monospace; color: var(--txt); word-break: break-all; user-select: all; -webkit-user-select: all; }
-  button { flex: none; font: 700 13px/1 Manrope, sans-serif; color: var(--mint); background: rgba(87,185,160,.1); border: 1px solid rgba(87,185,160,.3); border-radius: 11px; padding: 12px 16px; cursor: pointer; }
+  button { flex: none; font: 700 13px/1 Manrope, sans-serif; color: var(--bone); background: rgba(237,228,211,.08); border: 1px solid rgba(237,228,211,.28); border-radius: 11px; padding: 12px 16px; cursor: pointer; }
   button:active { transform: translateY(1px); }
   ol { list-style: none; counter-reset: paso; margin: 0; padding: 0; }
   ol > li { counter-increment: paso; position: relative; padding: 0 0 0 40px; margin: 0 0 18px; text-wrap: pretty; }
@@ -38,54 +38,56 @@
   .nota { color: var(--sub); font-size: 13px; margin: 6px 0 0; }
   ul.usos { margin: 0; padding: 0 0 0 18px; color: var(--sub); }
   ul.usos li { margin: 0 0 6px; }
-  a { color: var(--mint); }
+  a { color: var(--bone); }
 </style>
 </head>
 <body>
 <main>
   <h1>Atajo de Pilares</h1>
-  <p class="lead">Anota un gasto en segundos sin abrir Pilares: el iPhone te pregunta <b>¿Cuánto gastaste?</b>, <b>¿En qué?</b> y <b>¿Cuándo fue?</b>, y queda guardado en Finanzas como una libretica de Gasto. Lo armas una sola vez en la app <b>Atajos</b>.</p>
+  <p class="lead">Anota un gasto en segundos sin abrir Pilares: el iPhone te pregunta <b>¿Cuánto gastaste?</b>, <b>¿En qué gastaste?</b> y <b>¿Cuándo?</b>, y el gasto queda en <b>Finanzas › Gastos</b>. El motivo decide el tipo: Alimentos, Trabajo u Ocio.</p>
 
   <h2>Antes de empezar</h2>
   <div class="card">
-    En Pilares abre la <b>ruedita</b> y, en <b>Tu cuenta</b>, toca <b>Crear clave</b> en «Atajo del iPhone». La vas a pegar en el paso 5.
+    En Pilares abre la <b>ruedita</b> y, en <b>Tu cuenta › Atajo del iPhone</b>, toca <b>Copiar</b>. Esa clave la pegas en el paso 9.
   </div>
   <div class="card">
-    <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:var(--sub);margin-bottom:10px">LA DIRECCIÓN (PASO 5)</div>
+    <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:var(--sub);margin-bottom:10px">LA DIRECCIÓN (PASO 8)</div>
     <div class="copiar">
-      <code id="url">https://muawlxszfibohwhwnsng.supabase.co/rest/v1/rpc/atajo_gasto?apikey=sb_publishable_2KSrLx1N8Wt9wZp_FOOOaQ_2qVG6fAA</code>
+      <code id="url">https://muawlxszfibohwhwnsng.supabase.co/functions/v1/gasto</code>
       <button type="button" data-copiar="url">Copiar</button>
     </div>
   </div>
 
   <h2>Arma el atajo</h2>
   <ol>
-    <li>Abre <b>Atajos</b>, toca <b>+</b> y ponle de nombre <span class="txt">Gasto</span>.</li>
-    <li>Agrega <span class="accion">Pedir entrada</span>. Cambia <b>Texto</b> por <b>Número</b> y en la pregunta escribe <span class="txt">¿Cuánto gastaste?</span></li>
-    <li>Agrega otra <span class="accion">Pedir entrada</span> (esta queda en <b>Texto</b>) y escribe <span class="txt">¿En qué gastaste?</span></li>
-    <li>Agrega una tercera <span class="accion">Solicitar</span> (o <b>Pedir entrada</b>) de tipo <b>Fecha</b> con la pregunta <span class="txt">¿Cuándo?</span> Nada más.</li>
-    <li>Agrega <span class="accion">Obtener contenido de URL</span>. En la URL pega <b>la dirección</b> de arriba. Toca la flecha para ver más:
+    <li>Abre <b>Atajos</b>. Si ya tienes un atajo <b>Gasto</b>, mantenlo presionado y toca <b>Eliminar</b>. Luego toca <b>+</b> y ponle de nombre <span class="txt">Gasto</span>.</li>
+    <li>Busca <span class="accion">Solicitar entrada</span> y tócala. Cambia <b>Texto</b> por <b>Número</b> y en la pregunta escribe <span class="txt">¿Cuánto gastaste?</span></li>
+    <li>Busca <span class="accion">Definir variable</span> y tócala. En <b>Nombre de variable</b> escribe <span class="txt">Monto</span>.</li>
+    <li>Busca otra vez <span class="accion">Solicitar entrada</span>. Déjala en <b>Texto</b> y en la pregunta escribe <span class="txt">¿En qué gastaste?</span></li>
+    <li><span class="accion">Definir variable</span> con el nombre <span class="txt">Motivo</span>.</li>
+    <li>Una tercera <span class="accion">Solicitar entrada</span>: cambia <b>Texto</b> por <b>Fecha</b> y en la pregunta escribe <span class="txt">¿Cuándo?</span></li>
+    <li><span class="accion">Definir variable</span> con el nombre <span class="txt">Dia</span>.<p class="nota">Así cada respuesta queda con su nombre y no se confunde con otra.</p></li>
+    <li>Busca <span class="accion">Obtener contenido de URL</span>. En <b>URL</b> pega <b>la dirección</b> de arriba y toca la flecha para ver más. <b>Método:</b> <span class="txt">POST</span> · <b>Solicitar cuerpo:</b> <span class="txt">JSON</span></li>
+    <li>Toca <b>Agregar nuevo campo › Texto</b> cuatro veces y llénalos así:
       <div class="dentro">
-        <p>Método: <span class="txt">POST</span> · Cuerpo de la solicitud: <span class="txt">JSON</span></p>
-        <p>Toca <b>Agregar campo nuevo › Texto</b> cuatro veces:</p>
         <p><span class="txt">clave</span> → pega tu clave de Pilares</p>
-        <p><span class="txt">monto</span> → toca <b>Seleccionar variable</b> y luego la respuesta del paso 2 (<span class="var">Entrada proporcionada</span>)</p>
-        <p><span class="txt">motivo</span> → igual, pero la respuesta del paso 3</p>
-        <p><span class="txt">fecha</span> → la respuesta del paso 4, tal cual. No hace falta cambiarle el formato.</p>
+        <p><span class="txt">monto</span> → toca el valor y, en la barra de encima del teclado, toca <span class="var">Monto</span></p>
+        <p><span class="txt">motivo</span> → igual, con <span class="var">Motivo</span></p>
+        <p><span class="txt">fecha</span> → igual, con <span class="var">Dia</span></p>
+        <p class="nota">Si en la barra no ves el nombre, toca <b>Seleccionar variable</b> y toca la burbuja con ese nombre. No uses <b>Fecha actual</b>: esa es la hora del iPhone, no tu respuesta.</p>
       </div>
     </li>
-    <li>Agrega <span class="accion">Obtener valor del diccionario</span>: obtener <b>Valor</b> de <span class="txt">mensaje</span> en <span class="var">Contenido de URL</span>.</li>
-    <li>Agrega <span class="accion">Mostrar notificación</span> con <span class="var">Valor del diccionario</span>.</li>
-    <li>Toca <b>OK</b>. La primera vez que lo uses, el iPhone te pregunta si Atajos puede conectarse con supabase.co: toca <b>Permitir siempre</b>.</li>
+    <li>Busca <span class="accion">Mostrar notificación</span> y tócala: debe decir <span class="var">Contenido de URL</span>.</li>
+    <li>Toca <b>OK</b>. La primera vez, el iPhone pregunta si Atajos puede conectarse con supabase.co: toca <b>Permitir siempre</b>.</li>
   </ol>
 
   <h2>Cómo usarlo</h2>
   <div class="card">
     <ul class="usos">
-      <li>Di <b>«Oye Siri, Gasto»</b> o tócalo en la app Atajos.</li>
-      <li>También puedes ponerlo en la pantalla de inicio, en el Centro de control o en el botón de acción.</li>
-      <li>Al guardar te llega una notificación, por ejemplo «Gasto guardado · $25.000 · Almuerzo · ayer». En Pilares sale en Finanzas al abrir la app.</li>
-      <li>Si cambias la clave en la ruedita, pega la nueva en el paso 5.</li>
+      <li><b>Tres toques atrás:</b> Ajustes › Accesibilidad › Tocar › Tocar atrás › Tres toques › <b>Gasto</b>.</li>
+      <li><b>Centro de control:</b> desliza desde arriba a la derecha › <b>+</b> › Agregar un control › Atajo › <b>Gasto</b>.</li>
+      <li>Si quedó bien, la notificación dice por ejemplo «Gasto guardado · $25.000 · Almuerzo». Si dice «Ojo: llegó sin motivo», en el paso 9 el campo <span class="txt">motivo</span> no tiene <span class="var">Motivo</span>.</li>
+      <li>Si cambias la clave en la ruedita, pégala otra vez en el campo <span class="txt">clave</span>.</li>
     </ul>
   </div>
   <p class="nota" style="margin-top:22px"><a href="/">Volver a Pilares</a></p>
