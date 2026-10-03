@@ -1,3 +1,11 @@
+// Cada pilar lleva el color de su barra en el ícono de la app: Ejercicio verde,
+// Estudio naranja y Finanzas hueso.
+const BONE = '#EDE4D3';
+const PILAR_COLOR = {
+  ejercicio: { c: '#57B9A0', bg: 'rgba(87,185,160,.12)', border: 'rgba(87,185,160,.28)' },
+  estudio: { c: '#CE7F55', bg: 'rgba(206,127,85,.12)', border: 'rgba(206,127,85,.26)' },
+  finanzas: { c: BONE, bg: 'rgba(237,228,211,.09)', border: 'rgba(237,228,211,.24)' },
+};
 const GASTO = '#A7B0BF', MINT = '#57B9A0', MINT_D = '#5EA37D', GREEN = '#5EA37D', AMBER = '#CE7F55', RED = '#C46461', GREY = '#8E9AAE';
 
 const ICONS = {
@@ -353,7 +361,7 @@ class Component extends DCLogic {
       openCuaderno: null, estudioTab: 'agenda',
       month: NOW.getMonth(), year: NOW.getFullYear(), selDay: NOW.getDate(),
       modal: null,
-      showHist: false, openLib: null, abonoMonto: '', finVista: 'deudas', finMes: 0, sueldoEdit: false, sueldoInput: '',
+      showHist: false, openLib: null, abonoMonto: '', gastosOn: false, finMes: 0, sueldoEdit: false, sueldoInput: '',
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
       invRutinas: [], verRutina: null,
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false,
@@ -598,7 +606,7 @@ class Component extends DCLogic {
     return Object.assign(vacio(), {
       auth: 'fuera', authMode: 'entrar', aNombre: '', aClave: '', authErr: '', authBusy: false,
       me: null, codigo: '', amigos: [], cuadAmigos: {}, amigoCodigo: '', amigoMsg: '', importMsg: '',
-      nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null, finVista: 'deudas', finMes: 0, sueldoEdit: false, sueldoInput: '',
+      nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null, gastosOn: false, finMes: 0, sueldoEdit: false, sueldoInput: '',
       activeDay: 1, expanded: null, elegir: null, atajoClave: null, atajoCambiar: false, atajoMsg: '',
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
       invRutinas: [], verRutina: null,
@@ -901,6 +909,7 @@ class Component extends DCLogic {
       : tipo === 'chat' ? { chatHoja: null }
       : tipo === 'lg' ? { lgVer: null, lgAbono: '', lgMsg: '', lgBusy: false }
       : tipo === 'elegir' ? { elegir: null }
+      : tipo === 'gastos' ? { gastosOn: false, openLib: null, sueldoEdit: false }
       : {
         panel: false,
         respaldo: st.respaldo === 'preparando' ? 'preparando' : '',
@@ -2091,8 +2100,8 @@ class Component extends DCLogic {
       return Object.assign(base, {
         hjOpcionesAdj: [
           { titulo: 'Rutina', sub: 'Tu semana o uno de tus grupos, para todos', color: MINT, ir: () => self.hojaChat('rutina') },
-          { titulo: 'Libretica', sub: 'Reparte una cuenta entre el grupo', color: AMBER, ir: () => self.hojaChat('grupoLibreta', { total: '', nota: '', partes: {} }) },
-          { titulo: 'Actividad', sub: 'Quiz, parcial, salida… en la agenda de todos', color: '#4B7BE5', ir: () => self.abrirActividadGrupo(g.id) },
+          { titulo: 'Libretica', sub: 'Reparte una cuenta entre el grupo', color: BONE, ir: () => self.hojaChat('grupoLibreta', { total: '', nota: '', partes: {} }) },
+          { titulo: 'Actividad', sub: 'Quiz, parcial, salida… en la agenda de todos', color: AMBER, ir: () => self.abrirActividadGrupo(g.id) },
         ],
       });
     }
@@ -2100,8 +2109,8 @@ class Component extends DCLogic {
       return Object.assign(base, {
         hjOpcionesAdj: [
           { titulo: 'Rutina', sub: 'Tu semana o uno de tus grupos', color: MINT, ir: () => self.hojaChat('rutina') },
-          { titulo: 'Libretica', sub: 'Lo que ' + quien + ' te debe o le debes', color: AMBER, ir: () => self.hojaChat('libreta', { meDebe: true, monto: '', nota: '' }) },
-          { titulo: 'Actividad', sub: 'Quiz, parcial, salida… en su agenda', color: '#4B7BE5', ir: () => self.abrirActividadPara(s.chatCon) },
+          { titulo: 'Libretica', sub: 'Lo que ' + quien + ' te debe o le debes', color: BONE, ir: () => self.hojaChat('libreta', { meDebe: true, monto: '', nota: '' }) },
+          { titulo: 'Actividad', sub: 'Quiz, parcial, salida… en su agenda', color: AMBER, ir: () => self.abrirActividadPara(s.chatCon) },
         ],
       });
     }
@@ -3174,11 +3183,21 @@ class Component extends DCLogic {
     const aprendidos = {};
     gastosMios.slice().reverse().forEach(l => { if (l.cat && TIPO_GASTO[l.cat] && motivoUtil(l.nota)) aprendidos[motivoClave(l.nota)] = l.cat; });
     const tipoDe = l => tipoGasto(l, aprendidos);
+    // Dentro de la hoja de Gastos, el gasto que se abre queda a la vista (la hoja se desplaza sola).
+    const verGasto = id => setTimeout(() => {
+      const el = document.querySelector('[data-hoja="gastos"] [data-lib-id="' + id + '"]');
+      if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }, 90);
     const valsTipoGasto = l => {
       const tg = tipoDe(l), d = l.en ? isoOf(new Date(l.en)) : TODAY;
       const cuando = d === TODAY ? 'HOY' : (d === isoOf(addDays(NOW, -1)) ? 'AYER' : self.fechaTxt(d).toUpperCase());
       return {
         tipoN: tg.n, tipoC: tg.c, tipoTint: tg.tint, gastoMonto: pesosTxt(l.monto),
+        abrirGasto: () => {
+          const abrir = s.openLib !== l.id;
+          self.setState({ openLib: abrir ? l.id : null, abonoMonto: '' });
+          if (abrir) verGasto(l.id);
+        },
         gastoNota: motivoUtil(l.nota) ? l.nota.trim() : 'Sin motivo',
         gastoNotaFg: motivoUtil(l.nota) ? '#EDF1F7' : '#8E9AAE',
         gastoMeta: cuando + ' · ' + tg.n.toUpperCase(),
@@ -3415,11 +3434,9 @@ class Component extends DCLogic {
       dayStateTxt: pct >= 100 ? 'COMPLETO' : (doneSets > 0 ? pct + '% HECHO' : 'SIN EMPEZAR'),
       finanzasSummary: nCobrar + ' POR COBRAR · ' + nPagar + ' POR PAGAR',
       // Finanzas › Gastos
-      finDeudas: s.finVista !== 'gastos', finGastos: s.finVista === 'gastos',
-      finKicker: s.finVista === 'gastos' ? 'FINANZAS PERSONALES' : 'LIBRETICAS · COP',
-      finTitle: s.finVista === 'gastos' ? 'Gastos' : 'Finanzas',
-      finIrA: () => self.setState(st => ({ finVista: st.finVista === 'gastos' ? 'deudas' : 'gastos', openLib: null, sueldoEdit: false })),
-      finVerGastos: s.finVista !== 'gastos', finVolver: s.finVista === 'gastos',
+      gastosOn: !!s.gastosOn,
+      abrirGastos: () => self.setState({ gastosOn: true, finMes: 0, openLib: null, sueldoEdit: false }),
+      cerrarGastos: () => self.cerrarHoja('gastos'),
       gMesTxt: MONTHS[fMes.getMonth()] + ' ' + fMes.getFullYear(),
       mesAnt: () => self.setState(st => ({ finMes: (st.finMes || 0) - 1, openLib: null })),
       mesSig: () => self.setState(st => ({ finMes: Math.min(0, (st.finMes || 0) + 1), openLib: null })),
@@ -3452,6 +3469,7 @@ class Component extends DCLogic {
         const id = Nube.uuid();
         self.setState(st => ({ finMes: 0, openLib: id, libs: [{ id, owner: me, contra: null, deudor: miNombre, prestamista: miNombre, monto: '0', mine: true,
           paid: false, nota: '', vence: '', enviada: false, gasto: true, cat: null, en: new Date().toISOString(), abonos: [] }].concat(st.libs) }));
+        verGasto(id);
       },
       canReset: doneSets > 0,
       resetDay: () => self.mut(d => d[s.activeDay].ex.forEach(e => { e.done = e.done.map(() => false); })),
@@ -3614,7 +3632,7 @@ class Component extends DCLogic {
       urgentAcad,
       dashSub: pendAll.length + ' pendientes académicos · ' + (activeLibs.length + lgCobrar.length + lgPagar.length) + ' libreticas activas',
       kpis: [
-        { label: 'SERIES HOY', value: doneSets + '/' + totalSets, color: AMBER, sub: day.abbr, border: 'rgba(206,127,85,.3)', go: () => self.setState({ tab: 'ejercicio' }) },
+        { label: 'SERIES HOY', value: doneSets + '/' + totalSets, color: MINT, sub: day.abbr, border: 'rgba(87,185,160,.3)', go: () => self.setState({ tab: 'ejercicio' }) },
         { label: 'PENDIENTES', value: String(pendAll.length), color: '#fff', sub: nextA ? self.plazo(nextA.fecha) : 'AL DÍA', border: 'rgba(255,255,255,.07)', go: () => self.setState({ tab: 'estudio', estudioTab: 'agenda', openCuaderno: null }) },
         { label: 'POR COBRAR', value: '$' + fmtMoney(sumMine), color: MINT, sub: nCobrar + ' LIBRETICAS', border: 'rgba(87,185,160,.26)', go: () => self.setState({ tab: 'finanzas' }) },
         { label: 'POR PAGAR', value: '$' + fmtMoney(sumOwe), color: RED, sub: nPagar + ' LIBRETICAS', border: 'rgba(196,100,97,.26)', go: () => self.setState({ tab: 'finanzas' }) },
@@ -3660,8 +3678,8 @@ class Component extends DCLogic {
         const on = s.tab === key;
         return {
           label, h1: hs[0], h2: hs[1], h3: hs[2],
-          fg: on ? '#CE7F55' : '#8E9AAE', bg: on ? 'rgba(206,127,85,.12)' : 'transparent',
-          border: on ? 'rgba(206,127,85,.26)' : 'transparent',
+          fg: on ? PILAR_COLOR[key].c : '#8E9AAE', bg: on ? PILAR_COLOR[key].bg : 'transparent',
+          border: on ? PILAR_COLOR[key].border : 'transparent',
           go: () => self.setState({ tab: key }),
         };
       }),
