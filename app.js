@@ -156,13 +156,6 @@ function apodoLimpio(v, nombre) {
 const DIAS_LUNES = [1, 2, 3, 4, 5, 6, 0];
 function entero(v, min, max, def) { const n = parseInt(v, 10); return isNaN(n) ? def : Math.max(min, Math.min(max, n)); }
 function recorte(v, max, def) { const x = typeof v === 'string' ? v.trim() : ''; return (x || def || '').slice(0, max); }
-/** Captura rápida que pide un atajo del iPhone: ?accion=rapido, gasto, debo o medeben. */
-function leerAccion(url) {
-  try {
-    const a = String(new URL(url, location.href).searchParams.get('accion') || '').toLowerCase();
-    return ['rapido', 'gasto', 'debo', 'medeben'].includes(a) ? a : null;
-  } catch (e) { return null; }
-}
 /** Destino que trae el enlace de una notificación (?ir=estudio&fecha=…). */
 function leerDestino(url) {
   try {
@@ -342,9 +335,9 @@ class Component extends DCLogic {
       invRutinas: [], verRutina: null,
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false,
       push: '', pushBusy: false, pushMsg: '', pushSuena: false,
+      atajoClave: null, atajoCambiar: false, atajoBusy: false, atajoMsg: '',   // null = aún no se sabe
       tipoEd: null,   // editor de un tipo de actividad (Modo edición)
       elegir: null,   // hoja «Elegir amigo»: { tipo: 'lib' | 'para', id, q }
-      rapido: null,   // captura rápida desde un atajo (valsRapido)
       chats: [],      // un renglón por conversación (último mensaje, sin leer)
       chatCon: null,  // amigo con el chat abierto (o chatG: grupo)
       chatMsgs: {},   // mensajes cargados por amigo (o 'g:' + grupo): { lista, hayMas, cargando, error }
@@ -359,8 +352,6 @@ class Component extends DCLogic {
     this.invPorBorrar = new Set();
     // Si la app se abrió desde una notificación, a dónde hay que ir.
     this.destino = leerDestino(location.href);
-    // Captura rápida pedida por un atajo (?accion=…): se abre al tener sesión.
-    this.accionPendiente = leerAccion(location.href);
     if (this.destino) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }   // invitaciones respondidas que aún no se borran en el servidor
   }
 
@@ -449,13 +440,6 @@ class Component extends DCLogic {
         e.preventDefault();
         this.guardarApodo();
       }
-      if (e.key === 'Enter' && !e.isComposing && x && x.matches && x.matches('[data-rapido-campo], [data-rapido-otro], [data-rapido-buscar]')) {
-        e.preventDefault();
-        const v = this.valsRapido(this.state);
-        if (x.matches('[data-rapido-otro]')) { if (v.rOtroSeguir) v.rOtroSeguir(); }
-        else if (x.matches('[data-rapido-buscar]')) x.blur();
-        else if (v.rBoton) v.rBoton();
-      }
       if (e.key === 'Enter' && !e.isComposing && x && x.matches && x.matches('[data-amigos-buscar]')) {
         e.preventDefault();
         x.blur();
@@ -529,7 +513,6 @@ class Component extends DCLogic {
         chats: cache.chats || [], gAmigos: cache.gAmigos || [], libsG: cache.libsG || [],
       }));
       this.aplicarDestino(false);
-      this.abrirRapidoPendiente();
     } else {
       this.base = null;
       this.setState(Object.assign(vacio(), { auth: 'cargando', cargaError: '', me }));
@@ -592,7 +575,7 @@ class Component extends DCLogic {
       auth: 'fuera', authMode: 'entrar', aNombre: '', aClave: '', authErr: '', authBusy: false,
       me: null, codigo: '', amigos: [], cuadAmigos: {}, amigoCodigo: '', amigoMsg: '', importMsg: '',
       nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null,
-      activeDay: 1, expanded: null, elegir: null, rapido: null,
+      activeDay: 1, expanded: null, elegir: null, atajoClave: null, atajoCambiar: false, atajoMsg: '',
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
       invRutinas: [], verRutina: null,
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false, pushMsg: '',
@@ -888,14 +871,12 @@ class Component extends DCLogic {
 
   /* ── Lo que piden los gestos y animaciones (fluido.js) ───────────── */
   cerrarHoja(tipo, yaAnimado) {
-    if (tipo === 'rapido') this.quitarAccionDeLaDireccion();
     const cerrar = () => this.setState(st => tipo === 'modal' ? { modal: null, tipoEd: null }
       : tipo === 'rutina' ? { rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null }
       : tipo === 'ver' ? { verRutina: null }
       : tipo === 'chat' ? { chatHoja: null }
       : tipo === 'lg' ? { lgVer: null, lgAbono: '', lgMsg: '', lgBusy: false }
       : tipo === 'elegir' ? { elegir: null }
-      : tipo === 'rapido' ? { rapido: null }
       : {
         panel: false,
         respaldo: st.respaldo === 'preparando' ? 'preparando' : '',
@@ -1235,7 +1216,6 @@ class Component extends DCLogic {
       Nube.renovarPush().catch(e => console.warn('[pilares] push', e));
     }
     this.aplicarDestino(true);
-    this.abrirRapidoPendiente();
   }
 
   /** Abre la sección de un aviso. Con datos frescos se da por hecho aunque
@@ -1309,8 +1289,58 @@ class Component extends DCLogic {
   }
 
   abrirPanel() {
-    this.setState({ panel: true, amigosQ: '', pushMsg: '', pushSuena: false });
+    this.setState({ panel: true, amigosQ: '', pushMsg: '', pushSuena: false, atajoCambiar: false, atajoMsg: '' });
     this.actualizarPush();
+    this.leerClaveAtajo();
+  }
+
+  /* ── Atajo del iPhone: la app Atajos pregunta y guarda con esta clave ── */
+  async leerClaveAtajo() {
+    try { this.setState({ atajoClave: await Nube.miClaveAtajo() }); }
+    catch (e) { if (this.state.atajoClave === null) this.setState({ atajoMsg: 'Sin conexión: no se pudo leer la clave.' }); }
+  }
+
+  /** Crea la clave; si ya hay una, el primer toque pide confirmar (la vieja deja de servir). */
+  async crearClaveAtajo() {
+    const s = this.state;
+    if (s.atajoBusy) return;
+    if (s.atajoClave && !s.atajoCambiar) { this.setState({ atajoCambiar: true, atajoMsg: '' }); return; }
+    this.setState({ atajoBusy: true, atajoMsg: '' });
+    try {
+      const k = await Nube.nuevaClaveAtajo();
+      this.setState({ atajoClave: k, atajoCambiar: false,
+                      atajoMsg: s.atajoClave ? 'Clave nueva. Cópiala y pégala en el atajo: la anterior ya no sirve.' : '' });
+    } catch (e) {
+      this.setState({ atajoMsg: e.message || 'No se pudo crear la clave. Revisa tu conexión.' });
+    } finally {
+      this.setState({ atajoBusy: false });
+    }
+  }
+
+  async copiarClaveAtajo() {
+    const k = this.state.atajoClave;
+    if (!k) return;
+    try {
+      await navigator.clipboard.writeText(k);
+      if (window.Fluido) Fluido.aviso('Clave copiada');
+    } catch (e) {
+      // Sin permiso para copiar: se selecciona para copiarla a mano.
+      const x = document.querySelector('[data-atajo-clave]');
+      if (x && window.getSelection) { const r = document.createRange(); r.selectNodeContents(x); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+      this.setState({ atajoMsg: 'Mantén presionada la clave para copiarla.' });
+    }
+  }
+
+  valsAtajo(s) {
+    const self = this, k = s.atajoClave;
+    return {
+      atajoListo: !!k, atajoSinClave: k === '', atajoClave: k || '',
+      atajoCambiarTxt: s.atajoBusy ? 'Creando…' : (s.atajoCambiar ? 'Toca otra vez' : 'Cambiar'),
+      atajoCambiarColor: s.atajoCambiar ? '#E08A87' : '#8E9AAE',
+      atajoCrearTxt: s.atajoBusy ? 'Creando…' : 'Crear clave',
+      atajoMsg: s.atajoMsg || '',
+      crearClaveAtajo: () => self.crearClaveAtajo(), copiarClaveAtajo: () => self.copiarClaveAtajo(),
+    };
   }
 
   async actualizarPush() {
@@ -2497,227 +2527,6 @@ class Component extends DCLogic {
     });
   }
 
-  /* ── Captura rápida (atajo del iPhone: ?accion=rapido|gasto|debo|medeben) ── */
-  // Una pregunta a la vez. Pasos: inicio → Finanzas (finTipo → [quien] → monto → motivo)
-  // o Estudio (tipo → para → dia → tema). Al guardar o cerrar se quita ?accion.
-
-  /** Se abre cuando ya hay sesión (si había que entrar, justo después). */
-  abrirRapidoPendiente() {
-    const a = this.accionPendiente;
-    if (!a || this.state.auth !== 'dentro') return;
-    this.accionPendiente = null;
-    const r = { paso: 'inicio', rama: null, fin: null, quien: null, monto: '', motivo: '', q: '', otro: '',
-                tipo: null, urg: true, para: null, fecha: TODAY, tema: '', hist: [], msg: '', enviando: false };
-    if (a === 'gasto') Object.assign(r, { rama: 'fin', fin: 'gasto', paso: 'monto' });
-    if (a === 'debo' || a === 'medeben') Object.assign(r, { rama: 'fin', fin: a, paso: 'quien' });
-    this.cerrarChat();
-    this.setState({ rapido: r, panel: false, modal: null, chatHoja: null, elegir: null, lgVer: null, verRutina: null, rutinaOn: false });
-    // Sin un toque, iOS no abre el teclado: el campo del monto queda listo y basta tocarlo.
-    if (r.paso === 'monto') setTimeout(() => { const x = document.querySelector('[data-rapido-campo]'); if (x) x.focus(); }, 350);
-  }
-
-  quitarAccionDeLaDireccion() {
-    if (/[?&]accion=/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
-  }
-
-  /** Pasa a otra pregunta. Si tiene campo, se dibuja ya y se enfoca dentro del
-   *  mismo toque: así iOS sí abre el teclado. */
-  irRapido(paso, cambios) {
-    this.setState(st => st.rapido ? { rapido: { ...st.rapido, ...cambios, paso, msg: '', hist: st.rapido.hist.concat([st.rapido.paso]) } } : null);
-    this.enfocarRapido();
-  }
-
-  enfocarRapido() {
-    const r = this.state.rapido;
-    if (!r || !['monto', 'motivo', 'tema'].includes(r.paso)) {
-      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-      return;
-    }
-    if (this.__host) this.__host.render();
-    const x = document.querySelector('[data-rapido-campo]');
-    if (x) { try { x.focus({ preventScroll: true }); } catch (e) { x.focus(); } }
-  }
-
-  atrasRapido() {
-    this.setState(st => {
-      const r = st.rapido;
-      if (!r || !r.hist.length) return null;
-      return { rapido: { ...r, paso: r.hist[r.hist.length - 1], hist: r.hist.slice(0, -1), msg: '', q: '' } };
-    });
-    this.enfocarRapido();
-  }
-
-  cerrarRapido(yaAnimado) {
-    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    this.quitarAccionDeLaDireccion();
-    this.cerrarHoja('rapido', yaAnimado);
-  }
-
-  async guardarRapido() {
-    const s = this.state, r = s.rapido, me = this.uid;
-    if (!r || r.enviando) return;
-    const miNombre = s.profile.nombre || (s.me && s.me.usuario) || 'Yo';
-    let aviso = '', tab = s.tab;
-    if (r.rama === 'fin') {
-      const monto = String(r.monto || '').replace(/\D/g, '');
-      if (!(+monto > 0)) { this.setState({ rapido: { ...r, msg: 'Escribe el monto.' } }); return; }
-      const nota = String(r.motivo || '').trim().replace(/\s+/g, ' ').slice(0, 80);
-      const base = { id: Nube.uuid(), owner: me, monto, paid: false, nota, vence: '', abonos: [], en: new Date().toISOString() };
-      let lib;
-      if (r.fin === 'gasto') {
-        lib = { ...base, contra: null, gasto: true, mine: false, deudor: miNombre, prestamista: '', enviada: false };
-        aviso = 'Gasto guardado · ' + pesosTxt(monto);
-      } else {
-        const q = r.quien || { id: null, nombre: '' }, meDeben = r.fin === 'medeben';
-        lib = { ...base, contra: q.id, gasto: false, mine: meDeben, enviada: !!q.id,
-                deudor: meDeben ? q.nombre : miNombre, prestamista: meDeben ? miNombre : q.nombre };
-        const quien = q.id ? nombreCorto(q.id, q.nombre) : q.nombre;
-        aviso = q.id ? 'Libretica enviada a ' + quien + ' · ' + pesosTxt(monto)
-                     : (meDeben ? quien + ' te debe ' : 'Le debes a ' + quien + ' ') + pesosTxt(monto);
-      }
-      this.setState(st => ({ libs: [lib].concat(st.libs) }));
-      tab = 'finanzas';
-    } else {
-      const asunto = String(r.tema || '').trim() ? [String(r.tema).trim().slice(0, 80)] : ['Sin temas'];
-      const cuando = r.fecha === TODAY ? 'hoy' : (r.fecha === isoOf(addDays(new Date(), 1)) ? 'mañana' : fechaLarga(r.fecha).toLowerCase());
-      if (r.para && r.para.grupo) {
-        this.setState({ rapido: { ...r, enviando: true, msg: '' } });
-        try {
-          await Nube.crearActividadGrupo(r.para.id, { tipo: r.tipo, urg: r.urg, fecha: r.fecha, asunto: String(r.tema || '').trim() ? asunto : [], c: null });
-          this.refrescar();   // trae mi copia
-        } catch (e) {
-          this.setState(st => st.rapido ? { rapido: { ...st.rapido, enviando: false, msg: e.message || 'No se pudo agendar. Revisa tu conexión.' } } : null);
-          return;
-        }
-        aviso = r.tipo + ' agendado para «' + r.para.nombre + '» · ' + cuando;
-      } else {
-        const para = r.para ? r.para.id : me;
-        this.setState(st => ({ acts: st.acts.concat([{ id: Nube.uuid(), c: null, tipo: r.tipo, urg: r.urg !== false, fecha: r.fecha, asunto,
-                                                        owner: para, por: para === me ? null : me, nota: '' }]) }));
-        aviso = r.tipo + (para === me ? ' agendado' : ' para ' + nombreCorto(para, (s.amigos.find(a => a.id === para) || {}).nombre)) + ' · ' + cuando;
-      }
-      tab = 'estudio';
-      const p = r.fecha.split('-').map(Number);
-      this.setState({ estudioTab: 'agenda', openCuaderno: null, year: p[0], month: p[1] - 1, selDay: p[2] });
-    }
-    this.setState({ tab });
-    this.cerrarRapido();
-    if (window.Fluido) Fluido.aviso(aviso);
-  }
-
-  valsRapido(s) {
-    const r = s.rapido;
-    if (!r) return { rapidoOn: false };
-    const self = this, me = this.uid;
-    const miNombre = s.profile.nombre || (s.me && s.me.usuario) || 'Yo';
-    const cta = on => ({ rBotonBg: on ? MINT : 'rgba(87,185,160,.14)', rBotonFg: on ? '#0A0E1A' : 'rgba(87,185,160,.55)' });
-    const colorFin = { gasto: GASTO, medeben: MINT, debo: RED };
-    const nombreFin = { gasto: 'Gasto', medeben: 'Me deben', debo: 'Yo debo' };
-    const color = r.rama === 'fin' ? (colorFin[r.fin] || MINT) : (r.rama === 'est' ? AMBER : '#8E9AAE');
-    // Lo ya respondido, arriba del título.
-    const montoTxt = +String(r.monto || '').replace(/\D/g, '') > 0 ? pesosTxt(r.monto) : '';
-    const resumen = (r.rama === 'fin'
-      ? [nombreFin[r.fin], r.quien && r.paso !== 'quien' ? (r.quien.id ? nombreCorto(r.quien.id, r.quien.nombre) : r.quien.nombre) : '',
-         r.paso === 'motivo' ? montoTxt : '']
-      : (r.rama === 'est'
-        ? [r.tipo && r.paso !== 'tipo' ? r.tipo : '', r.para && ['dia', 'tema'].includes(r.paso) ? (r.para.id === me ? 'Para mí' : r.para.nombre) : '',
-           r.paso === 'tema' ? (r.fecha === TODAY ? 'Hoy' : fechaLarga(r.fecha)) : '']
-        : [])).filter(Boolean).join(' · ');
-    const v = {
-      rapidoOn: true, rColor: color, rResumen: resumen, rMsg: r.msg || '',
-      rAtrasOn: r.hist.length > 0, rAtras: () => self.atrasRapido(), rCerrar: () => self.cerrarRapido(),
-      rEsOpciones: false, rEsChips: false, rEsPersonas: false, rEsMonto: false, rEsTexto: false, rEsDia: false, rBotonOn: false,
-    };
-    const ir = (paso, c) => () => self.irRapido(paso, c);
-
-    if (r.paso === 'inicio') {
-      return Object.assign(v, { rTituloPaso: '¿Qué vas a anotar?', rEsOpciones: true, rOpciones: [
-        { titulo: 'Estudio', sub: 'Una tarea, un quiz, un parcial…', color: AMBER, ir: ir('tipo', { rama: 'est' }) },
-        { titulo: 'Finanzas', sub: 'Un gasto, o lo que te deben o debes', color: MINT, ir: ir('finTipo', { rama: 'fin' }) },
-      ] });
-    }
-    if (r.paso === 'finTipo') {
-      return Object.assign(v, { rTituloPaso: '¿Qué es?', rEsOpciones: true, rOpciones: [
-        { titulo: 'Gasto', sub: 'Algo que pagaste tú', color: GASTO, ir: ir('monto', { fin: 'gasto', quien: null }) },
-        { titulo: 'Me deben', sub: 'Alguien te debe plata', color: MINT, ir: ir('quien', { fin: 'medeben' }) },
-        { titulo: 'Yo debo', sub: 'Le debes a alguien', color: RED, ir: ir('quien', { fin: 'debo' }) },
-      ] });
-    }
-    if (r.paso === 'quien' || r.paso === 'para') {
-      const amigos = s.amigos.filter(a => a.estado === 'aceptada')
-        .map(a => ({ id: a.id, nombre: nombreVisto(a.id, a.nombre), real: a.nombre, sub: a.apodo ? a.nombre : '', radio: '50%' }))
-        .sort((x, y) => String(x.nombre).localeCompare(String(y.nombre), 'es'));
-      const grupos = r.paso === 'para'
-        ? s.gAmigos.map(g => ({ id: g.id, nombre: g.nombre, real: g.nombre, sub: cuenta(g.miembros.length, 'persona', 'personas'), radio: '11px', grupo: true }))
-        : [];
-      const todos = amigos.concat(grupos), buscarOn = todos.length > 4, q = buscarOn ? norm(r.q) : '';
-      const filtrados = q ? todos.filter(x => norm(x.nombre).includes(q) || norm(x.real).includes(q)) : todos;
-      const fila = (x, fn) => ({ nombre: x.nombre, sub: x.sub || '', radio: x.radio, color: x.yo ? colorDe(me) : colorDe(x.id),
-        inicial: x.grupo ? inicialesDe(x.nombre) : String((x.yo ? miNombre : x.nombre) || '?').charAt(0).toUpperCase(), ir: fn });
-      const base = Object.assign(v, {
-        rEsPersonas: true, rBuscarOn: buscarOn, rQ: r.q || '',
-        onRQ: ev => { const val = ev.target.value; self.setState(st => st.rapido ? { rapido: { ...st.rapido, q: val } } : null); },
-        rSinPersonas: q && !filtrados.length ? 'Nadie coincide con «' + String(r.q).trim() + '»' : '',
-      });
-      if (r.paso === 'quien') {
-        const otro = String(r.otro || '').trim(), listo = otro.length > 0;
-        return Object.assign(base, {
-          rTituloPaso: r.fin === 'medeben' ? '¿Quién te debe?' : '¿A quién le debes?',
-          rPersonas: filtrados.map(x => fila(x, ir('monto', { quien: { id: x.id, nombre: x.real }, q: '' }))),
-          rOtroOn: true, rOtro: r.otro || '',
-          onROtro: ev => { const val = ev.target.value; self.setState(st => st.rapido ? { rapido: { ...st.rapido, otro: val } } : null); },
-          rOtroBg: listo ? MINT : 'rgba(87,185,160,.14)', rOtroFg: listo ? '#0A0E1A' : 'rgba(87,185,160,.55)',
-          rOtroSeguir: () => { if (listo) self.irRapido('monto', { quien: { id: null, nombre: otro.slice(0, 40) }, q: '' }); },
-        });
-      }
-      // Para quién: primero yo; luego amigos y grupos.
-      const yo = { id: me, nombre: 'Para mí', sub: 'En tu agenda', radio: '50%', yo: true };
-      const lista = (q ? [] : [yo]).concat(filtrados);
-      return Object.assign(base, {
-        rTituloPaso: '¿Para quién es?', rOtroOn: false,
-        rPersonas: lista.map(x => fila(x, ir('dia', { para: { id: x.id, nombre: x.nombre, grupo: !!x.grupo }, q: '' }))),
-      });
-    }
-    if (r.paso === 'tipo') {
-      return Object.assign(v, { rTituloPaso: '¿Qué actividad?', rEsChips: true,
-        rChips: tiposDe(s.profile).map(t => ({ t: t.nombre, bg: 'rgba(255,255,255,.05)', borde: 'rgba(255,255,255,.09)', fg: '#EDF1F7',
-          ir: ir('para', { tipo: t.nombre, urg: t.urgencia }) })) });
-    }
-    if (r.paso === 'dia') {
-      const dias = [0, 1, 2, 3, 4, 5, 6].map(n => {
-        const d = addDays(new Date(), n), k = isoOf(d);
-        const t = n === 0 ? 'Hoy' : (n === 1 ? 'Mañana' : DIAS_LARGO[d.getDay()].slice(0, 3) + ' ' + d.getDate());
-        const on = r.fecha === k;
-        return { t, bg: on ? '#fff' : 'rgba(255,255,255,.05)', borde: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#EDF1F7',
-                 ir: ir('tema', { fecha: k }) };
-      });
-      return Object.assign(v, { rTituloPaso: '¿Qué día?', rEsDia: true, rDias: dias, rFecha: r.fecha,
-        onRFecha: ev => { const val = ev.target.value; if (/^\d{4}-\d{2}-\d{2}$/.test(val)) self.setState(st => st.rapido ? { rapido: { ...st.rapido, fecha: val } } : null); },
-        rBotonOn: true, rBotonTxt: 'Siguiente', ...cta(true), rBoton: () => self.irRapido('tema', {}) });
-    }
-    if (r.paso === 'monto') {
-      const listo = +String(r.monto || '').replace(/\D/g, '') > 0;
-      return Object.assign(v, { rTituloPaso: '¿Cuánto?', rEsMonto: true, rMonto: fmtMoney(r.monto),
-        onRMonto: ev => { const val = ev.target.value.replace(/\D/g, '').slice(0, 12); self.setState(st => st.rapido ? { rapido: { ...st.rapido, monto: val, msg: '' } } : null); },
-        rBotonOn: true, rBotonTxt: 'Siguiente', ...cta(listo),
-        rBoton: () => { if (listo) self.irRapido('motivo', {}); else self.setState(st => st.rapido ? { rapido: { ...st.rapido, msg: 'Escribe el monto.' } } : null); } });
-    }
-    if (r.paso === 'motivo' || r.paso === 'tema') {
-      const tema = r.paso === 'tema', campo = tema ? 'tema' : 'motivo';
-      const enviaA = !tema && r.quien && r.quien.id ? nombreCorto(r.quien.id, r.quien.nombre) : '';
-      return Object.assign(v, {
-        rTituloPaso: tema ? '¿Qué tema?' : (r.fin === 'gasto' ? '¿En qué?' : '¿Por qué?'),
-        rEsTexto: true, rTexto: r[campo] || '',
-        rTextoPh: tema ? 'ej. Derivadas, capítulo 3' : (r.fin === 'gasto' ? 'ej. Almuerzo' : 'ej. Almuerzo del viernes'),
-        rTextoNota: tema ? 'Opcional: puedes guardarla sin tema.' : (enviaA ? 'Al guardar le llega a ' + enviaA + ' con el monto y el motivo.' : ''),
-        onRTexto: ev => { const val = ev.target.value; self.setState(st => st.rapido ? { rapido: { ...st.rapido, [campo]: val } } : null); },
-        rBotonOn: true, rBotonTxt: r.enviando ? 'Guardando…' : (enviaA ? 'Guardar y enviar' : 'Guardar'), ...cta(!r.enviando),
-        rBoton: () => self.guardarRapido(),
-      });
-    }
-    return Object.assign(v, { rTituloPaso: '' });
-  }
-
   /* ── Elegir amigo (Compartir con / Para) ─────────────────────────── */
 
   abrirElegir(tipo, id) { this.setState({ elegir: { tipo, id: id || null, q: '' } }); }
@@ -3078,7 +2887,7 @@ class Component extends DCLogic {
       })),
       authCrearOn: crear,
       authSub: crear ? 'Crea tu cuenta con un usuario y una contraseña. No necesitas correo.'
-        : (self.accionPendiente ? 'Entra con tu usuario y contraseña; después sigues con lo que ibas a anotar.' : 'Entra con tu usuario y contraseña.'),
+        : 'Entra con tu usuario y contraseña.',
       aUsuario: s.aUsuario, aNombre: s.aNombre, aClave: s.aClave,
       onAUsuario: ev => { const v = ev.target.value; self.setState({ aUsuario: v }); },
       onANombre: ev => { const v = ev.target.value; self.setState({ aNombre: v }); },
@@ -3514,8 +3323,8 @@ class Component extends DCLogic {
     return {
       yes: true,
       appOn: true, authOn: false, loadOn: false,
-      ...self.valsRutina(s), ...self.valsMenu(s), ...self.valsVer(s), ...self.valsAvisos(s),
-      ...self.valsAmigos(s), ...vChat, ...self.valsChatHoja(s), ...self.valsLG(s), ...self.valsElegir(s), ...self.valsRapido(s),
+      ...self.valsRutina(s), ...self.valsMenu(s), ...self.valsVer(s), ...self.valsAvisos(s), ...self.valsAtajo(s),
+      ...self.valsAmigos(s), ...vChat, ...self.valsChatHoja(s), ...self.valsLG(s), ...self.valsElegir(s),
       isHome: s.tab === 'home', isEjercicio: s.tab === 'ejercicio', isEstudio: s.tab === 'estudio', isFinanzas: s.tab === 'finanzas',
       barraOn: !vChat.chatOn,
       editOn: s.edit, panelOn: s.panel, modalOn: !!m, restOn: s.restOn,

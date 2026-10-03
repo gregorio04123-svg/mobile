@@ -716,6 +716,21 @@
   }
 
   /** Devuelve la hora del servidor hasta la que ya se vieron los avisos. */
+  /* ------------------------------------------------------------------
+   * Atajo del iPhone: la clave con la que la app Atajos guarda en tu cuenta
+   * ---------------------------------------------------------------- */
+  async function miClaveAtajo() {
+    var r = await sb.rpc('mi_clave_atajo');
+    if (r.error) throw new Error(mensajeDe(r.error));
+    return r.data || '';
+  }
+
+  async function nuevaClaveAtajo() {
+    var r = await sb.rpc('nueva_clave_atajo');
+    if (r.error) throw new Error(mensajeDe(r.error));
+    return r.data || '';
+  }
+
   async function marcarAvisosLeidos() {
     var r = await sb.rpc('marcar_avisos_leidos');
     if (r.error) throw r.error;
@@ -806,5 +821,6 @@
     registrarSW: registrarSW, estadoPush: estadoPush, activarPush: activarPush, renovarPush: renovarPush,
     soltarPush: soltarPush, desactivarPush: desactivarPush, marcarAvisosLeidos: marcarAvisosLeidos, ponerGlobo: ponerGlobo,
     escuchar: escuchar, dejarDeEscuchar: dejarDeEscuchar, exportar: exportar,
+    miClaveAtajo: miClaveAtajo, nuevaClaveAtajo: nuevaClaveAtajo,
   };
 })(window);

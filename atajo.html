@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atajo de Pilares</title>
+<meta name="description" content="Cómo armar el atajo del iPhone que anota en Pilares sin abrir la app.">
+<meta name="theme-color" content="#090C14">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex">
+<link rel="icon" href="icon.svg?v=2" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #090C14; --card: #121724; --line: rgba(255,255,255,.08); --txt: #EDF1F7; --sub: #8E9AAE; --mint: #57B9A0; --amber: #CE7F55; --var: #3B82F6; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--txt); font: 500 15px/1.55 Manrope, system-ui, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 28px) 16px calc(env(safe-area-inset-bottom, 0px) + 48px); }
+  h1 { font: 800 28px/1.1 Manrope, sans-serif; letter-spacing: -.02em; margin: 0; }
+  .lead { color: var(--sub); margin: 10px 0 0; text-wrap: pretty; }
+  h2 { font: 700 10px/1 Manrope, sans-serif; letter-spacing: .18em; color: var(--sub); margin: 34px 0 12px; text-transform: uppercase; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .card + .card { margin-top: 10px; }
+  .copiar { display: flex; gap: 10px; align-items: center; }
+  .copiar code { flex: 1; min-width: 0; font: 600 12px/1.4 ui-monospace, Menlo, monospace; color: var(--txt); word-break: break-all; user-select: all; -webkit-user-select: all; }
+  button { flex: none; font: 700 13px/1 Manrope, sans-serif; color: var(--mint); background: rgba(87,185,160,.1); border: 1px solid rgba(87,185,160,.3); border-radius: 11px; padding: 12px 16px; cursor: pointer; }
+  button:active { transform: translateY(1px); }
+  ol { list-style: none; counter-reset: paso; margin: 0; padding: 0; }
+  ol > li { counter-increment: paso; position: relative; padding: 0 0 0 40px; margin: 0 0 18px; text-wrap: pretty; }
+  ol > li::before { content: counter(paso); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 8px; background: rgba(255,255,255,.06); color: var(--sub); font: 800 12px/26px Manrope, sans-serif; text-align: center; }
+  .accion { font-weight: 800; color: var(--txt); }
+  .var { display: inline-block; font: 700 13px/1.5 Manrope, sans-serif; color: #fff; background: var(--var); border-radius: 6px; padding: 0 7px; }
+  .txt { display: inline-block; font: 700 13px/1.5 ui-monospace, Menlo, monospace; color: var(--amber); background: rgba(206,127,85,.12); border-radius: 6px; padding: 0 7px; }
+  .dentro { margin: 8px 0 0; padding: 10px 0 2px 14px; border-left: 2px solid rgba(255,255,255,.1); }
+  .dentro p { margin: 0 0 8px; }
+  .nota { color: var(--sub); font-size: 13px; margin: 6px 0 0; }
+  .aviso { background: rgba(206,127,85,.08); border-color: rgba(206,127,85,.28); }
+  ul.usos { margin: 0; padding: 0 0 0 18px; color: var(--sub); }
+  ul.usos li { margin: 0 0 6px; }
+  a { color: var(--mint); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Atajo de Pilares</h1>
+  <p class="lead">Con este atajo anotas un gasto, lo que te deben, lo que debes o una actividad de estudio con los menús del iPhone, sin abrir Pilares. Lo armas una sola vez en la app <b>Atajos</b>; las preguntas las manda Pilares, así que si algo cambia no tienes que volver a armarlo.</p>
+
+  <h2>Antes de empezar</h2>
+  <div class="card">
+    En Pilares abre la <b>ruedita</b> y, en <b>Tu cuenta</b>, toca <b>Crear clave</b> en «Atajo del iPhone». La vas a pegar en el paso 4.
+  </div>
+  <div class="card">
+    <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:var(--sub);margin-bottom:10px">LA DIRECCIÓN (PASO 4)</div>
+    <div class="copiar">
+      <code id="url">https://muawlxszfibohwhwnsng.supabase.co/rest/v1/rpc/atajo?apikey=sb_publishable_2KSrLx1N8Wt9wZp_FOOOaQ_2qVG6fAA</code>
+      <button type="button" data-copiar="url">Copiar</button>
+    </div>
+  </div>
+
+  <h2>Arma el atajo</h2>
+  <div class="card aviso" style="margin-bottom:18px">
+    <b>Truco:</b> cada acción nueva aparece al final. Si queda debajo de <b>Finalizar repetición</b> o fuera de un <b>Si</b>, mantenla presionada y arrástrala a su lugar.
+  </div>
+  <ol>
+    <li>Abre <b>Atajos</b>, toca <b>+</b> y ponle de nombre <span class="txt">Pilares</span>.</li>
+    <li>Agrega <span class="accion">Texto</span> y déjalo vacío. Debajo, agrega <span class="accion">Establecer variable</span> y llámala <span class="txt">Respuesta</span>.</li>
+    <li>Agrega <span class="accion">Repetir</span> y cambia las veces a <span class="txt">20</span>. Todo lo que sigue va <b>dentro</b> del Repetir.</li>
+    <li>Agrega <span class="accion">Obtener contenido de URL</span>. En la URL pega <b>la dirección</b> de arriba. Toca la flecha para ver más:
+      <div class="dentro">
+        <p>Método: <span class="txt">POST</span> · Cuerpo de la solicitud: <span class="txt">JSON</span></p>
+        <p>Toca <b>Agregar campo nuevo › Texto</b> tres veces:</p>
+        <p><span class="txt">clave</span> → pega tu clave de Pilares</p>
+        <p><span class="txt">vuelta</span> → la variable <span class="var">Índice de repetición</span></p>
+        <p><span class="txt">respuesta</span> → la variable <span class="var">Respuesta</span></p>
+      </div>
+    </li>
+    <li>Agrega <span class="accion">Obtener valor del diccionario</span>: obtener <b>Valor</b> de <span class="txt">pregunta</span> en <span class="var">Contenido de URL</span>. Debajo, <span class="accion">Establecer variable</span> <span class="txt">Pregunta</span>.</li>
+    <li>Otra vez <span class="accion">Obtener valor del diccionario</span>: <b>Valor</b> de <span class="txt">tipo</span> en <span class="var">Contenido de URL</span>. Debajo, <span class="accion">Establecer variable</span> <span class="txt">Tipo</span>.</li>
+    <li>Agrega <span class="accion">Si</span>: <span class="var">Tipo</span> es <span class="txt">fin</span>. Entre <b>Si</b> y <b>De lo contrario</b> pon:
+      <div class="dentro">
+        <p><span class="accion">Mostrar notificación</span> con <span class="var">Pregunta</span></p>
+        <p><span class="accion">Detener este atajo</span></p>
+      </div>
+    </li>
+    <li>Debajo de ese <b>Finalizar si</b>, otro <span class="accion">Si</span>: <span class="var">Tipo</span> es <span class="txt">menu</span>. Adentro:
+      <div class="dentro">
+        <p><span class="accion">Obtener valor del diccionario</span>: <b>Valor</b> de <span class="txt">opciones</span> en <span class="var">Contenido de URL</span></p>
+        <p><span class="accion">Elegir de la lista</span> con ese <span class="var">Valor del diccionario</span>; en «Solicitud» pon <span class="var">Pregunta</span></p>
+        <p><span class="accion">Establecer variable</span> <span class="txt">Respuesta</span> a <span class="var">Elemento elegido</span></p>
+      </div>
+    </li>
+    <li>Otro <span class="accion">Si</span>: <span class="var">Tipo</span> es <span class="txt">numero</span>. Adentro:
+      <div class="dentro">
+        <p><span class="accion">Pedir entrada</span>: tipo <b>Número</b>, solicitud <span class="var">Pregunta</span></p>
+        <p><span class="accion">Establecer variable</span> <span class="txt">Respuesta</span> a <span class="var">Entrada proporcionada</span></p>
+      </div>
+    </li>
+    <li>Y el último <span class="accion">Si</span>: <span class="var">Tipo</span> es <span class="txt">texto</span>. Adentro:
+      <div class="dentro">
+        <p><span class="accion">Pedir entrada</span>: tipo <b>Texto</b>, solicitud <span class="var">Pregunta</span></p>
+        <p><span class="accion">Establecer variable</span> <span class="txt">Respuesta</span> a <span class="var">Entrada proporcionada</span></p>
+      </div>
+      <p class="nota">Los «De lo contrario» quedan vacíos. Al final todo debe estar antes de <b>Finalizar repetición</b>.</p>
+    </li>
+    <li>Toca <b>OK</b>. La primera vez que lo uses, el iPhone te pregunta si Atajos puede conectarse con supabase.co: toca <b>Permitir siempre</b>.</li>
+  </ol>
+
+  <h2>Cómo usarlo</h2>
+  <div class="card">
+    <ul class="usos">
+      <li>Di <b>«Oye Siri, Pilares»</b> o tócalo en la app Atajos.</li>
+      <li>Ponlo en tu pantalla de inicio (mantén presionado el atajo › <b>Compartir › Agregar a pantalla de inicio</b>), o en el botón de acción o Tocar atrás en Ajustes.</li>
+      <li>Las listas tienen <b>← Atrás</b> para volver a la pregunta anterior. Al guardar te llega una notificación de confirmación, y si era para un amigo, a él le llega su aviso.</li>
+      <li>Si cambias la clave en la ruedita, pega la nueva en el paso 4.</li>
+    </ul>
+  </div>
+  <p class="nota" style="margin-top:22px"><a href="/">Volver a Pilares</a></p>
+</main>
+<script>
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-copiar]');
+    if (!b) return;
+    var x = document.getElementById(b.getAttribute('data-copiar'));
+    var listo = function () { b.textContent = 'Copiada'; setTimeout(function () { b.textContent = 'Copiar'; }, 1600); };
+    try {
+      navigator.clipboard.writeText(x.textContent.trim()).then(listo, function () { seleccionar(x); });
+    } catch (err) { seleccionar(x); }
+  });
+  function seleccionar(x) {
+    var r = document.createRange(); r.selectNodeContents(x);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+</script>
+</body>
+</html>

@@ -1168,6 +1168,29 @@
         </div>
       </div>
 
+      <!-- Atajo del iPhone: la app Atajos pregunta con sus menús y guarda con esta clave. -->
+      <div style="margin-top:10px;padding:16px;border-radius:14px;background:#121724;border:1px solid rgba(255,255,255,.07)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE">ATAJO DEL IPHONE</div>
+          <a href="/atajo" target="_blank" rel="noopener" style="flex:none;font:700 11px/1 Manrope,sans-serif;color:#57B9A0;text-decoration:none;padding:6px 0">Cómo armarlo</a>
+        </div>
+        <sc-if value="{{ atajoSinClave }}">
+          <div style="font:500 12px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:8px;text-wrap:pretty">Anota gastos, deudas y actividades desde la app Atajos, sin abrir Pilares.</div>
+          <div sc-camel-on-click="{{ crearClaveAtajo }}" role="button" style="margin-top:12px;padding:13px;border-radius:11px;text-align:center;cursor:pointer;background:rgba(87,185,160,.1);border:1px solid rgba(87,185,160,.3);font:700 13px/1 Manrope,sans-serif;color:#57B9A0" style-active="transform:translateY(1px)">{{ atajoCrearTxt }}</div>
+        </sc-if>
+        <sc-if value="{{ atajoListo }}">
+          <div data-atajo-clave style="margin-top:10px;font:600 13px/1.4 ui-monospace,Menlo,monospace;color:#EDF1F7;word-break:break-all;user-select:all;-webkit-user-select:all">{{ atajoClave }}</div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <div sc-camel-on-click="{{ copiarClaveAtajo }}" role="button" style="flex:1;padding:12px;border-radius:11px;text-align:center;cursor:pointer;background:rgba(87,185,160,.1);border:1px solid rgba(87,185,160,.3);font:700 13px/1 Manrope,sans-serif;color:#57B9A0" style-active="transform:translateY(1px)">Copiar</div>
+            <div sc-camel-on-click="{{ crearClaveAtajo }}" role="button" style="flex:1;padding:12px;border-radius:11px;text-align:center;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);font:700 13px/1 Manrope,sans-serif;color:{{ atajoCambiarColor }}" style-active="transform:translateY(1px)">{{ atajoCambiarTxt }}</div>
+          </div>
+          <div style="font:500 11px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:10px;text-wrap:pretty">Es privada: con ella el atajo guarda en tu cuenta. No la compartas.</div>
+        </sc-if>
+        <sc-if value="{{ atajoMsg }}">
+          <div role="status" style="font:600 12px/1.45 Manrope,sans-serif;color:#E08A87;margin-top:10px">{{ atajoMsg }}</div>
+        </sc-if>
+      </div>
+
       <sc-if value="{{ importarOn }}">
         <div sc-camel-on-click="{{ importar }}" style="margin-top:20px;padding:15px 16px;border-radius:12px;cursor:pointer;background:rgba(87,185,160,.08);border:1px solid rgba(87,185,160,.26)">
           <div style="font:700 13.5px/1.3 Manrope,sans-serif;color:#57B9A0">{{ importarTxt }}</div>
@@ -1710,125 +1733,6 @@
             <div sc-camel-on-click="{{ vAceptar }}" style="flex:1.6;padding:16px;border-radius:12px;text-align:center;cursor:pointer;background:#57B9A0;font:800 13.5px/1 Manrope,sans-serif;color:#0A0E1A">Aceptar</div>
           </div>
         </sc-if>
-      </sc-if>
-    </div>
-  </div>
-</sc-if>
-
-<!-- Captura rápida (?accion=rapido, gasto, debo o medeben, desde un atajo del
-     iPhone): una pregunta a la vez, en una hoja pequeña. -->
-<sc-if value="{{ rapidoOn }}">
-  <div data-hoja-fondo="rapido" style="position:absolute;inset:0;z-index:101;display:flex;align-items:flex-end">
-    <div data-hoja-velo style="position:absolute;inset:0;background:rgba(3,5,10,.62)"></div>
-    <div data-hoja="rapido" role="dialog" aria-label="{{ rTituloPaso }}" style="position:relative;box-sizing:border-box;width:100%;max-height:calc(100% - env(safe-area-inset-top,0px) - 44px);overflow:auto;overscroll-behavior:contain;background:#0E131F;border-top:1px solid rgba(255,255,255,.1);border-radius:28px 28px 0 0;padding:10px 22px calc(env(safe-area-inset-bottom,0px) + 24px)">
-      <div style="width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.2);margin:0 auto 14px"></div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <sc-if value="{{ rAtrasOn }}">
-          <div sc-camel-on-click="{{ rAtras }}" role="button" aria-label="Volver a la pregunta anterior" style="flex:none;width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#9AA6BA">
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5L5.5 9 11 14.5"></path></svg>
-          </div>
-        </sc-if>
-        <div style="flex:1;min-width:0">
-          <sc-if value="{{ rResumen }}">
-            <div style="font:700 11px/1.3 Manrope,sans-serif;color:{{ rColor }};margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ rResumen }}</div>
-          </sc-if>
-          <div style="font:800 22px/1.15 Manrope,sans-serif;letter-spacing:-.02em">{{ rTituloPaso }}</div>
-        </div>
-        <div sc-camel-on-click="{{ rCerrar }}" role="button" aria-label="Cerrar" style="flex:none;width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#8E9AAE">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"></path></svg>
-        </div>
-      </div>
-
-      <sc-if value="{{ rEsOpciones }}">
-        <div class="paso" style="display:flex;flex-direction:column;gap:8px;margin-top:18px">
-          <sc-for list="{{ rOpciones }}" as="ro" hint-placeholder-count="3">
-            <div sc-camel-on-click="{{ ro.ir }}" style="padding:15px;border-radius:14px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:13px;cursor:pointer">
-              <div style="width:8px;height:36px;flex:none;border-radius:4px;background:{{ ro.color }}"></div>
-              <div style="flex:1;min-width:0">
-                <div style="font:700 15px/1.2 Manrope,sans-serif">{{ ro.titulo }}</div>
-                <div style="font:500 12px/1.4 Manrope,sans-serif;color:#8E9AAE;margin-top:4px">{{ ro.sub }}</div>
-              </div>
-              <svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="#8E9AAE" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M1.5 1.5l5 5-5 5"></path></svg>
-            </div>
-          </sc-for>
-        </div>
-      </sc-if>
-
-      <sc-if value="{{ rEsChips }}">
-        <div class="paso" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:18px">
-          <sc-for list="{{ rChips }}" as="rc" hint-placeholder-count="5">
-            <div sc-camel-on-click="{{ rc.ir }}" style="padding:13px 15px;border-radius:12px;cursor:pointer;font:700 13.5px/1 Manrope,sans-serif;background:{{ rc.bg }};border:1px solid {{ rc.borde }};color:{{ rc.fg }}">{{ rc.t }}</div>
-          </sc-for>
-        </div>
-      </sc-if>
-
-      <sc-if value="{{ rEsPersonas }}">
-        <div class="paso" style="margin-top:16px">
-          <sc-if value="{{ rBuscarOn }}">
-            <div style="position:relative;margin-bottom:10px">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#8E9AAE" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="position:absolute;left:13px;top:14px;pointer-events:none"><circle cx="7" cy="7" r="5"></circle><path d="M10.8 10.8l3.4 3.4"></path></svg>
-              <input data-rapido-buscar type="text" inputmode="search" enterkeyhint="search" value="{{ rQ }}" sc-camel-on-change="{{ onRQ }}" placeholder="Buscar" aria-label="Buscar" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" maxlength="40" style="width:100%;box-sizing:border-box;height:44px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;color:#fff;font:600 16px Manrope,sans-serif;padding:0 14px 0 38px">
-            </div>
-          </sc-if>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <sc-for list="{{ rPersonas }}" as="rp" hint-placeholder-count="5">
-              <div sc-camel-on-click="{{ rp.ir }}" style="min-height:54px;box-sizing:border-box;padding:9px 12px;border-radius:13px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:12px;cursor:pointer">
-                <div style="width:34px;height:34px;flex:none;border-radius:{{ rp.radio }};background:{{ rp.color }};display:flex;align-items:center;justify-content:center;font:800 13px/1 Manrope,sans-serif;color:#0A0E1A">{{ rp.inicial }}</div>
-                <div style="flex:1;min-width:0">
-                  <div style="font:700 14.5px/1.2 Manrope,sans-serif;color:#EDF1F7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ rp.nombre }}</div>
-                  <sc-if value="{{ rp.sub }}">
-                    <div style="font:600 11.5px/1.3 Manrope,sans-serif;color:#8E9AAE;margin-top:3px">{{ rp.sub }}</div>
-                  </sc-if>
-                </div>
-              </div>
-            </sc-for>
-          </div>
-          <sc-if value="{{ rSinPersonas }}">
-            <div style="padding:14px 4px;font:600 12.5px/1.45 Manrope,sans-serif;color:#8E9AAE;text-align:center">{{ rSinPersonas }}</div>
-          </sc-if>
-          <sc-if value="{{ rOtroOn }}">
-            <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin:16px 0 6px">O ESCRIBE SU NOMBRE</div>
-            <div style="display:flex;gap:8px">
-              <input data-rapido-otro value="{{ rOtro }}" sc-camel-on-change="{{ onROtro }}" placeholder="Alguien que no está en Pilares" aria-label="Nombre de la persona" maxlength="40" enterkeyhint="next" autocomplete="off" style="flex:1;min-width:0;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:600 16px Manrope,sans-serif;padding:11px 12px">
-              <div sc-camel-on-click="{{ rOtroSeguir }}" style="flex:none;padding:14px 15px;border-radius:10px;cursor:pointer;background:{{ rOtroBg }};font:800 12.5px/1 Manrope,sans-serif;color:{{ rOtroFg }}">Siguiente</div>
-            </div>
-          </sc-if>
-        </div>
-      </sc-if>
-
-      <sc-if value="{{ rEsMonto }}">
-        <div class="paso" style="margin-top:20px;display:flex;align-items:center;gap:10px">
-          <div style="font:800 26px/1 Manrope,sans-serif;color:{{ rColor }}">$</div>
-          <input data-rapido-campo value="{{ rMonto }}" sc-camel-on-change="{{ onRMonto }}" inputmode="numeric" enterkeyhint="next" placeholder="0" aria-label="Monto" autocomplete="off" style="flex:1;min-width:0;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.14);border-radius:0;color:{{ rColor }};font:800 36px Manrope,sans-serif;letter-spacing:-.02em;padding:2px 0 7px">
-        </div>
-      </sc-if>
-
-      <sc-if value="{{ rEsTexto }}">
-        <div class="paso" style="margin-top:18px">
-          <input data-rapido-campo value="{{ rTexto }}" sc-camel-on-change="{{ onRTexto }}" placeholder="{{ rTextoPh }}" aria-label="{{ rTituloPaso }}" maxlength="80" enterkeyhint="done" autocomplete="off" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:11px;color:#fff;font:600 16px Manrope,sans-serif;padding:13px 13px">
-          <sc-if value="{{ rTextoNota }}">
-            <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:8px">{{ rTextoNota }}</div>
-          </sc-if>
-        </div>
-      </sc-if>
-
-      <sc-if value="{{ rEsDia }}">
-        <div class="paso" style="margin-top:18px">
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            <sc-for list="{{ rDias }}" as="rd" hint-placeholder-count="6">
-              <div sc-camel-on-click="{{ rd.ir }}" style="padding:12px 14px;border-radius:12px;cursor:pointer;font:700 13px/1 Manrope,sans-serif;background:{{ rd.bg }};border:1px solid {{ rd.borde }};color:{{ rd.fg }}">{{ rd.t }}</div>
-            </sc-for>
-          </div>
-          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin:16px 0 6px">OTRO DÍA</div>
-          <input type="date" value="{{ rFecha }}" sc-camel-on-change="{{ onRFecha }}" aria-label="Otro día" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:11px;color:#fff;font:600 16px Manrope,sans-serif;padding:11px 12px;min-height:46px;color-scheme:dark">
-        </div>
-      </sc-if>
-
-      <sc-if value="{{ rBotonOn }}">
-        <div sc-camel-on-click="{{ rBoton }}" style="margin-top:18px;padding:16px;border-radius:12px;text-align:center;cursor:pointer;background:{{ rBotonBg }};font:800 14px/1 Manrope,sans-serif;color:{{ rBotonFg }}">{{ rBotonTxt }}</div>
-      </sc-if>
-      <sc-if value="{{ rMsg }}">
-        <div role="status" style="font:600 12px/1.45 Manrope,sans-serif;color:#E08A87;margin-top:10px;text-align:center">{{ rMsg }}</div>
       </sc-if>
     </div>
   </div>
