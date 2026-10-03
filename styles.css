@@ -156,6 +156,15 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
   54% { transform: rotate(8deg); } 72% { transform: rotate(-4deg); } 100% { transform: rotate(0); }
 }
 
+/* Rueda de gastos: al abrirla, cada color crece desde su inicio; si cambian los
+   montos o el mes, los arcos se acomodan desde donde estaban. */
+[data-arco] {
+  transition: stroke-dasharray .7s cubic-bezier(.22, 1, .36, 1), stroke-dashoffset .7s cubic-bezier(.22, 1, .36, 1), stroke-opacity .25s ease;
+  animation: arco-entra .9s cubic-bezier(.22, 1, .36, 1) .08s backwards;
+}
+@keyframes arco-entra { from { stroke-dasharray: 0.001 528; } }
+[data-tipo-gasto] { transition: background-color .18s ease, border-color .18s ease, color .18s ease; }
+
 /* Menos transparencia: superficies sólidas, sin desenfoque. */
 @media (prefers-reduced-transparency: reduce) {
   [data-vidrio] { background: #0B0F19 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }

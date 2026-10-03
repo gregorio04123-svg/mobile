@@ -559,15 +559,38 @@
   <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
     <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:#4A566B">{{ finKicker }}</div>
     <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#EDF1F7">{{ finTitle }}</div>
-    <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE;padding:5px 9px;border-radius:7px;background:rgba(255,255,255,.05)">{{ finSummary }}</div>
-    <div sc-camel-on-click="{{ finIrA }}" role="button" aria-label="Gastos personales" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
-      <sc-if value="{{ finVerGastos }}">
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#CE7F55" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h11.5a1.5 1.5 0 0 1 1.5 1.5V9"></path><path d="M3.5 7.5V17a2 2 0 0 0 2 2H19a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 19 8H5.5a2 2 0 0 1-2-.5z"></path><circle cx="16.2" cy="13.5" r="1.1" fill="#CE7F55" stroke="none"></circle></svg>
-      </sc-if>
-      <sc-if value="{{ finVolver }}">
+    <sc-if value="{{ finDeudas }}">
+      <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE;padding:5px 9px;border-radius:7px;background:rgba(255,255,255,.05)">{{ finanzasSummary }}</div>
+    </sc-if>
+    <sc-if value="{{ finGastos }}">
+      <div style="display:flex;align-items:center;margin:-7px 0">
+        <div sc-camel-on-click="{{ mesAnt }}" role="button" aria-label="Mes anterior" style="width:38px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="opacity:.6">
+          <svg width="9" height="13" viewBox="0 0 8 13" fill="none" stroke="#8E9AAE" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 1.5l-5 5 5 5"></path></svg>
+        </div>
+        <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE;padding:5px 9px;border-radius:7px;background:rgba(255,255,255,.05)">{{ gMesTxt }}</div>
+        <sc-if value="{{ mesSigOn }}">
+          <div sc-camel-on-click="{{ mesSig }}" role="button" aria-label="Mes siguiente" style="width:38px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="opacity:.6">
+            <svg width="9" height="13" viewBox="0 0 8 13" fill="none" stroke="#8E9AAE" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"></path></svg>
+          </div>
+        </sc-if>
+        <sc-if value="{{ mesSigOff }}"><div style="width:38px;height:34px"></div></sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{ finVerGastos }}">
+      <div sc-camel-on-click="{{ finIrA }}" role="button" aria-label="Tus gastos" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px;width:44px;height:44px;border-radius:12px;background:rgba(206,127,85,.14);border:1px solid rgba(206,127,85,.34);display:flex;align-items:center;justify-content:center;cursor:pointer">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#CE7F55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5.5 6.6l8.4-2.9a1.4 1.4 0 0 1 1.85 1.3V6.6"></path>
+          <rect x="2.8" y="6.6" width="16.4" height="11.6" rx="3"></rect>
+          <path d="M19.2 10.4h-3.4a2 2 0 0 0 0 4h3.4"></path>
+          <circle cx="15.9" cy="12.4" r="1.05" fill="#CE7F55" stroke="none"></circle>
+        </svg>
+      </div>
+    </sc-if>
+    <sc-if value="{{ finVolver }}">
+      <div sc-camel-on-click="{{ finIrA }}" role="button" aria-label="Volver a Finanzas" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#9AA6BA" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5L5.5 9 11 14.5"></path></svg>
-      </sc-if>
-    </div>
+      </div>
+    </sc-if>
     <div sc-camel-on-click="{{ openPanel }}" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
   <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9AA6BA" stroke-linecap="round">
         <path stroke-width="4.6" d="M20.2 12 L21.2 12 M3.8 12 L2.8 12 M12 20.2 L12 21.2 M12 3.8 L12 2.8 M17.8 17.8 L18.5 18.5 M6.2 6.2 L5.5 5.5 M6.2 17.8 L5.5 18.5 M17.8 6.2 L18.5 5.5"></path>
@@ -769,20 +792,66 @@
   </sc-if>
 
   <sc-if value="{{ finGastos }}">
-  <div data-desplaza style="flex:1;min-height:0;overflow:auto;padding:6px 22px calc(env(safe-area-inset-bottom,0px) + 112px);display:flex;flex-direction:column;gap:12px">
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <div sc-camel-on-click="{{ mesAnt }}" role="button" aria-label="Mes anterior" style="width:44px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="#8E9AAE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5L5.5 9 11 14.5"></path></svg></div>
-      <div style="font:700 10.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:#B8C2D2">{{ gMesTxt }}</div>
-      <sc-if value="{{ mesSigOn }}"><div sc-camel-on-click="{{ mesSig }}" role="button" aria-label="Mes siguiente" style="width:44px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="#8E9AAE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5L12.5 9 7 14.5"></path></svg></div></sc-if>
-      <sc-if value="{{ mesSigOff }}"><div style="width:44px;height:36px"></div></sc-if>
-    </div>
+  <div data-desplaza style="flex:1;min-height:0;overflow:auto;padding:6px 22px calc(env(safe-area-inset-bottom,0px) + 112px);display:flex;flex-direction:column;gap:10px">
+    <div style="background:#121724;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:22px 18px 6px">
+      <div role="img" aria-label="{{ ruedaLabel }}" style="position:relative;width:212px;height:212px;margin:0 auto">
+        <svg width="212" height="212" viewBox="0 0 200 200" aria-hidden="true" style="display:block">
+          <circle cx="100" cy="100" r="84" fill="none" stroke="#1D2534" stroke-width="14"></circle>
+          <sc-for list="{{ ruedaArcos }}" as="ar" hint-placeholder-count="3">
+            <circle data-arco cx="100" cy="100" r="84" fill="none" stroke="{{ ar.c }}" stroke-width="14" stroke-linecap="round" transform="rotate(-90 100 100)" style="stroke-dasharray:{{ ar.dash }};stroke-dashoffset:{{ ar.off }};stroke-opacity:{{ ar.op }}"></circle>
+          </sc-for>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 28px">
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.16em;color:#8E9AAE">{{ centroLabel }}</div>
+          <div style="margin-top:10px;font:800 {{ centroTam }}/1 Manrope,sans-serif;letter-spacing:-.025em;color:{{ centroColor }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ centroMonto }}</div>
+          <div style="margin-top:9px;font:600 11.5px/1.2 Manrope,sans-serif;color:#8E9AAE;white-space:nowrap;font-variant-numeric:tabular-nums">{{ centroSub }}</div>
+        </div>
+      </div>
 
-    <div style="background:#121724;border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:20px">
-      <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE">GASTADO EN EL MES</div>
-      <div style="margin-top:12px;font:800 38px/1 Manrope,sans-serif;letter-spacing:-.03em;color:#EDF1F7">{{ gTotalTxt }}</div>
-      <div style="margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px">
-        <div style="font:600 12px/1.3 Manrope,sans-serif;color:#8E9AAE">{{ gLinea }}</div>
-        <sc-if value="{{ gDeltaOn }}"><div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.04em;padding:6px 8px;border-radius:7px;background:{{ gDeltaBg }};color:{{ gDeltaColor }}">{{ gDeltaTxt }}</div></sc-if>
+      <div style="margin-top:20px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
+        <sc-for list="{{ tiposLeyenda }}" as="tl" hint-placeholder-count="3">
+          <div style="min-width:0;text-align:center">
+            <div style="display:flex;align-items:center;justify-content:center;gap:6px">
+              <div style="width:8px;height:8px;flex:none;border-radius:50%;background:{{ tl.c }}"></div>
+              <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.1em;color:#B8C2D2;text-transform:uppercase">{{ tl.n }}</div>
+            </div>
+            <div style="margin-top:7px;font:800 13.5px/1 Manrope,sans-serif;color:{{ tl.fg }};font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tl.montoTxt }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:18px;border-top:1px solid rgba(255,255,255,.07)">
+        <sc-if value="{{ sueldoVer }}">
+          <div sc-camel-on-click="{{ abrirSueldo }}" role="button" aria-label="Cambiar el sueldo mensual" style="min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer" style-active="opacity:.7">
+            <div style="font:600 12.5px/1.2 Manrope,sans-serif;color:#8E9AAE">Sueldo mensual</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="font:700 13.5px/1 Manrope,sans-serif;color:#EDF1F7;font-variant-numeric:tabular-nums">{{ sueldoTxt }}</div>
+              <svg width="7" height="12" viewBox="0 0 8 13" fill="none" stroke="#8E9AAE" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"></path></svg>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ sueldoFalta }}">
+          <div style="padding:14px 0 12px">
+            <div sc-camel-on-click="{{ abrirSueldo }}" role="button" style="padding:14px;border-radius:12px;cursor:pointer;background:rgba(206,127,85,.12);border:1px solid rgba(206,127,85,.34);text-align:center;font:700 13.5px/1 Manrope,sans-serif;color:#CE7F55" style-active="transform:translateY(1px)">Poner mi sueldo</div>
+            <div style="margin-top:9px;font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;text-align:center;text-wrap:pretty">Con tu sueldo, la rueda te muestra cuánto te queda del mes.</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ sueldoEditOn }}">
+          <div style="padding:14px 0 12px">
+            <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE">SUELDO MENSUAL</div>
+            <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+              <div style="font:800 20px/1 Manrope,sans-serif;color:#B8C2D2">$</div>
+              <input data-sueldo value="{{ sueldoInput }}" sc-camel-on-change="{{ onSueldo }}" inputmode="numeric" enterkeyhint="done" placeholder="0" aria-label="Sueldo mensual" style="flex:1;min-width:0;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.14);border-radius:0;color:#EDF1F7;font:800 24px Manrope,sans-serif;letter-spacing:-.02em;padding:2px 0 7px;font-variant-numeric:tabular-nums">
+              <div sc-camel-on-click="{{ guardarSueldo }}" role="button" style="flex:none;padding:13px 16px;border-radius:11px;cursor:pointer;background:#CE7F55;font:800 13px/1 Manrope,sans-serif;color:#0A0E1A" style-active="transform:translateY(1px)">Guardar</div>
+            </div>
+            <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+              <div sc-camel-on-click="{{ cancelarSueldo }}" role="button" style="padding:10px 10px 4px 0;cursor:pointer;font:700 12px/1 Manrope,sans-serif;color:#8E9AAE">Cancelar</div>
+              <sc-if value="{{ sueldoQuitarOn }}">
+                <div sc-camel-on-click="{{ quitarSueldo }}" role="button" style="padding:10px 0 4px 10px;cursor:pointer;font:700 12px/1 Manrope,sans-serif;color:#C46461">Quitar sueldo</div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-if>
       </div>
     </div>
 
@@ -790,56 +859,38 @@
       <div style="padding:22px;border-radius:14px;border:1px dashed rgba(255,255,255,.12);text-align:center;font:500 12.5px/1.5 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">{{ gVacioTxt }}</div>
     </sc-if>
 
-    <sc-if value="{{ gHayGastos }}">
-      <div style="background:#121724;border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:20px">
-        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE">EN QUÉ GASTAS MÁS</div>
-        <sc-if value="{{ gTopOn }}"><div style="margin-top:10px;font:700 14px/1.35 Manrope,sans-serif;color:#EDF1F7;text-wrap:pretty">{{ gTopTxt }}</div></sc-if>
-        <div style="margin-top:16px;display:flex;flex-direction:column;gap:16px">
-          <sc-for list="{{ gCats }}" as="ct" hint-placeholder-count="3">
-            <div>
-              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
-                <div style="min-width:0;display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;flex:none;border-radius:50%;background:{{ ct.c }}"></div><div style="font:700 13px/1.2 Manrope,sans-serif;color:#EDF1F7">{{ ct.n }}</div><div style="font:600 10.5px/1 Manrope,sans-serif;color:#8E9AAE">{{ ct.cuenta }}</div></div>
-                <div style="flex:none;font:700 13px/1 Manrope,sans-serif;color:#EDF1F7">{{ ct.montoTxt }} <span style="color:#8E9AAE;font-weight:600">· {{ ct.pct }}</span></div>
-              </div>
-              <div style="margin-top:8px;height:6px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden"><div style="height:100%;border-radius:3px;background:{{ ct.c }};width:{{ ct.w }}"></div></div>
-            </div>
-          </sc-for>
-        </div>
-        <sc-if value="{{ gSinMotivoOn }}"><div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07);font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">{{ gSinMotivoTxt }}</div></sc-if>
-      </div>
-    </sc-if>
-
-    <sc-for list="{{ gDias }}" as="dia" hint-placeholder-count="0">
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 4px">
-          <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE">{{ dia.label }}</div>
-          <div style="font:700 11px/1 Manrope,sans-serif;color:#8E9AAE">{{ dia.totalTxt }}</div>
-        </div>
-        <sc-for list="{{ dia.items }}" as="g" hint-placeholder-count="0">
-          <div data-lib-id="{{ g.id }}" style="background:#121724;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 16px;scroll-margin-top:150px">
-            <div sc-camel-on-click="{{ g.toggleOpen }}" role="button" style="display:flex;align-items:center;gap:12px;cursor:pointer">
-              <div style="width:9px;height:9px;flex:none;border-radius:50%;background:{{ g.catC }}"></div>
-              <div style="flex:1;min-width:0">
-                <div style="font:700 14px/1.25 Manrope,sans-serif;color:#EDF1F7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.gastoNota }}</div>
-                <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.1em;color:#8E9AAE;margin-top:6px">{{ g.catN }}</div>
-              </div>
-              <div style="flex:none;font:800 15px/1 Manrope,sans-serif;color:#EDF1F7">{{ g.montoTxt }}</div>
-            </div>
-            <sc-if value="{{ g.open }}">
-              <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:12px">
-                <div style="display:flex;align-items:center;gap:10px">
-                  <div style="font:800 20px/1 Manrope,sans-serif;color:#B8C2D2">$</div>
-                  <input value="{{ g.monto }}" sc-camel-on-change="{{ g.onMonto }}" inputmode="numeric" aria-label="Monto del gasto" style="flex:1;min-width:0;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.12);border-radius:0;color:#EDF1F7;font:800 26px Manrope,sans-serif;letter-spacing:-.02em;padding:2px 0 7px">
-                </div>
-                <input value="{{ g.nota }}" sc-camel-on-change="{{ g.onNota }}" maxlength="80" placeholder="Motivo, ej. Almuerzo" aria-label="Motivo del gasto" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:9px;color:#fff;font:600 14px Manrope,sans-serif;padding:10px 11px">
-                <div style="display:flex;align-items:center;justify-content:space-between">
-                  <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.08em;color:#8E9AAE">{{ g.gastoFecha }}</div>
-                  <div sc-camel-on-click="{{ g.borrarGasto }}" role="button" aria-label="Borrar este gasto" style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.1em;color:#C46461;padding:9px 2px 9px 12px;cursor:pointer">BORRAR</div>
-                </div>
-              </div>
-            </sc-if>
+    <sc-for list="{{ gLista }}" as="g" hint-placeholder-count="0">
+      <div data-lib-id="{{ g.id }}" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;scroll-margin-top:150px">
+        <div sc-camel-on-click="{{ g.toggleOpen }}" role="button" aria-label="{{ g.gastoNota }}, {{ g.gastoMonto }}" style="padding:13px 16px;display:flex;align-items:center;gap:13px;cursor:pointer">
+          <div style="width:30px;height:30px;flex:none;border-radius:9px;background:{{ g.tipoTint }};display:flex;align-items:center;justify-content:center">
+            <div style="width:9px;height:9px;border-radius:50%;background:{{ g.tipoC }}"></div>
           </div>
-        </sc-for>
+          <div style="flex:1;min-width:0">
+            <div style="font:700 14px/1.25 Manrope,sans-serif;color:{{ g.gastoNotaFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.gastoNota }}</div>
+            <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.08em;color:#8E9AAE;margin-top:6px">{{ g.gastoMeta }}</div>
+          </div>
+          <div style="flex:none;font:800 15px/1 Manrope,sans-serif;color:#EDF1F7;font-variant-numeric:tabular-nums">{{ g.gastoMonto }}</div>
+        </div>
+        <sc-if value="{{ g.open }}">
+          <div style="margin:0 16px;padding:14px 0 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="font:800 20px/1 Manrope,sans-serif;color:#B8C2D2">$</div>
+              <input value="{{ g.monto }}" sc-camel-on-change="{{ g.onMonto }}" inputmode="numeric" aria-label="Monto del gasto" style="flex:1;min-width:0;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.12);border-radius:0;color:#EDF1F7;font:800 24px Manrope,sans-serif;letter-spacing:-.02em;padding:2px 0 7px;font-variant-numeric:tabular-nums">
+            </div>
+            <input value="{{ g.nota }}" sc-camel-on-change="{{ g.onNota }}" maxlength="80" placeholder="Motivo, ej. Almuerzo" aria-label="Motivo del gasto" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:9px;color:#fff;font:600 14px Manrope,sans-serif;padding:10px 11px">
+            <div>
+              <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px">
+                <sc-for list="{{ g.tiposGasto }}" as="tp" hint-placeholder-count="3">
+                  <div data-tipo-gasto sc-camel-on-click="{{ tp.elegir }}" role="button" aria-pressed="{{ tp.on }}" style="padding:12px 4px;border-radius:10px;text-align:center;cursor:pointer;background:{{ tp.bg }};border:1px solid {{ tp.border }};font:700 12.5px/1 Manrope,sans-serif;color:{{ tp.fg }}" style-active="transform:translateY(1px)">{{ tp.n }}</div>
+                </sc-for>
+              </div>
+              <div style="margin-top:8px;font:500 11px/1.45 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">{{ g.tipoAyuda }}</div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:flex-end">
+              <div sc-camel-on-click="{{ g.borrarGasto }}" role="button" aria-label="Borrar este gasto" style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.1em;color:#C46461;padding:10px 0 4px 14px;cursor:pointer">BORRAR</div>
+            </div>
+          </div>
+        </sc-if>
       </div>
     </sc-for>
 
