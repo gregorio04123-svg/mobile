@@ -117,7 +117,7 @@
       sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,con_urgencia,grupo_id,lote').order('fecha'),
       sb.from('sesiones').select('fecha,grupo,abbr,dia,ejercicios,grupo_id').eq('user_id', uid).gte('fecha', haceDias(120)),
       // Las que cree y las que otra persona compartio conmigo.
-      sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,nota,vence_el,enviada,creado_en').order('creado_en', { ascending: false }),
+      sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,nota,vence_el,enviada,gasto,creado_en').order('creado_en', { ascending: false }),
       sb.from('abonos').select('id,libreta_id,monto,nota,registrado_por,creado_en').order('creado_en'),
       sb.rpc('mis_conexiones'),
       sb.from('grupos').select('id,nombre,abbr,color,musculo,orden,ejercicios').eq('user_id', uid).order('orden').order('creado_en'),
@@ -180,7 +180,7 @@
     var libs = q[5].data.map(function (l) {
       return { id: l.id, owner: l.user_id, contra: l.contraparte_id, deudor: l.deudor, prestamista: l.prestamista,
                monto: String(Math.round(+l.monto)), mine: l.mine, paid: l.paid, nota: l.nota || '',
-               vence: l.vence_el || '', enviada: !!l.enviada, abonos: abonos[l.id] || [] };
+               vence: l.vence_el || '', enviada: !!l.enviada, gasto: !!l.gasto, en: l.creado_en, abonos: abonos[l.id] || [] };
     });
 
     // nombre: el que tiene en Pilares (el que ven los demás); apodo: el mío para él.
@@ -299,6 +299,8 @@
                            mine: !!l.mine, paid: !!l.paid, nota: l.nota || '', vence_el: l.vence || null };
       // Enviada solo viaja si se conoce (una copia local vieja no la trae).
       if (l.enviada !== undefined) t.libretas[l.id].enviada = !!l.enviada;
+      // Gasto: libretica propia (gris), sin contraparte.
+      if (l.gasto !== undefined) t.libretas[l.id].gasto = !!l.gasto;
       (l.abonos || []).forEach(function (a) {
         t.abonos[a.id] = { id: a.id, libreta_id: l.id, monto: +a.monto || 0, nota: a.nota || '',
                            registrado_por: a.por || uid };
@@ -750,7 +752,7 @@
       todas(function () { return sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,con_urgencia,creado_en').order('fecha').order('id'); }),
       // Todo el historial del gimnasio, no solo los ultimos 120 dias.
       todas(function () { return sb.from('sesiones').select('fecha,grupo,abbr,dia,ejercicios,actualizado_en').eq('user_id', uid).order('fecha'); }),
-      todas(function () { return sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,pagado_en,nota,vence_el,enviada,creado_en,actualizado_en').order('creado_en').order('id'); }),
+      todas(function () { return sb.from('libretas').select('id,user_id,contraparte_id,deudor,prestamista,monto,mine,paid,pagado_en,nota,vence_el,enviada,gasto,creado_en,actualizado_en').order('creado_en').order('id'); }),
       todas(function () { return sb.from('abonos').select('id,libreta_id,monto,nota,registrado_por,creado_en').order('creado_en').order('id'); }),
       sb.rpc('mis_conexiones'),
       sb.from('grupos').select('id,nombre,abbr,color,musculo,orden,ejercicios').eq('user_id', uid).order('orden'),

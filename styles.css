@@ -156,6 +156,10 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
   54% { transform: rotate(8deg); } 72% { transform: rotate(-4deg); } 100% { transform: rotate(0); }
 }
 
+/* Captura rápida: cada pregunta entra desde la derecha, corta y sin rebote. */
+.paso { animation: paso-entra .22s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes paso-entra { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
 /* Menos transparencia: superficies sólidas, sin desenfoque. */
 @media (prefers-reduced-transparency: reduce) {
   [data-vidrio] { background: #0B0F19 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
