@@ -132,9 +132,13 @@
       // Mis grupos de amigos y las libreticas de grupo en las que estoy.
       sb.rpc('mis_grupos'),
       sb.rpc('libretas_grupo_de'),
+      // Los nombres que les puse a mis amigos (solo yo los veo).
+      sb.from('apodos').select('amigo_id,apodo'),
     ]);
     for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
 
+    var apodos = {};
+    (q[15].data || []).forEach(function (a) { apodos[a.amigo_id] = a.apodo; });
     var perfil = q[0].data || {};
     var grupos = (q[8].data || []).map(function (g) {
       return { id: g.id, nombre: g.nombre, abbr: g.abbr, color: g.color, musculo: g.musculo, ejercicios: g.ejercicios || [] };
@@ -179,9 +183,10 @@
                vence: l.vence_el || '', enviada: !!l.enviada, abonos: abonos[l.id] || [] };
     });
 
+    // nombre: el que tiene en Pilares (el que ven los demás); apodo: el mío para él.
     var amigos = (q[7].data || []).map(function (c) {
       return { conexion: c.conexion_id, id: c.otro_id, nombre: c.nombre, codigo: c.codigo,
-               estado: c.estado, yo: c.soy_solicitante };
+               estado: c.estado, yo: c.soy_solicitante, apodo: apodos[c.otro_id] || '' };
     });
 
     return {
@@ -416,6 +421,17 @@
   async function borrarConexion(conexionId) {
     var r = await sb.from('conexiones').delete().eq('id', conexionId);
     if (r.error) throw new Error(mensajeDe(r.error));
+  }
+
+  /** El nombre que le pongo a un amigo; vacío lo quita (vuelve a su nombre). */
+  async function guardarApodo(amigoId, apodo) {
+    var r = apodo
+      ? await sb.from('apodos').upsert({ amigo_id: amigoId, apodo: apodo }, { onConflict: 'dueno_id,amigo_id' })
+      : await sb.from('apodos').delete().eq('amigo_id', amigoId);
+    if (r.error) {
+      if (r.error.code === '42501') throw new Error('Solo puedes ponerle nombre a tus amigos.');
+      throw new Error(mensajeDe(r.error));
+    }
   }
 
   /* ------------------------------------------------------------------
@@ -741,15 +757,19 @@
       sb.rpc('mis_grupos'),
       sb.rpc('libretas_grupo_de'),
       todas(function () { return sb.from('mensajes_grupo').select('id,grupo_id,de_id,de_nombre,tipo,texto,datos,creado_en').order('creado_en').order('id'); }),
+      sb.from('apodos').select('amigo_id,apodo'),
     ]);
     for (var i = 0; i < q.length; i++) if (q[i].error) throw q[i].error;
+    var apodos = {};
+    (q[14].data || []).forEach(function (a) { apodos[a.amigo_id] = a.apodo; });
 
     return {
       app: 'Pilares', formato: 1, exportado_en: new Date().toISOString(),
       usuario: usuario, id: uid,
       perfil: q[0].data,
+      // apodo: el nombre que tú le pusiste (solo tú lo ves).
       amigos: (q[7].data || []).map(function (c) {
-        return { id: c.otro_id, nombre: c.nombre, codigo: c.codigo, estado: c.estado };
+        return { id: c.otro_id, nombre: c.nombre, apodo: apodos[c.otro_id] || null, codigo: c.codigo, estado: c.estado };
       }),
       cuadernos: q[1].data, archivos: q[2].data, actividades: q[3].data,
       sesiones_gimnasio: q[4].data, libreticas: q[5].data, abonos: q[6].data,
@@ -770,7 +790,7 @@
     cliente: sb, uuid: uuid, usuarioDe: usuarioDe,
     sesion: sesion, entrar: entrar, crear: crear, salir: salir, alPerderSesion: alPerderSesion,
     cargar: cargar, sembrarRutina: sembrarRutina, filas: filas, pendientes: pendientes, sincronizar: sincronizar,
-    buscarCodigo: buscarCodigo, invitar: invitar, aceptar: aceptar, borrarConexion: borrarConexion,
+    buscarCodigo: buscarCodigo, invitar: invitar, aceptar: aceptar, borrarConexion: borrarConexion, guardarApodo: guardarApodo,
     compartirRutina: compartirRutina, borrarInvitacionRutina: borrarInvitacionRutina,
     mensajes: mensajes, enviarMensaje: enviarMensaje, marcarChatLeido: marcarChatLeido, mensajeDe: mensajeApp,
     mensajesGrupo: mensajesGrupo, enviarMensajeGrupo: enviarMensajeGrupo, mensajeGrupoDe: mensajeGrupoApp,

@@ -140,6 +140,18 @@ function enviadaDe(l) { return l.enviada === undefined ? !!l.contra : !!l.enviad
 /** ¿La actividad usa colores de urgencia? (una copia vieja no lo trae: la Tarea no). */
 function conUrg(a) { return a.urg === undefined ? a.tipo !== 'Tarea' : a.urg !== false; }
 function primerNombre(n) { return String(n || '').trim().split(/\s+/)[0] || 'tu amigo'; }
+// Los nombres que les pones a tus amigos (solo tú los ves): id → apodo. Se
+// arma en cada dibujo desde s.amigos. Solo cambian lo que se muestra; lo que
+// se guarda o se envía lleva siempre el nombre que tiene en Pilares.
+let APODOS = {};
+function nombreVisto(id, nombre) { return (id && APODOS[id]) || nombre; }
+/** Para frases: el apodo completo («Tío Carlos») o el primer nombre. */
+function nombreCorto(id, nombre) { return (id && APODOS[id]) || primerNombre(nombre); }
+/** El apodo como se guarda: sin espacios de más, máx. 40; igual a su nombre = sin apodo. */
+function apodoLimpio(v, nombre) {
+  const x = String(v || '').trim().replace(/\s+/g, ' ').slice(0, 40).trim();
+  return x === String(nombre || '').trim() ? '' : x;
+}
 // Semana empezando en lunes (índices de día: 0 = domingo).
 const DIAS_LUNES = [1, 2, 3, 4, 5, 6, 0];
 function entero(v, min, max, def) { const n = parseInt(v, 10); return isNaN(n) ? def : Math.max(min, Math.min(max, n)); }
@@ -168,12 +180,14 @@ function listaNombres(ns) {
 }
 /** Texto de un mensaje del sistema en un grupo (creó, agregó, salió, nombre, borró). */
 function textoSistema(m, me) {
-  const d = m.datos || {}, yo = m.de === me, quien = primerNombre(m.deNombre || 'Alguien');
+  const d = m.datos || {}, yo = m.de === me, quien = nombreCorto(m.de, m.deNombre || 'Alguien');
   if (d.accion === 'crear') return (yo ? 'Creaste' : quien + ' creó') + ' el grupo «' + (d.nombre || '') + '»';
   if (d.accion === 'agregar') {
     const otros = Array.isArray(d.otros) ? d.otros : [], nombres = Array.isArray(d.nombres) ? d.nombres : [];
     if (!yo && otros.includes(me)) return quien + ' te agregó al grupo';
-    return (yo ? 'Agregaste a ' : quien + ' agregó a ') + listaNombres(nombres.map(primerNombre));
+    // nombres va en el mismo orden que otros (los ids).
+    const juntos = nombres.length === otros.length;
+    return (yo ? 'Agregaste a ' : quien + ' agregó a ') + listaNombres(nombres.map((n, i) => juntos ? nombreCorto(otros[i], n) : primerNombre(n)));
   }
   if (d.accion === 'salir') return (yo ? 'Saliste' : quien + ' salió') + ' del grupo';
   if (d.accion === 'nombre') return (yo ? 'Cambiaste' : quien + ' cambió') + ' el nombre a «' + (d.nombre || '') + '»';
@@ -190,7 +204,7 @@ function textoSistema(m, me) {
 function previewGrupo(u, me) {
   if (!u) return 'Toca para escribirle al grupo';
   if (u.tipo === 'sistema') return textoSistema(u, me);
-  const quien = u.de === me ? 'Tú: ' : primerNombre(u.deNombre || 'Alguien') + ': ', d = u.datos || {};
+  const quien = u.de === me ? 'Tú: ' : nombreCorto(u.de, u.deNombre || 'Alguien') + ': ', d = u.datos || {};
   if (u.tipo === 'texto') return quien + u.texto;
   if (u.tipo === 'libreta') return quien + 'Libretica · ' + pesosTxt(d.total) + (d.nota ? ' · ' + d.nota : '');
   if (u.tipo === 'rutina') return quien + (d.tipo === 'semana' ? 'Rutina · semana completa' : 'Rutina · «' + (d.nombre || 'grupo') + '»');
@@ -333,6 +347,7 @@ class Component extends DCLogic {
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false,
       push: '', pushBusy: false, pushMsg: '',
       tipoEd: null,   // editor de un tipo de actividad (Modo edición)
+      elegir: null,   // hoja «Elegir amigo»: { tipo: 'lib' | 'para', id, q }
       chats: [],      // un renglón por conversación (último mensaje, sin leer)
       chatCon: null,  // amigo con el chat abierto (o chatG: grupo)
       chatMsgs: {},   // mensajes cargados por amigo (o 'g:' + grupo): { lista, hayMas, cargando, error }
@@ -428,6 +443,14 @@ class Component extends DCLogic {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && x && x.matches && x.matches('[data-chat-entrada]')) {
         e.preventDefault();
         this.enviarMensaje();
+      }
+      if (e.key === 'Enter' && !e.isComposing && x && x.matches && x.matches('[data-apodo-entrada]')) {
+        e.preventDefault();
+        this.guardarApodo();
+      }
+      if (e.key === 'Enter' && !e.isComposing && x && x.matches && x.matches('[data-elegir-buscar]')) {
+        e.preventDefault();
+        this.elegirConEnter();
       }
     });
     // El desplazamiento no burbujea: se escucha en captura y se filtra la lista del chat.
@@ -556,7 +579,7 @@ class Component extends DCLogic {
       auth: 'fuera', authMode: 'entrar', aNombre: '', aClave: '', authErr: '', authBusy: false,
       me: null, codigo: '', amigos: [], cuadAmigos: {}, amigoCodigo: '', amigoMsg: '', importMsg: '',
       nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null,
-      activeDay: 1, expanded: null,
+      activeDay: 1, expanded: null, elegir: null,
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
       invRutinas: [], verRutina: null,
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false, pushMsg: '',
@@ -786,7 +809,7 @@ class Component extends DCLogic {
         rCompAmigos: vacia ? [] : amigos.map((a, i) => {
           const e = rc.enviados[a.id];
           return {
-            nombre: a.nombre, inicial: (a.nombre || '?').charAt(0).toUpperCase(), bg: i % 2 ? MINT : AMBER,
+            nombre: nombreVisto(a.id, a.nombre), inicial: (nombreVisto(a.id, a.nombre) || '?').charAt(0).toUpperCase(), bg: i % 2 ? MINT : AMBER,
             txt: e === 'enviando' ? 'Enviando…' : e === 'ok' ? 'Enviada ✓' : e === 'error' ? 'Reintentar' : 'Enviar',
             btnBg: e === 'ok' ? 'transparent' : 'rgba(87,185,160,.12)',
             btnBorder: e === 'ok' ? 'transparent' : 'rgba(87,185,160,.34)',
@@ -857,6 +880,7 @@ class Component extends DCLogic {
       : tipo === 'ver' ? { verRutina: null }
       : tipo === 'chat' ? { chatHoja: null }
       : tipo === 'lg' ? { lgVer: null, lgAbono: '', lgMsg: '', lgBusy: false }
+      : tipo === 'elegir' ? { elegir: null }
       : {
         panel: false,
         respaldo: st.respaldo === 'preparando' ? 'preparando' : '',
@@ -1011,7 +1035,7 @@ class Component extends DCLogic {
       const p = await Nube.buscarCodigo(cod);
       if (!p) throw new Error('No encontramos a nadie con ese código.');
       const ya = this.state.amigos.find(a => a.id === p.id);
-      if (ya) throw new Error(ya.estado === 'aceptada' ? p.nombre + ' ya es tu amigo.' : 'Ya hay una solicitud pendiente con ' + p.nombre + '.');
+      if (ya) throw new Error(ya.estado === 'aceptada' ? nombreVisto(ya.id, p.nombre) + ' ya es tu amigo.' : 'Ya hay una solicitud pendiente con ' + p.nombre + '.');
       await Nube.invitar(this.uid, p.id);
       this.setState({ amigoCodigo: '', amigoMsg: 'Solicitud enviada a ' + p.nombre + '. Aparecerá como amigo cuando la acepte.' });
       this.refrescar();
@@ -1054,7 +1078,8 @@ class Component extends DCLogic {
     return !this.hayPendientes();
   }
 
-  nombreAmigo(inv) { return (this.state.amigos.find(a => a.id === inv.de) || {}).nombre || inv.deNombre || 'Un amigo'; }
+  nombrePilares(inv) { return (this.state.amigos.find(a => a.id === inv.de) || {}).nombre || inv.deNombre || 'Un amigo'; }
+  nombreAmigo(inv) { return nombreVisto(inv.de, this.nombrePilares(inv)); }
 
   /** Vista de compartir dentro de "Tu rutina": la semana (gid nulo) o un grupo. */
   abrirCompartir(gid) { this.setState({ rCompartir: { gid: gid || null, enviados: {}, msg: '' } }); }
@@ -1089,7 +1114,7 @@ class Component extends DCLogic {
     const s = this.state;
     if (!s.rutinaLista) { if (window.Fluido) Fluido.aviso('Tu rutina aún está cargando. Intenta en un momento.'); return; }
     const c = sanearRutina(inv.contenido);
-    const quien = primerNombre(this.nombreAmigo(inv));
+    const quien = nombreCorto(inv.de, this.nombrePilares(inv));
     this.cerrarHoja('ver');
     this.quitarInvitacion(inv.id);
     if (!c.grupos.length) { if (window.Fluido) Fluido.aviso('Esa rutina llegó vacía.'); return; }
@@ -1217,7 +1242,7 @@ class Component extends DCLogic {
   irA(d, cerrarTodo) {
     if (!d) return true;
     const s = this.state;
-    const cambios = cerrarTodo ? { panel: false, modal: null, rutinaOn: false, verRutina: null, menuDia: null, chatHoja: null, lgVer: null } : {};
+    const cambios = cerrarTodo ? { panel: false, modal: null, rutinaOn: false, verRutina: null, menuDia: null, chatHoja: null, lgVer: null, elegir: null } : {};
     let hallado = true, libreta = null;
     if (d.ir === 'estudio') {
       Object.assign(cambios, { tab: 'estudio', estudioTab: 'agenda', openCuaderno: null });
@@ -1254,8 +1279,9 @@ class Component extends DCLogic {
         this.setState({ verRutina: { modo: 'inv', inv } });
         return true;
       }
-      // Ya respondida: el chat con quien la envió, si su nombre no se repite entre tus amigos.
-      const tocayos = !inv && d.quien ? s.amigos.filter(a => a.estado === 'aceptada' && a.nombre === d.quien) : [];
+      // Ya respondida: el chat con quien la envió, si su nombre no se repite entre tus amigos
+      // (el aviso trae el apodo que le pusiste o, si no tiene, su nombre).
+      const tocayos = !inv && d.quien ? s.amigos.filter(a => a.estado === 'aceptada' && (a.apodo || a.nombre) === d.quien) : [];
       const con = inv ? inv.de : d.con || (tocayos.length === 1 ? tocayos[0].id : null);
       cambios.tab = 'amigos';
       if (con && s.amigos.some(a => a.id === con && a.estado === 'aceptada')) {
@@ -1713,7 +1739,7 @@ class Component extends DCLogic {
     };
     this.setState(st => ({ libs: [lib].concat(st.libs) }));
     this.cerrarHoja('chat');
-    if (window.Fluido) Fluido.aviso('Libretica enviada a ' + primerNombre(a.nombre));
+    if (window.Fluido) Fluido.aviso('Libretica enviada a ' + nombreCorto(a.id, a.nombre));
   }
 
   /** "Nueva actividad" para todo el grupo (también queda en mi agenda). */
@@ -1758,8 +1784,9 @@ class Component extends DCLogic {
     // Amigos y grupos juntos, del último mensaje al más viejo.
     const filas = acept.map(a => {
       const c = porId[a.id] || null;
-      return { en: c ? c.en : '', nombre: a.nombre, v: {
-        nombre: a.nombre, inicial: (a.nombre || '?').charAt(0).toUpperCase(), color: colorDe(a.id), radio: '50%', letra: '17px',
+      const visto = nombreVisto(a.id, a.nombre);
+      return { en: c ? c.en : '', nombre: visto, v: {
+        nombre: visto, inicial: (visto || '?').charAt(0).toUpperCase(), color: colorDe(a.id), radio: '50%', letra: '17px',
         preview: c ? previewChat(c, me) : 'Toca para escribirle', sinLeer: c ? c.sinLeer : 0,
         abrir: () => self.abrirChat(a.id),
       } };
@@ -1828,7 +1855,7 @@ class Component extends DCLogic {
       // En un grupo, el nombre de quien escribe va sobre el primero de sus mensajes seguidos.
       const autorOn = !!g && !mio && !seguido;
       const base = { lado: mio ? 'flex-end' : 'flex-start', sep: seguido ? '2px' : '8px', hora: horaCorta(m.en),
-                     autorOn, autor: autorOn ? primerNombre(m.deNombre || 'Alguien') : '', autorColor: colorDe(m.de || '') };
+                     autorOn, autor: autorOn ? nombreCorto(m.de, m.deNombre || 'Alguien') : '', autorColor: colorDe(m.de || '') };
       if (m.tipo === 'texto') {
         items.push(Object.assign(base, {
           esTexto: true, texto: m.texto,
@@ -1862,20 +1889,22 @@ class Component extends DCLogic {
       return Object.assign(comun, {
         chatNombre: g.nombre, chatInicial: inicialesDe(g.nombre), chatColor: colorDe(g.id), chatRadio: '9px', chatLetra: '11px',
         chatSubOn: true,
-        chatSub: otros.length ? listaNombres(otros.map(x => primerNombre(x.nombre)).concat(['tú'])) : 'Solo tú en el grupo',
+        chatSub: otros.length ? listaNombres(otros.map(x => nombreCorto(x.id, x.nombre)).concat(['tú'])) : 'Solo tú en el grupo',
         chatVacioTxt: 'Escríbanse aquí. Con el + envías una rutina, repartes una cuenta o agendan una actividad para todos.',
         chatAdjuntarTxt: 'Enviar rutina, libretica o actividad al grupo',
         chatAdjuntar: () => self.hojaChat('adjuntar'),
         chatOpciones: () => self.hojaChat('grupoOpciones', { nombre: g.nombre }),
       });
     }
+    // Con apodo, debajo va el nombre que tiene en Pilares (para no perder de vista quién es).
+    const visto = nombreVisto(a.id, a.nombre);
     return Object.assign(comun, {
-      chatNombre: a.nombre, chatInicial: (a.nombre || '?').charAt(0).toUpperCase(), chatColor: colorDe(a.id), chatRadio: '50%', chatLetra: '13px',
-      chatSubOn: false, chatSub: '',
-      chatVacioTxt: 'Escríbele a ' + primerNombre(a.nombre) + ', o envíale una rutina, una libretica o una actividad con el +.',
+      chatNombre: visto, chatInicial: (visto || '?').charAt(0).toUpperCase(), chatColor: colorDe(a.id), chatRadio: '50%', chatLetra: '13px',
+      chatSubOn: visto !== a.nombre, chatSub: visto !== a.nombre ? a.nombre : '',
+      chatVacioTxt: 'Escríbele a ' + nombreCorto(a.id, a.nombre) + ', o envíale una rutina, una libretica o una actividad con el +.',
       chatAdjuntarTxt: 'Enviar rutina, libretica o actividad',
       chatAdjuntar: () => self.hojaChat('adjuntar'),
-      chatOpciones: () => self.hojaChat('opciones'),
+      chatOpciones: () => self.hojaChat('opciones', { apodo: a.apodo || '' }),
     });
   }
 
@@ -1902,7 +1931,7 @@ class Component extends DCLogic {
     if (m.tipo === 'actividad') {
       const temas = Array.isArray(d.temas) ? d.temas : [];
       return {
-        kicker: 'ACTIVIDAD' + (mio ? ' · PARA ' + String(primerNombre(a.nombre)).toUpperCase() : ''), color: AMBER,
+        kicker: 'ACTIVIDAD' + (mio ? ' · PARA ' + String(nombreCorto(a.id, a.nombre)).toUpperCase() : ''), color: AMBER,
         borde: 'rgba(206,127,85,.3)',
         titulo: (d.tipo || 'Actividad') + (d.cuaderno ? ' · ' + d.cuaderno : ''),
         sub: fechaLarga(d.fecha), extra: temas.length ? 'Temas: ' + temas.join(', ') : '',
@@ -1956,7 +1985,7 @@ class Component extends DCLogic {
     const l = this.libretaGrupoVista(m.ref, s);
     const borrada = borradas.has(m.ref) || l === null;
     const pMia = l && mia ? l.partes.find(p => p.id === me) : null;
-    const nombres = listaNombres(partes.map(p => p.id === me ? 'tú' : primerNombre(p.nombre)));
+    const nombres = listaNombres(partes.map(p => p.id === me ? 'tú' : nombreCorto(p.id, p.nombre)));
     let extra;
     if (borrada) extra = 'Se borró';
     else if (mio) {
@@ -1986,7 +2015,7 @@ class Component extends DCLogic {
     if (!h) return { chatHojaOn: false };
     const a = s.chatCon ? s.amigos.find(x => x.id === s.chatCon) : null;
     const g = s.chatG ? s.gAmigos.find(x => x.id === s.chatG) : null;
-    const quien = a ? primerNombre(a.nombre) : '';
+    const quien = a ? nombreCorto(a.id, a.nombre) : '';
     const chip = on => ({ bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE' });
     const volver = () => self.hojaChat('adjuntar');
     const sub = h.vista === 'rutina' || h.vista === 'libreta' || h.vista === 'grupoLibreta';
@@ -2004,7 +2033,7 @@ class Component extends DCLogic {
       hjKickerColor: sub ? AMBER : '#8E9AAE',
       hjVolver: sub ? volver : () => {},
       hjTitulo: {
-        adjuntar: 'Adjuntar', rutina: 'Rutina', libreta: 'Libretica', opciones: a ? a.nombre : 'Amigo', agregar: 'Agregar amigo',
+        adjuntar: 'Adjuntar', rutina: 'Rutina', libreta: 'Libretica', opciones: a ? nombreVisto(a.id, a.nombre) : 'Amigo', agregar: 'Agregar amigo',
         grupoNuevo: 'Nuevo grupo', grupoOpciones: g ? g.nombre : 'Grupo', grupoLibreta: 'Libretica de grupo',
       }[h.vista] || '',
       hjMsg: h.msg || '',
@@ -2061,10 +2090,22 @@ class Component extends DCLogic {
       });
     }
     if (h.vista === 'opciones') {
+      // Cómo le dices: el apodo es privado; vacío vuelve a su nombre de Pilares.
+      const actual = a ? a.apodo || '' : '', borrador = h.apodo == null ? actual : String(h.apodo);
+      const limpio = apodoLimpio(borrador, a ? a.nombre : '');
       return Object.assign(base, {
         hjAmigoCodigo: a ? a.codigo : '',
+        hjApodo: borrador,
+        hjApodoPh: a ? a.nombre : '',
+        onHjApodo: ev => { const v = ev.target.value; self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, apodo: v, msg: '' } } : null); },
+        hjApodoGuardarOn: limpio !== actual || h.enviando === 'apodo',
+        hjApodoGuardarTxt: h.enviando === 'apodo' ? 'Guardando…' : 'Guardar',
+        hjApodoGuardar: () => self.guardarApodo(),
+        hjApodoNota: !a ? '' : (actual
+          ? 'Solo tú ves este nombre. Bórralo y guarda para volver a «' + a.nombre + '».'
+          : 'Ponle el nombre que quieras: solo tú lo ves, ' + primerNombre(a.nombre) + ' no se entera.'),
         hjQuitar: () => {
-          if (!a || !window.confirm('¿Quitar a ' + a.nombre + ' de tus amigos? Las libreticas que ya comparten se conservan.')) return;
+          if (!a || !window.confirm('¿Quitar a ' + nombreVisto(a.id, a.nombre) + ' de tus amigos? Las libreticas que ya comparten se conservan.')) return;
           self.cerrarHoja('chat', true);
           self.cerrarChat();
           self.conexion('quitar', a);
@@ -2073,15 +2114,16 @@ class Component extends DCLogic {
     }
     if (h.vista === 'grupoNuevo') {
       const sel = h.sel || [], nombre = String(h.nombre || '').trim();
-      const amigos = s.amigos.filter(x => x.estado === 'aceptada').slice().sort((x, y) => String(x.nombre).localeCompare(String(y.nombre), 'es'));
+      const amigos = s.amigos.filter(x => x.estado === 'aceptada').slice()
+        .sort((x, y) => String(nombreVisto(x.id, x.nombre)).localeCompare(String(nombreVisto(y.id, y.nombre)), 'es'));
       const elegidos = amigos.filter(x => sel.includes(x.id)), listo = !!nombre && sel.length > 0 && !h.enviando, c = cta(listo);
       return Object.assign(base, {
         hjGNombre: h.nombre || '',
         onHjGNombre: ev => { const v = ev.target.value; self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, nombre: v, msg: '' } } : null); },
         hjGAmigos: amigos.map(x => {
-          const on = sel.includes(x.id);
+          const on = sel.includes(x.id), visto = nombreVisto(x.id, x.nombre);
           return {
-            nombre: x.nombre, inicial: (x.nombre || '?').charAt(0).toUpperCase(), color: colorDe(x.id),
+            nombre: visto, inicial: (visto || '?').charAt(0).toUpperCase(), color: colorDe(x.id),
             marca: on ? MINT : 'transparent', marcaBorde: on ? MINT : 'rgba(255,255,255,.2)', tick: on ? '#0A0E1A' : 'transparent',
             pick: () => self.setState(st => {
               const hh = st.chatHoja;
@@ -2094,7 +2136,7 @@ class Component extends DCLogic {
         hjGCrear: () => self.crearGrupoNuevo(),
         hjGCrearTxt: h.enviando ? 'Creando…' : 'Crear grupo', hjGCrearBg: c.bg, hjGCrearFg: c.fg,
         hjGNota: elegidos.length
-          ? 'Con ' + listaNombres(elegidos.map(x => primerNombre(x.nombre)).concat(['tú'])) + '. Después cualquiera del grupo puede agregar a sus amigos.'
+          ? 'Con ' + listaNombres(elegidos.map(x => nombreCorto(x.id, x.nombre)).concat(['tú'])) + '. Después cualquiera del grupo puede agregar a sus amigos.'
           : 'Elige al menos un amigo. Después cualquiera del grupo puede agregar a sus amigos.',
       });
     }
@@ -2102,7 +2144,7 @@ class Component extends DCLogic {
       if (!g) return base;
       const enGrupo = new Set(g.miembros.map(x => x.id));
       const agregables = s.amigos.filter(x => x.estado === 'aceptada' && !enGrupo.has(x.id))
-        .sort((x, y) => String(x.nombre).localeCompare(String(y.nombre), 'es'));
+        .sort((x, y) => String(nombreVisto(x.id, x.nombre)).localeCompare(String(nombreVisto(y.id, y.nombre)), 'es'));
       const nombre = String(h.nombre || '').trim().replace(/\s+/g, ' ');
       const cambiaNombre = !!nombre && nombre !== g.nombre;
       const miembros = g.miembros.slice().sort((x, y) => (x.id === me ? -1 : (y.id === me ? 1 : 0)));
@@ -2114,12 +2156,12 @@ class Component extends DCLogic {
         hjGOGuardar: () => self.renombrarGrupoActual(),
         hjGOCuantos: cuenta(g.miembros.length, 'PERSONA', 'PERSONAS'),
         hjGOMiembros: miembros.map(x => ({
-          nombre: x.id === me ? 'Tú' : x.nombre, inicial: (x.nombre || '?').charAt(0).toUpperCase(), color: colorDe(x.id),
+          nombre: x.id === me ? 'Tú' : nombreVisto(x.id, x.nombre), inicial: (nombreVisto(x.id, x.nombre) || '?').charAt(0).toUpperCase(), color: colorDe(x.id),
           meta: x.unido ? 'Desde el ' + self.fechaTxt(isoOf(new Date(x.unido))).toLowerCase() : '',
         })),
         hjGOAgregarOn: agregables.length > 0,
         hjGOAgregables: agregables.map(x => ({
-          nombre: x.nombre, inicial: (x.nombre || '?').charAt(0).toUpperCase(), color: colorDe(x.id),
+          nombre: nombreVisto(x.id, x.nombre), inicial: (nombreVisto(x.id, x.nombre) || '?').charAt(0).toUpperCase(), color: colorDe(x.id),
           accion: h.enviando === x.id ? 'Agregando…' : 'Agregar',
           agregar: () => self.agregarAlGrupo(x.id),
         })),
@@ -2137,7 +2179,7 @@ class Component extends DCLogic {
       if (!total) { estado = 'Escribe el total y elige quiénes consumieron.'; estadoColor = '#8E9AAE'; }
       else if (!elegidos.length) { estado = 'Elige quiénes consumieron.'; estadoColor = '#8E9AAE'; }
       else if (suma > total) { estado = 'Te pasaste por ' + pesosTxt(suma - total) + ': la suma no puede ser mayor que el total.'; estadoColor = '#E08A87'; }
-      else if (sinMonto) { estado = 'Falta cuánto le toca a ' + primerNombre(sinMonto.nombre) + '.'; estadoColor = AMBER; }
+      else if (sinMonto) { estado = 'Falta cuánto le toca a ' + nombreCorto(sinMonto.id, sinMonto.nombre) + '.'; estadoColor = AMBER; }
       else if (suma < total) { estado = 'Repartido ' + pesosTxt(suma) + ' de ' + pesosTxt(total) + ' · faltan ' + pesosTxt(total - suma); estadoColor = AMBER; }
       else { estado = 'Cuadra exacto ✓'; estadoColor = MINT; }
       const listo = total > 0 && elegidos.length > 0 && !sinMonto && suma === total && !h.enviando, c = cta(listo);
@@ -2148,9 +2190,9 @@ class Component extends DCLogic {
         hjLGNota: h.nota || '',
         onHjLGNota: ev => { const v = ev.target.value; self.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, nota: v } } : null); },
         hjLGPersonas: otros.map(x => {
-          const on = partes[x.id] !== undefined;
+          const on = partes[x.id] !== undefined, visto = nombreVisto(x.id, x.nombre);
           return {
-            nombre: x.nombre, inicial: (x.nombre || '?').charAt(0).toUpperCase(), color: colorDe(x.id), on,
+            nombre: visto, inicial: (visto || '?').charAt(0).toUpperCase(), color: colorDe(x.id), on,
             marca: on ? MINT : 'transparent', marcaBorde: on ? MINT : 'rgba(255,255,255,.2)', tick: on ? '#0A0E1A' : 'transparent',
             monto: on ? fmtMoney(partes[x.id]) : '',
             pick: () => self.setState(st => {
@@ -2181,6 +2223,27 @@ class Component extends DCLogic {
   }
 
   /* ── Grupos: crear, renombrar, agregar, salir ────────────────────── */
+
+  /** Guarda cómo le dices al amigo del chat abierto (vacío: vuelve a su nombre). */
+  async guardarApodo() {
+    const s = this.state, h = s.chatHoja, a = s.chatCon ? s.amigos.find(x => x.id === s.chatCon) : null;
+    if (!h || h.vista !== 'opciones' || !a || h.enviando) return;
+    const apodo = apodoLimpio(h.apodo == null ? a.apodo : h.apodo, a.nombre);
+    if (apodo === (a.apodo || '')) return;
+    this.hojaEnviando('apodo');
+    try {
+      await Nube.guardarApodo(a.id, apodo);
+      this.setState(st => ({
+        amigos: st.amigos.map(x => x.id === a.id ? { ...x, apodo } : x),
+        chatHoja: st.chatHoja ? { ...st.chatHoja, enviando: null, apodo, msg: '' } : null,
+      }));
+      this.guardarCache();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      if (window.Fluido) Fluido.aviso(apodo ? 'Ahora le dices «' + apodo + '»' : 'Volvió a llamarse «' + a.nombre + '»');
+    } catch (e) {
+      this.errorHoja(e, 'No se pudo guardar el nombre.');
+    }
+  }
 
   msgHoja(msg) { this.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, msg } } : null); }
   hojaEnviando(v) { this.setState(st => st.chatHoja ? { chatHoja: { ...st.chatHoja, enviando: v, msg: '' } } : null); }
@@ -2235,7 +2298,7 @@ class Component extends DCLogic {
       await Nube.agregarAGrupo(g.id, [id]);
       const lista = await Nube.misGrupos();
       this.setState(st => ({ gAmigos: lista, chatHoja: st.chatHoja ? { ...st.chatHoja, enviando: null, msg: '' } : null }));
-      if (window.Fluido) Fluido.aviso(primerNombre(a ? a.nombre : '') + ' ahora está en el grupo');
+      if (window.Fluido) Fluido.aviso(nombreCorto(id, a ? a.nombre : '') + ' ahora está en el grupo');
     } catch (e) {
       this.errorHoja(e, 'No se pudo agregar.');
     }
@@ -2346,7 +2409,7 @@ class Component extends DCLogic {
   async borrarAbonoLG(a) {
     const s = this.state, l = this.libretaGrupoVista(s.lgVer);
     if (!l || s.lgBusy) return;
-    if (!window.confirm('¿Borrar tu abono de ' + pesosTxt(a.monto) + '? ' + primerNombre(l.creadorNombre) + ' se enterará.')) return;
+    if (!window.confirm('¿Borrar tu abono de ' + pesosTxt(a.monto) + '? ' + nombreCorto(l.creador, l.creadorNombre) + ' se enterará.')) return;
     this.setState({ lgBusy: true, lgMsg: '' });
     try {
       await Nube.borrarAbonoGrupo(a.id);
@@ -2393,7 +2456,7 @@ class Component extends DCLogic {
     const pagaron = l.partes.filter(p => saldoParte(p) <= 0).length;
     const miSaldo = mia ? saldoParte(mia) : 0;
     const orden = l.partes.slice().sort((x, y) => (x.id === me ? -1 : (y.id === me ? 1 : 0)));
-    const creador = soyCreador ? 'tú' : primerNombre(l.creadorNombre);
+    const creador = soyCreador ? 'tú' : nombreCorto(l.creador, l.creadorNombre);
     return Object.assign(base, {
       lgListo: true,
       lgKicker: 'LIBRETICA DE GRUPO · ' + String(l.grupoNombre).toUpperCase(),
@@ -2410,7 +2473,7 @@ class Component extends DCLogic {
         else if (abonado > 0) estado = (yo ? 'Abonaste ' : 'Abonó ') + pesosTxt(abonado) + ' · ' + (yo ? 'te falta ' : 'debe ') + pesosTxt(saldo);
         else estado = yo ? 'Te falta todo' : 'Debe todo';
         return {
-          nombre: yo ? 'Tú' : p.nombre, inicial: (p.nombre || '?').charAt(0).toUpperCase(), color: colorDe(p.id),
+          nombre: yo ? 'Tú' : nombreVisto(p.id, p.nombre), inicial: (nombreVisto(p.id, p.nombre) || '?').charAt(0).toUpperCase(), color: colorDe(p.id),
           monto: pesosTxt(p.monto), estado,
           estadoColor: saldo <= 0 ? MINT : (abonado > 0 ? AMBER : '#8E9AAE'),
           barW: Math.round(abonado / Math.max(1, p.monto) * 100) + '%', barColor: saldo <= 0 ? MINT : AMBER,
@@ -2439,6 +2502,99 @@ class Component extends DCLogic {
     });
   }
 
+  /* ── Elegir amigo (Compartir con / Para) ─────────────────────────── */
+
+  abrirElegir(tipo, id) { this.setState({ elegir: { tipo, id: id || null, q: '' } }); }
+
+  /** Aplica lo elegido (se ve debajo mientras la hoja baja) y cierra. */
+  elegir(id) {
+    const e = this.state.elegir, me = this.uid;
+    if (!e) return;
+    if (e.tipo === 'lib') {
+      // Elegir a alguien no se la muestra aún: hay que tocar Enviar. Deudor y
+      // prestamista llevan el nombre de Pilares: el amigo también los ve.
+      this.setState(st => ({ libs: st.libs.map(x => {
+        if (x.id !== e.id || (x.contra || null) === id) return x;
+        if (!id) return { ...x, contra: null, enviada: false };
+        const suyo = (st.amigos.find(a => a.id === id) || {}).nombre || '';
+        const mio = st.profile.nombre || (st.me && st.me.usuario) || 'Yo';
+        return x.mine ? { ...x, contra: id, enviada: false, deudor: suyo, prestamista: mio }
+                      : { ...x, contra: id, enviada: false, deudor: mio, prestamista: suyo };
+      }) }));
+    } else {
+      this.setState(st => {
+        if (!st.modal) return null;
+        const lista = id === me ? st.cuadernos : (st.cuadAmigos[id] || []);
+        return { modal: { ...st.modal, para: id, c: lista[0] ? lista[0].id : null } };
+      });
+    }
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    this.cerrarHoja('elegir');
+  }
+
+  /** Enter en el buscador: con una sola persona en la lista, la elige; si no, guarda el teclado. */
+  elegirConEnter() {
+    const v = this.valsElegir(this.state);
+    if (v.elegirOn && v.elegirQ.trim() && v.elegirFilas.length === 1) v.elegirFilas[0].pick();
+    else if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+
+  valsElegir(s) {
+    const e = s.elegir, self = this, me = this.uid;
+    if (!e) return { elegirOn: false };
+    let actual, propio, titulo;
+    if (e.tipo === 'lib') {
+      const l = s.libs.find(x => x.id === e.id);
+      if (!l) return { elegirOn: false };
+      actual = l.contra || null;
+      titulo = '¿Con quién la compartes?';
+      propio = { id: null, nombre: 'Solo yo', sub: 'Nadie más la ve' };
+    } else {
+      if (!s.modal) return { elegirOn: false };
+      actual = s.modal.para || me;
+      titulo = '¿Para quién es?';
+      propio = { id: me, nombre: 'Mí', sub: 'En tu agenda' };
+    }
+    const miNombre = s.profile.nombre || (s.me && s.me.usuario) || 'Yo';
+    // Por el nombre que se ve (el apodo, si tiene); debajo, el de Pilares.
+    const amigos = s.amigos.filter(a => a.estado === 'aceptada')
+      .map(a => ({ id: a.id, nombre: nombreVisto(a.id, a.nombre), real: a.nombre, sub: a.apodo ? a.nombre : '' }))
+      .sort((x, y) => String(x.nombre).localeCompare(String(y.nombre), 'es'));
+    // Con pocos amigos la lista se ve completa: el buscador sobra.
+    const buscarOn = amigos.length > 4;
+    const q = buscarOn ? norm(e.q) : '';
+    const lista = q ? amigos.filter(a => norm(a.nombre).includes(q) || norm(a.real).includes(q)) : [propio].concat(amigos);
+    const ponerQ = v => self.setState(st => st.elegir ? { elegir: { ...st.elegir, q: v } } : null);
+    return {
+      elegirOn: true, elegirTitulo: titulo,
+      elegirAlto: buscarOn ? 'min(640px, calc(100% - env(safe-area-inset-top,0px) - 44px))' : 'auto',
+      elegirBuscarOn: buscarOn,
+      elegirQ: e.q || '',
+      onElegirQ: ev => ponerQ(ev.target.value),
+      limpiarElegirQ: () => {
+        ponerQ('');
+        const x = document.querySelector('[data-elegir-buscar]');
+        if (x) x.focus();
+      },
+      cerrarElegir: () => {
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        self.cerrarHoja('elegir');
+      },
+      elegirFilas: lista.map(f => {
+        const sel = f.id === actual, yo = f === propio;
+        return {
+          nombre: f.nombre, sub: f.sub || '',
+          inicial: String((yo ? miNombre : f.nombre) || '?').charAt(0).toUpperCase(), color: colorDe(yo ? me : f.id),
+          sel: sel ? 'true' : 'false',
+          fondo: sel ? 'rgba(87,185,160,.1)' : '#121724', borde: sel ? 'rgba(87,185,160,.38)' : 'rgba(255,255,255,.07)',
+          marca: sel ? MINT : 'transparent', marcaBorde: sel ? MINT : 'rgba(255,255,255,.2)', tick: sel ? '#0A0E1A' : 'transparent',
+          pick: () => self.elegir(f.id),
+        };
+      }),
+      elegirVacio: q && !lista.length ? 'Ningún amigo coincide con «' + String(e.q).trim() + '»' : '',
+    };
+  }
+
   /* ── Libreticas: enviar al amigo ─────────────────────────────────── */
 
   /** El amigo la ve y recibe el aviso (con monto y concepto) solo al enviarla. */
@@ -2448,7 +2604,7 @@ class Component extends DCLogic {
     if (!((+l.monto || 0) > 0)) { if (window.Fluido) Fluido.aviso('Escribe el monto antes de enviarla'); return; }
     const nombre = (this.state.amigos.find(a => a.id === l.contra) || {}).nombre || 'tu amigo';
     this.setState(st => ({ libs: st.libs.map(x => x.id === id ? { ...x, enviada: true } : x) }));
-    if (window.Fluido) Fluido.aviso('Libretica enviada a ' + primerNombre(nombre));
+    if (window.Fluido) Fluido.aviso('Libretica enviada a ' + nombreCorto(l.contra, nombre));
   }
 
   /* ── Tipos de actividad propios ──────────────────────────────────── */
@@ -2767,8 +2923,10 @@ class Component extends DCLogic {
     const me = this.uid;
     const ac = this.accent();
 
+    APODOS = {};
+    s.amigos.forEach(a => { if (a.apodo && a.estado === 'aceptada') APODOS[a.id] = a.apodo; });
     const amigosOk = s.amigos.filter(a => a.estado === 'aceptada');
-    const nombreDe = id => (s.amigos.find(a => a.id === id) || {}).nombre || 'un amigo';
+    const nombreDe = id => { const a = s.amigos.find(x => x.id === id); return a ? nombreVisto(a.id, a.nombre) : 'un amigo'; };
     const miNombre = s.profile.nombre || (s.me && s.me.usuario) || 'Yo';
     // Mis actividades cuentan en todo; las que asigné a amigos solo se listan.
     const misActs = s.acts.filter(a => !a.owner || a.owner === me);
@@ -2917,7 +3075,7 @@ class Component extends DCLogic {
     const mGrupoId = mGrupoNueva ? m.grupo : (mLote ? mAct.g : null);
     const mGrupoNom = mGrupoId ? ((s.gAmigos.find(g => g.id === mGrupoId) || {}).nombre || '') : '';
     const mCreador = mFijo
-      ? primerNombre(((s.gAmigos.find(g => g.id === mAct.g) || { miembros: [] }).miembros.find(x => x.id === mAct.por) || {}).nombre || nombreDe(mAct.por))
+      ? nombreCorto(mAct.por, ((s.gAmigos.find(g => g.id === mAct.g) || { miembros: [] }).miembros.find(x => x.id === mAct.por) || {}).nombre || nombreDe(mAct.por))
       : '';
     const mCuads = mPara === me ? s.cuadernos : (s.cuadAmigos[mPara] || []);
     let mCells = [], mUrg = { color: GREY, tint: 'rgba(142,154,174,.14)', label: 'SIN URGENCIA' };
@@ -2952,6 +3110,13 @@ class Component extends DCLogic {
       return { mia, meDeben: mia ? l.mine : !l.mine, abonado, saldo: Math.max(0, (+l.monto || 0) - abonado) };
     };
     const setLib = (id, fn) => self.setState(st => ({ libs: st.libs.map(x => x.id === id ? fn(x) : x) }));
+    // Deudor y prestamista se guardan con el nombre de Pilares (los dos los ven y
+    // en la propia se editan tal cual); donde solo se leen, el del otro va con mi apodo.
+    const enLib = (l, t) => {
+      const otro = (!l.owner || l.owner === me) ? l.contra : l.owner;
+      const a = otro && APODOS[otro] ? s.amigos.find(x => x.id === otro) : null;
+      return a && String(t || '').trim() === String(a.nombre || '').trim() ? APODOS[otro] : t;
+    };
     // Igual que en la base de datos: queda saldada cuando los abonos cubren el monto.
     const conAbonos = (x, abonos) => {
       const ab = abonos.reduce((t, a) => t + (+a.monto || 0), 0);
@@ -2968,9 +3133,10 @@ class Component extends DCLogic {
       const open = s.openLib === l.id;
       const n = (l.abonos || []).length;
       const pendiente = v.mia && !!l.contra && !enviadaDe(l);
-      const montoOk = (+l.monto || 0) > 0, quien = primerNombre(otroNombre);
+      const montoOk = (+l.monto || 0) > 0, quien = nombreCorto(otro, otroNombre);
       return {
         id: l.id, deudor: l.deudor, prestamista: l.prestamista, monto: fmtMoney(l.monto),
+        deudorVer: enLib(l, l.deudor), prestamistaVer: enLib(l, l.prestamista),
         montoTxt: '$ ' + fmtMoney(l.monto), color: col,
         bg: green ? 'rgba(46,204,113,.09)' : 'rgba(196,100,97,.08)',
         border: green ? 'rgba(87,185,160,.32)' : 'rgba(196,100,97,.3)',
@@ -2983,7 +3149,7 @@ class Component extends DCLogic {
         tick: l.paid ? '#0A0E1A' : 'rgba(255,255,255,.18)',
         editable: v.mia, readonly: !v.mia,
         shared: !!otro,
-        sharedLabel: !otro ? '' : (!v.mia ? 'CREADA POR ' : (pendiente ? 'PARA ' : 'COMPARTIDA CON ')) + String(otroNombre).toUpperCase() + (pendiente ? ' · SIN ENVIAR' : ''),
+        sharedLabel: !otro ? '' : (!v.mia ? 'CREADA POR ' : (pendiente ? 'PARA ' : 'COMPARTIDA CON ')) + String(nombreVisto(otro, otroNombre)).toUpperCase() + (pendiente ? ' · SIN ENVIAR' : ''),
         sharedDot: pendiente ? AMBER : col,
         enviarOn: pendiente,
         enviarTxt: 'Enviar a ' + quien,
@@ -2994,20 +3160,13 @@ class Component extends DCLogic {
           : 'Escribe el monto para poder enviarla.',
         enviar: () => self.enviarLibreta(l.id),
         hayConcepto: !!(l.nota || '').trim(),
-        hasChips: v.mia && amigosOk.length > 0,
-        chips: [{ t: 'Solo yo', id: null }].concat(amigosOk.map(a => ({ t: a.nombre, id: a.id }))).map(c => {
-          const on = (l.contra || null) === c.id;
-          return {
-            t: c.t, bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE',
-            // Elegir a alguien no se la muestra aún: hay que tocar Enviar.
-            pick: () => setLib(l.id, x => {
-              if ((x.contra || null) === c.id) return x;
-              if (!c.id) return { ...x, contra: null, enviada: false };
-              return x.mine ? { ...x, contra: c.id, enviada: false, deudor: c.t, prestamista: miNombre }
-                            : { ...x, contra: c.id, enviada: false, deudor: miNombre, prestamista: c.t };
-            }),
-          };
-        }),
+        // Con quién se comparte: un botón que abre la hoja «Elegir amigo» (con buscador).
+        hasPara: v.mia && amigosOk.length > 0,
+        paraNombre: l.contra ? nombreVisto(l.contra, otroNombre) : 'Solo yo',
+        paraInicial: String((l.contra ? nombreVisto(l.contra, otroNombre) : miNombre) || '?').charAt(0).toUpperCase(),
+        paraColor: colorDe(l.contra || me),
+        paraFg: l.contra ? '#EDF1F7' : '#B8C2D2',
+        elegirPara: () => self.abrirElegir('lib', l.id),
         togglePaid: () => setLib(l.id, x => ({ ...x, paid: !x.paid })),
         flip: () => { if (v.mia) setLib(l.id, x => x.contra ? { ...x, mine: !x.mine, deudor: x.prestamista, prestamista: x.deudor } : { ...x, mine: !x.mine }); },
         remove: () => { if (v.mia) self.setState(st => ({ libs: st.libs.filter(x => x.id !== l.id) })); },
@@ -3069,7 +3228,7 @@ class Component extends DCLogic {
         montoTxt: '$ ' + fmtMoney(String(x.falta)),
         linea: green
           ? 'De ' + pesosTxt(l.total) + ' · ' + pagaron + ' de ' + l.partes.length + ' pagaron'
-          : 'Tu parte: ' + pesosTxt(x.mia.monto) + ' de ' + pesosTxt(l.total) + ' · a ' + primerNombre(l.creadorNombre),
+          : 'Tu parte: ' + pesosTxt(x.mia.monto) + ' de ' + pesosTxt(l.total) + ' · a ' + nombreCorto(l.creador, l.creadorNombre),
         hasBar: pagado > 0, barW: Math.min(100, Math.round(pagado / Math.max(1, base) * 100)) + '%',
         accion: green ? 'VER DETALLE ›' : 'VER Y PAGAR ›',
         abrir: () => self.abrirLibretaGrupo(l.id),
@@ -3090,8 +3249,8 @@ class Component extends DCLogic {
         };
       })
       ;
-    const deudas = pagar.map(l => ({ saldo: libView(l).saldo, title: l.prestamista, meta: 'YO DEBO · LIBRETICA', go: () => self.setState({ tab: 'finanzas' }) }))
-      .concat(lgPagar.map(x => ({ saldo: x.falta, title: x.l.creadorNombre, meta: 'YO DEBO · GRUPO ' + String(x.l.grupoNombre).toUpperCase(),
+    const deudas = pagar.map(l => ({ saldo: libView(l).saldo, title: enLib(l, l.prestamista), meta: 'YO DEBO · LIBRETICA', go: () => self.setState({ tab: 'finanzas' }) }))
+      .concat(lgPagar.map(x => ({ saldo: x.falta, title: nombreVisto(x.l.creador, x.l.creadorNombre), meta: 'YO DEBO · GRUPO ' + String(x.l.grupoNombre).toUpperCase(),
                                    go: () => { self.setState({ tab: 'finanzas' }); self.abrirLibretaGrupo(x.l.id); } })));
     const urgent = urgentAcad
       .concat(deudas.sort((a, b) => b.saldo - a.saldo).slice(0, 2).map(d => ({
@@ -3128,7 +3287,7 @@ class Component extends DCLogic {
       yes: true,
       appOn: true, authOn: false, loadOn: false,
       ...self.valsRutina(s), ...self.valsMenu(s), ...self.valsVer(s), ...self.valsAvisos(s),
-      ...self.valsAmigos(s), ...vChat, ...self.valsChatHoja(s), ...self.valsLG(s),
+      ...self.valsAmigos(s), ...vChat, ...self.valsChatHoja(s), ...self.valsLG(s), ...self.valsElegir(s),
       isHome: s.tab === 'home', isEjercicio: s.tab === 'ejercicio', isEstudio: s.tab === 'estudio', isFinanzas: s.tab === 'finanzas',
       isAmigos: s.tab === 'amigos',
       barraOn: !vChat.chatOn,
@@ -3213,16 +3372,11 @@ class Component extends DCLogic {
         ? 'Aún no tienes cuadernos. Puedes crear uno en Estudio › Cuadernos.'
         : nombreDe(mPara) + ' no tiene cuadernos.',
       modalParaOn: !!(m && !m.id && !m.grupo && amigosOk.length),
-      modalPara: [{ t: 'Mí', id: me }].concat(amigosOk.map(a => ({ t: a.nombre, id: a.id }))).map(p => {
-        const on = mPara === p.id;
-        return {
-          t: p.t, bg: on ? '#fff' : 'rgba(255,255,255,.05)', border: on ? '#fff' : 'rgba(255,255,255,.09)', fg: on ? '#090C14' : '#8E9AAE',
-          pick: () => self.setState(st => {
-            const lista = p.id === me ? st.cuadernos : (st.cuadAmigos[p.id] || []);
-            return { modal: { ...st.modal, para: p.id, c: lista[0] ? lista[0].id : null } };
-          }),
-        };
-      }),
+      modalParaNombre: mPara === me ? 'Mí' : nombreDe(mPara),
+      modalParaSub: mPara === me ? 'En tu agenda' : 'En su agenda',
+      modalParaInicial: String((mPara === me ? miNombre : nombreDe(mPara)) || '?').charAt(0).toUpperCase(),
+      modalParaColor: colorDe(mPara),
+      modalElegirPara: () => self.abrirElegir('para'),
       modalDe: !m ? '' : (mGrupoNueva
         ? 'Para todos en «' + mGrupoNom + '»: aparecerá en la agenda de cada uno, también en la tuya.'
         : (mFijo

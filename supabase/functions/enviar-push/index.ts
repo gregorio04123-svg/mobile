@@ -6,6 +6,8 @@
 // - Solo acepta llamadas con la clave compartida guardada en Vault.
 // - Cada aviso o mensaje se envía una sola vez (se marca push_en antes de enviar).
 // - Las claves VAPID viven en Vault; aquí no hay ningún secreto escrito.
+// - Quien escribe sale con el apodo que le puso quien recibe (tabla apodos);
+//   los avisos ya llegan con ese nombre desde la base (nombre_para).
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
@@ -116,9 +118,16 @@ Deno.serve(async (req) => {
         .select("user_id").eq("grupo_id", m.grupo_id).neq("user_id", m.de_id).lte("unido_en", m.creado_en);
       if (e2) throw e2;
       const autor = (m.de_nombre || "").trim() || "Alguien", grupo = (g?.nombre || "").trim() || "el grupo";
+      // Cada quien ve a quien escribe con el apodo que le puso, si le puso uno.
+      const apodos = new Map<string, string>();
+      if (miembros && miembros.length) {
+        const { data: ap } = await sb.from("apodos").select("dueno_id,apodo")
+          .eq("amigo_id", m.de_id).in("dueno_id", miembros.map((x) => x.user_id));
+        for (const a of ap || []) apodos.set(a.dueno_id, a.apodo);
+      }
       for (const x of miembros || []) {
         envios.push({ para: x.user_id, contenido: {
-          id: m.id, tipo: "mensaje", titulo: autor + " · " + grupo,
+          id: m.id, tipo: "mensaje", titulo: (apodos.get(x.user_id) || autor) + " · " + grupo,
           cuerpo: recorte(String(m.texto || "")), url: "./?ir=grupo&g=" + m.grupo_id,
         } });
       }
@@ -132,9 +141,13 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (e1) throw e1;
       if (!m) return json({ ok: true, omitido: "ya enviado" });
-      const { data: autor } = await sb.from("perfiles").select("nombre").eq("id", m.de_id).maybeSingle();
+      const [{ data: autor }, { data: apodo }] = await Promise.all([
+        sb.from("perfiles").select("nombre").eq("id", m.de_id).maybeSingle(),
+        // Con el apodo que quien recibe le puso a quien escribe, si le puso uno.
+        sb.from("apodos").select("apodo").eq("dueno_id", m.para_id).eq("amigo_id", m.de_id).maybeSingle(),
+      ]);
       envios.push({ para: m.para_id, contenido: {
-        id: m.id, tipo: "mensaje", titulo: (autor?.nombre || "").trim() || "Un amigo",
+        id: m.id, tipo: "mensaje", titulo: apodo?.apodo || (autor?.nombre || "").trim() || "Un amigo",
         cuerpo: recorte(String(m.texto || "")), url: "./?ir=chat&con=" + m.de_id,
       } });
     } else {
