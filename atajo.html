@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Atajo de Pilares</title>
-<meta name="description" content="Cómo armar el atajo del iPhone que anota en Pilares sin abrir la app.">
+<meta name="description" content="Cómo armar el atajo del iPhone que anota un gasto en Pilares sin abrir la app.">
 <meta name="theme-color" content="#090C14">
 <meta name="color-scheme" content="dark">
 <meta name="robots" content="noindex">
@@ -36,7 +36,6 @@
   .dentro { margin: 8px 0 0; padding: 10px 0 2px 14px; border-left: 2px solid rgba(255,255,255,.1); }
   .dentro p { margin: 0 0 8px; }
   .nota { color: var(--sub); font-size: 13px; margin: 6px 0 0; }
-  .aviso { background: rgba(206,127,85,.08); border-color: rgba(206,127,85,.28); }
   ul.usos { margin: 0; padding: 0 0 0 18px; color: var(--sub); }
   ul.usos li { margin: 0 0 6px; }
   a { color: var(--mint); }
@@ -45,7 +44,7 @@
 <body>
 <main>
   <h1>Atajo de Pilares</h1>
-  <p class="lead">Con este atajo anotas un gasto, lo que te deben, lo que debes o una actividad de estudio con los menús del iPhone, sin abrir Pilares. Lo armas una sola vez en la app <b>Atajos</b>; las preguntas las manda Pilares, así que si algo cambia no tienes que volver a armarlo.</p>
+  <p class="lead">Anota un gasto en segundos sin abrir Pilares: el iPhone te pregunta <b>¿Cuánto gastaste?</b> y <b>¿En qué?</b>, y queda guardado en Finanzas como una libretica de Gasto. Lo armas una sola vez en la app <b>Atajos</b>.</p>
 
   <h2>Antes de empezar</h2>
   <div class="card">
@@ -54,65 +53,36 @@
   <div class="card">
     <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:var(--sub);margin-bottom:10px">LA DIRECCIÓN (PASO 4)</div>
     <div class="copiar">
-      <code id="url">https://muawlxszfibohwhwnsng.supabase.co/rest/v1/rpc/atajo?apikey=sb_publishable_2KSrLx1N8Wt9wZp_FOOOaQ_2qVG6fAA</code>
+      <code id="url">https://muawlxszfibohwhwnsng.supabase.co/rest/v1/rpc/atajo_gasto?apikey=sb_publishable_2KSrLx1N8Wt9wZp_FOOOaQ_2qVG6fAA</code>
       <button type="button" data-copiar="url">Copiar</button>
     </div>
   </div>
 
   <h2>Arma el atajo</h2>
-  <div class="card aviso" style="margin-bottom:18px">
-    <b>Truco:</b> cada acción nueva aparece al final. Si queda debajo de <b>Finalizar repetición</b> o fuera de un <b>Si</b>, mantenla presionada y arrástrala a su lugar.
-  </div>
   <ol>
-    <li>Abre <b>Atajos</b>, toca <b>+</b> y ponle de nombre <span class="txt">Pilares</span>.</li>
-    <li>Agrega <span class="accion">Texto</span> y déjalo vacío. Debajo, agrega <span class="accion">Establecer variable</span> y llámala <span class="txt">Respuesta</span>.</li>
-    <li>Agrega <span class="accion">Repetir</span> y cambia las veces a <span class="txt">20</span>. Todo lo que sigue va <b>dentro</b> del Repetir.</li>
+    <li>Abre <b>Atajos</b>, toca <b>+</b> y ponle de nombre <span class="txt">Gasto</span>.</li>
+    <li>Agrega <span class="accion">Pedir entrada</span>. Cambia <b>Texto</b> por <b>Número</b> y en la pregunta escribe <span class="txt">¿Cuánto gastaste?</span></li>
+    <li>Agrega otra <span class="accion">Pedir entrada</span> (esta queda en <b>Texto</b>) y escribe <span class="txt">¿En qué gastaste?</span></li>
     <li>Agrega <span class="accion">Obtener contenido de URL</span>. En la URL pega <b>la dirección</b> de arriba. Toca la flecha para ver más:
       <div class="dentro">
         <p>Método: <span class="txt">POST</span> · Cuerpo de la solicitud: <span class="txt">JSON</span></p>
         <p>Toca <b>Agregar campo nuevo › Texto</b> tres veces:</p>
         <p><span class="txt">clave</span> → pega tu clave de Pilares</p>
-        <p><span class="txt">vuelta</span> → la variable <span class="var">Índice de repetición</span></p>
-        <p><span class="txt">respuesta</span> → la variable <span class="var">Respuesta</span></p>
+        <p><span class="txt">monto</span> → toca <b>Seleccionar variable</b> y luego la respuesta del paso 2 (<span class="var">Entrada proporcionada</span>)</p>
+        <p><span class="txt">motivo</span> → igual, pero la respuesta del paso 3</p>
       </div>
     </li>
-    <li>Agrega <span class="accion">Obtener valor del diccionario</span>: obtener <b>Valor</b> de <span class="txt">pregunta</span> en <span class="var">Contenido de URL</span>. Debajo, <span class="accion">Establecer variable</span> <span class="txt">Pregunta</span>.</li>
-    <li>Otra vez <span class="accion">Obtener valor del diccionario</span>: <b>Valor</b> de <span class="txt">tipo</span> en <span class="var">Contenido de URL</span>. Debajo, <span class="accion">Establecer variable</span> <span class="txt">Tipo</span>.</li>
-    <li>Agrega <span class="accion">Si</span>: <span class="var">Tipo</span> es <span class="txt">fin</span>. Entre <b>Si</b> y <b>De lo contrario</b> pon:
-      <div class="dentro">
-        <p><span class="accion">Mostrar notificación</span> con <span class="var">Pregunta</span></p>
-        <p><span class="accion">Detener este atajo</span></p>
-      </div>
-    </li>
-    <li>Debajo de ese <b>Finalizar si</b>, otro <span class="accion">Si</span>: <span class="var">Tipo</span> es <span class="txt">menu</span>. Adentro:
-      <div class="dentro">
-        <p><span class="accion">Obtener valor del diccionario</span>: <b>Valor</b> de <span class="txt">opciones</span> en <span class="var">Contenido de URL</span></p>
-        <p><span class="accion">Elegir de la lista</span> con ese <span class="var">Valor del diccionario</span>; en «Solicitud» pon <span class="var">Pregunta</span></p>
-        <p><span class="accion">Establecer variable</span> <span class="txt">Respuesta</span> a <span class="var">Elemento elegido</span></p>
-      </div>
-    </li>
-    <li>Otro <span class="accion">Si</span>: <span class="var">Tipo</span> es <span class="txt">numero</span>. Adentro:
-      <div class="dentro">
-        <p><span class="accion">Pedir entrada</span>: tipo <b>Número</b>, solicitud <span class="var">Pregunta</span></p>
-        <p><span class="accion">Establecer variable</span> <span class="txt">Respuesta</span> a <span class="var">Entrada proporcionada</span></p>
-      </div>
-    </li>
-    <li>Y el último <span class="accion">Si</span>: <span class="var">Tipo</span> es <span class="txt">texto</span>. Adentro:
-      <div class="dentro">
-        <p><span class="accion">Pedir entrada</span>: tipo <b>Texto</b>, solicitud <span class="var">Pregunta</span></p>
-        <p><span class="accion">Establecer variable</span> <span class="txt">Respuesta</span> a <span class="var">Entrada proporcionada</span></p>
-      </div>
-      <p class="nota">Los «De lo contrario» quedan vacíos. Al final todo debe estar antes de <b>Finalizar repetición</b>.</p>
-    </li>
+    <li>Agrega <span class="accion">Obtener valor del diccionario</span>: obtener <b>Valor</b> de <span class="txt">mensaje</span> en <span class="var">Contenido de URL</span>.</li>
+    <li>Agrega <span class="accion">Mostrar notificación</span> con <span class="var">Valor del diccionario</span>.</li>
     <li>Toca <b>OK</b>. La primera vez que lo uses, el iPhone te pregunta si Atajos puede conectarse con supabase.co: toca <b>Permitir siempre</b>.</li>
   </ol>
 
   <h2>Cómo usarlo</h2>
   <div class="card">
     <ul class="usos">
-      <li>Di <b>«Oye Siri, Pilares»</b> o tócalo en la app Atajos.</li>
-      <li>Ponlo en tu pantalla de inicio (mantén presionado el atajo › <b>Compartir › Agregar a pantalla de inicio</b>), o en el botón de acción o Tocar atrás en Ajustes.</li>
-      <li>Las listas tienen <b>← Atrás</b> para volver a la pregunta anterior. Al guardar te llega una notificación de confirmación, y si era para un amigo, a él le llega su aviso.</li>
+      <li>Di <b>«Oye Siri, Gasto»</b> o tócalo en la app Atajos.</li>
+      <li>También puedes ponerlo en la pantalla de inicio, en el Centro de control o en el botón de acción.</li>
+      <li>Al guardar te llega una notificación, por ejemplo «Gasto guardado · $25.000 · Almuerzo». En Pilares sale en Finanzas al abrir la app.</li>
       <li>Si cambias la clave en la ruedita, pega la nueva en el paso 4.</li>
     </ul>
   </div>
