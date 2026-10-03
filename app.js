@@ -53,6 +53,24 @@ const TIPOS_BASE = [
 const DIA_LARGO = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 // Colores para grupos nuevos (los 4 primeros son los de siempre).
 const PALETA = ['#4B7BE5', '#E05C5C', '#5EA37D', '#9B6BD6', '#CE7F55', '#57B9A0', '#D4A843', '#8E9AAE'];
+// Tipos de gasto: Pilares los deduce de las palabras del motivo («almuerzo» → Comida).
+const CAT_SIN = { n: 'Sin motivo', c: '#4A566B' }, CAT_OTROS = { n: 'Otros', c: '#8E9AAE' };
+const CATS_GASTO = [
+  { n: 'Comida', c: '#CE7F55', re: /almuerz|cena\b|cenar|desayun|comida|comi\b|restaur|cafe\b|cafeteria|pizza|hamburg|perro caliente|empanada|snack|mecato|mercado|supermerc|tienda|domicilio|rappi|helado|pan\b|panader|bebida|gaseosa|jugo|cerveza|trago|licor|fruta|verdura|carne|pollo|arepa|sushi|postre|dulce/ },
+  { n: 'Transporte', c: '#57B9A0', re: /uber|taxi|bus\b|buseta|metro|transmi|sitp|gasolina|tanqueo|moto\b|pasaje|parqueadero|peaje|didi|indrive|cabify|bicicleta|vuelo|tiquete/ },
+  { n: 'Hogar', c: '#7F9BC4', re: /arriendo|renta|alquiler|luz\b|energia|agua\b|internet|gas\b|servicio|aseo|mueble|hogar|casa\b|cocina|lavander|plomer/ },
+  { n: 'Salud', c: '#6FBF8E', re: /medic|farmacia|drogueria|droga\b|doctor|dentista|cita\b|gym|gimnasio|suplement|proteina|creatina|terapia|examen|salud|vitamina/ },
+  { n: 'Estudio', c: '#B49AD0', re: /libro|copia|curso|universidad|matricula|papeleria|cuaderno|impresion|lapiz|esfero|calculadora|clase\b|semestre/ },
+  { n: 'Ocio', c: '#D6B25E', re: /cine|netflix|spotify|youtube|juego|fiesta|salida|concierto|bar\b|discoteca|paseo|viaje|steam|regalo|suscripcion|disney|hbo|prime|entrada\b|boleta/ },
+  { n: 'Ropa y cuidado', c: '#C98AA8', re: /ropa|camisa|camiseta|pantalon|zapato|tenis|jean|peluquer|barber|corte\b|maquillaje|perfume|crema|jabon|shampoo|uñas|unas\b/ },
+];
+function catDe(nota) {
+  const t = String(nota || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  // Si el motivo es solo una fecha (atajo mal armado), no sirve para clasificar.
+  if (!t || /^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(t)) return CAT_SIN;
+  return CATS_GASTO.find(c => c.re.test(t)) || CAT_OTROS;
+}
+
 // Plan semanal: índice = día de la semana (0 domingo … 6 sábado), valor = id del grupo o null (descanso).
 const PLAN_VACIO = [null, null, null, null, null, null, null];
 const TIPOS_EJ = ['Compuesto', 'Máquina', 'Aislamiento'];
@@ -330,7 +348,7 @@ class Component extends DCLogic {
       openCuaderno: null, estudioTab: 'agenda',
       month: NOW.getMonth(), year: NOW.getFullYear(), selDay: NOW.getDate(),
       modal: null,
-      showHist: false, openLib: null, abonoMonto: '',
+      showHist: false, openLib: null, abonoMonto: '', finVista: 'deudas', finMes: 0,
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
       invRutinas: [], verRutina: null,
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false,
@@ -574,7 +592,7 @@ class Component extends DCLogic {
     return Object.assign(vacio(), {
       auth: 'fuera', authMode: 'entrar', aNombre: '', aClave: '', authErr: '', authBusy: false,
       me: null, codigo: '', amigos: [], cuadAmigos: {}, amigoCodigo: '', amigoMsg: '', importMsg: '',
-      nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null,
+      nube: 'ok', respaldo: '', respaldoMsg: '', panel: false, modal: null, tab: 'home', openCuaderno: null, openLib: null, finVista: 'deudas', finMes: 0,
       activeDay: 1, expanded: null, elegir: null, atajoClave: null, atajoCambiar: false, atajoMsg: '',
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
       invRutinas: [], verRutina: null,
@@ -3166,11 +3184,10 @@ class Component extends DCLogic {
         border: gasto ? 'rgba(255,255,255,.12)' : (green ? 'rgba(87,185,160,.32)' : 'rgba(196,100,97,.3)'),
         tint: gasto ? 'rgba(255,255,255,.08)' : (green ? 'rgba(87,185,160,.14)' : 'rgba(196,100,97,.14)'),
         esGasto: gasto, noGasto: !gasto,
+        catN: catDe(l.nota).n, catC: catDe(l.nota).c, sinMotivo: !(l.nota || '').trim(),
+        gastoNota: (l.nota || '').trim() || 'Sin motivo',
         gastoFecha: l.en ? (isoOf(new Date(l.en)) === TODAY ? 'HOY' : self.fechaTxt(isoOf(new Date(l.en))).toUpperCase()) : 'HOY',
-        borrarGasto: () => {
-          if (!window.confirm('¿Borrar el gasto de ' + pesosTxt(l.monto) + (l.nota ? ' «' + l.nota + '»' : '') + '?')) return;
-          self.setState(st => ({ libs: st.libs.filter(x => x.id !== l.id) }));
-        },
+        borrarGasto: () => self.setState(st => ({ libs: st.libs.filter(x => x.id !== l.id) })),
         dirLabel: green ? 'ME DEBEN' : 'YO DEBO',
         opacity: l.paid ? 0.45 : 1,
         paidLabel: l.paid ? 'SALDADA' : 'SALDAR',
@@ -3198,11 +3215,10 @@ class Component extends DCLogic {
         paraFg: l.contra ? '#EDF1F7' : '#B8C2D2',
         elegirPara: () => self.abrirElegir('lib', l.id),
         togglePaid: () => setLib(l.id, x => ({ ...x, paid: !x.paid })),
-        // Tocar la etiqueta: ME DEBEN → YO DEBO → GASTO (si no está compartida) → ME DEBEN.
+        // Tocar la etiqueta: ME DEBEN ↔ YO DEBO.
         flip: () => { if (v.mia) setLib(l.id, x => {
           if (x.contra) return { ...x, mine: !x.mine, deudor: x.prestamista, prestamista: x.deudor };
-          if (x.gasto) return { ...x, gasto: false, mine: true };
-          return x.mine ? { ...x, mine: false } : { ...x, gasto: true };
+          return { ...x, mine: !x.mine };
         }); },
         remove: () => { if (v.mia) self.setState(st => ({ libs: st.libs.filter(x => x.id !== l.id) })); },
         onDeudor: ev => { const val = ev.target.value; setLib(l.id, x => ({ ...x, deudor: val })); },
@@ -3234,10 +3250,36 @@ class Component extends DCLogic {
         vence: l.vence || '', onVence: ev => { const val = ev.target.value; setLib(l.id, x => ({ ...x, vence: val })); },
       };
     };
-    const activeLibs = s.libs.filter(l => !l.paid), paidL = s.libs.filter(l => l.paid);
+    // Los gastos viven aparte (Finanzas › Gastos): no cuentan en lo que te deben ni en lo que debes.
+    const activeLibs = s.libs.filter(l => !l.paid && !l.gasto), paidL = s.libs.filter(l => l.paid && !l.gasto);
+
+    // ── Gastos personales: salen de las libreticas marcadas como gasto, por mes.
+    const gastosMios = s.libs.filter(l => l.gasto && libView(l).mia);
+    const fechaG = l => (l.en ? new Date(l.en) : NOW);
+    const enMes = (l, d0) => { const d = fechaG(l); return d.getFullYear() === d0.getFullYear() && d.getMonth() === d0.getMonth(); };
+    const sumG = arr => arr.reduce((t, l) => t + (+l.monto || 0), 0);
+    const fMes = new Date(NOW.getFullYear(), NOW.getMonth() + (s.finMes || 0), 1), fAnt = new Date(fMes.getFullYear(), fMes.getMonth() - 1, 1);
+    const gMes = gastosMios.filter(l => enMes(l, fMes)).sort((a, b) => fechaG(b) - fechaG(a));
+    const gTotal = sumG(gMes);
+    // En el mes en curso se compara con el mismo punto del mes anterior (hasta el mismo día).
+    const gAnt = sumG(gastosMios.filter(l => enMes(l, fAnt) && ((s.finMes || 0) < 0 || fechaG(l).getDate() <= NOW.getDate())));
+    const gDiasN = (s.finMes || 0) === 0 ? NOW.getDate() : new Date(fMes.getFullYear(), fMes.getMonth() + 1, 0).getDate();
+    const porCat = {};
+    gMes.forEach(l => { const c = catDe(l.nota); const x = porCat[c.n] || (porCat[c.n] = { c, t: 0, n: 0 }); x.t += (+l.monto || 0); x.n++; });
+    const catsOrd = Object.values(porCat).sort((a, b) => (a.c === CAT_SIN) - (b.c === CAT_SIN) || b.t - a.t);
+    const catTop = catsOrd.find(x => x.c !== CAT_SIN && x.c !== CAT_OTROS) || catsOrd.find(x => x.c !== CAT_SIN);
+    const nSinMotivo = gMes.filter(l => catDe(l.nota) === CAT_SIN).length;
+    const diasMap = {};
+    gMes.forEach(l => { const k = isoOf(fechaG(l)); (diasMap[k] = diasMap[k] || []).push(l); });
+    const gDias = Object.keys(diasMap).sort().reverse().map(k => ({
+      label: k === TODAY ? 'HOY' : (k === isoOf(addDays(NOW, -1)) ? 'AYER' : self.fechaTxt(k).toUpperCase()),
+      totalTxt: pesosTxt(sumG(diasMap[k])),
+      items: diasMap[k].map(mkLib),
+    }));
+    const pctAnt = gAnt > 0 ? Math.round((gTotal - gAnt) / gAnt * 100) : null;
 
     // Los gastos no cuentan en lo que te deben ni en lo que debes.
-    const deudas0 = activeLibs.filter(l => !l.gasto);
+    const deudas0 = activeLibs;
     const cobrar = deudas0.filter(l => libView(l).meDeben), pagar = deudas0.filter(l => !libView(l).meDeben);
     // Libreticas de grupo: en las que creé cuenta lo que me falta cobrar; en las que debo, mi parte.
     const lgMias = s.libsG.map(l => {
@@ -3343,6 +3385,39 @@ class Component extends DCLogic {
       abrirRutina: () => self.abrirRutina(),
       dayStateTxt: pct >= 100 ? 'COMPLETO' : (doneSets > 0 ? pct + '% HECHO' : 'SIN EMPEZAR'),
       finanzasSummary: nCobrar + ' POR COBRAR · ' + nPagar + ' POR PAGAR',
+      // Finanzas › Gastos
+      finDeudas: s.finVista !== 'gastos', finGastos: s.finVista === 'gastos',
+      finKicker: s.finVista === 'gastos' ? 'FINANZAS PERSONALES' : 'LIBRETICAS · COP',
+      finTitle: s.finVista === 'gastos' ? 'Gastos' : 'Finanzas',
+      finSummary: s.finVista === 'gastos' ? gMes.length + (gMes.length === 1 ? ' GASTO' : ' GASTOS') + ' · ' + MONTHS_SH[fMes.getMonth()] : nCobrar + ' POR COBRAR · ' + nPagar + ' POR PAGAR',
+      finIrA: () => self.setState(st => ({ finVista: st.finVista === 'gastos' ? 'deudas' : 'gastos', openLib: null })),
+      finVerGastos: s.finVista !== 'gastos', finVolver: s.finVista === 'gastos',
+      gMesTxt: MONTHS[fMes.getMonth()] + ' ' + fMes.getFullYear(),
+      mesAnt: () => self.setState(st => ({ finMes: (st.finMes || 0) - 1, openLib: null })),
+      mesSig: () => self.setState(st => ({ finMes: Math.min(0, (st.finMes || 0) + 1), openLib: null })),
+      mesSigOn: (s.finMes || 0) < 0, mesSigOff: (s.finMes || 0) >= 0,
+      gTotalTxt: pesosTxt(gTotal),
+      gHayGastos: gMes.length > 0, gVacio: gMes.length === 0,
+      gVacioTxt: (s.finMes || 0) === 0 ? 'Aún no hay gastos este mes. Anota el primero con el atajo del iPhone o con el botón de abajo.' : 'No anotaste gastos en este mes.',
+      gLinea: gMes.length + (gMes.length === 1 ? ' gasto' : ' gastos') + ' · ' + pesosTxt(gTotal / Math.max(1, gDiasN)) + ' por día',
+      gDeltaOn: pctAnt !== null,
+      gDeltaTxt: pctAnt === null ? '' : (pctAnt === 0 ? 'Igual' : (pctAnt > 0 ? '▲ ' : '▼ ') + Math.abs(pctAnt) + '%') + ' vs ' + String(MONTHS[fAnt.getMonth()]).toLowerCase(),
+      gDeltaColor: pctAnt !== null && pctAnt > 0 ? AMBER : MINT,
+      gDeltaBg: pctAnt !== null && pctAnt > 0 ? 'rgba(206,127,85,.14)' : 'rgba(87,185,160,.14)',
+      gTopOn: !!catTop,
+      gTopTxt: catTop ? 'Lo que más gastas: ' + catTop.c.n + ' (' + Math.round(catTop.t / Math.max(1, gTotal) * 100) + '%)' : '',
+      gCats: catsOrd.map(x => ({
+        n: x.c.n, c: x.c.c, montoTxt: pesosTxt(x.t), cuenta: x.n + (x.n === 1 ? ' gasto' : ' gastos'),
+        pct: Math.round(x.t / Math.max(1, gTotal) * 100) + '%', w: Math.max(2, Math.round(x.t / Math.max(1, gTotal) * 100)) + '%',
+      })),
+      gSinMotivoOn: nSinMotivo > 0,
+      gSinMotivoTxt: nSinMotivo + (nSinMotivo === 1 ? ' gasto sin motivo.' : ' gastos sin motivo.') + ' Escribe el motivo para que Pilares los clasifique.',
+      gDias,
+      addGasto: () => {
+        const id = Nube.uuid();
+        self.setState(st => ({ finMes: 0, openLib: id, libs: [{ id, owner: me, contra: null, deudor: miNombre, prestamista: miNombre, monto: '0', mine: true,
+          paid: false, nota: '', vence: '', enviada: false, gasto: true, en: new Date().toISOString(), abonos: [] }].concat(st.libs) }));
+      },
       canReset: doneSets > 0,
       resetDay: () => self.mut(d => d[s.activeDay].ex.forEach(e => { e.done = e.done.map(() => false); })),
       dayGroup: day.group, dayHeader: w.dow + ' ' + w.n + ' ' + w.mes, dayNum: String(day.dia),
