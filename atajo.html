@@ -44,14 +44,14 @@
 <body>
 <main>
   <h1>Atajo de Pilares</h1>
-  <p class="lead">Anota un gasto en segundos sin abrir Pilares: el iPhone te pregunta <b>¿Cuánto gastaste?</b> y <b>¿En qué?</b>, y queda guardado en Finanzas como una libretica de Gasto. Lo armas una sola vez en la app <b>Atajos</b>.</p>
+  <p class="lead">Anota un gasto en segundos sin abrir Pilares: el iPhone te pregunta <b>¿Cuánto gastaste?</b>, <b>¿En qué?</b> y <b>¿Cuándo fue?</b>, y queda guardado en Finanzas como una libretica de Gasto. Lo armas una sola vez en la app <b>Atajos</b>.</p>
 
   <h2>Antes de empezar</h2>
   <div class="card">
-    En Pilares abre la <b>ruedita</b> y, en <b>Tu cuenta</b>, toca <b>Crear clave</b> en «Atajo del iPhone». La vas a pegar en el paso 4.
+    En Pilares abre la <b>ruedita</b> y, en <b>Tu cuenta</b>, toca <b>Crear clave</b> en «Atajo del iPhone». La vas a pegar en el paso 5.
   </div>
   <div class="card">
-    <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:var(--sub);margin-bottom:10px">LA DIRECCIÓN (PASO 4)</div>
+    <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:var(--sub);margin-bottom:10px">LA DIRECCIÓN (PASO 5)</div>
     <div class="copiar">
       <code id="url">https://muawlxszfibohwhwnsng.supabase.co/rest/v1/rpc/atajo_gasto?apikey=sb_publishable_2KSrLx1N8Wt9wZp_FOOOaQ_2qVG6fAA</code>
       <button type="button" data-copiar="url">Copiar</button>
@@ -63,13 +63,15 @@
     <li>Abre <b>Atajos</b>, toca <b>+</b> y ponle de nombre <span class="txt">Gasto</span>.</li>
     <li>Agrega <span class="accion">Pedir entrada</span>. Cambia <b>Texto</b> por <b>Número</b> y en la pregunta escribe <span class="txt">¿Cuánto gastaste?</span></li>
     <li>Agrega otra <span class="accion">Pedir entrada</span> (esta queda en <b>Texto</b>) y escribe <span class="txt">¿En qué gastaste?</span></li>
+    <li>Agrega una tercera <span class="accion">Pedir entrada</span>. Cambia <b>Texto</b> por <b>Fecha</b>, escribe <span class="txt">¿Cuándo fue ese gasto?</span> y, en la flecha, pon como respuesta predeterminada <span class="var">Fecha actual</span>: así, si fue hoy, solo tocas <b>OK</b>.</li>
     <li>Agrega <span class="accion">Obtener contenido de URL</span>. En la URL pega <b>la dirección</b> de arriba. Toca la flecha para ver más:
       <div class="dentro">
         <p>Método: <span class="txt">POST</span> · Cuerpo de la solicitud: <span class="txt">JSON</span></p>
-        <p>Toca <b>Agregar campo nuevo › Texto</b> tres veces:</p>
+        <p>Toca <b>Agregar campo nuevo › Texto</b> cuatro veces:</p>
         <p><span class="txt">clave</span> → pega tu clave de Pilares</p>
         <p><span class="txt">monto</span> → toca <b>Seleccionar variable</b> y luego la respuesta del paso 2 (<span class="var">Entrada proporcionada</span>)</p>
         <p><span class="txt">motivo</span> → igual, pero la respuesta del paso 3</p>
+        <p><span class="txt">fecha</span> → la respuesta del paso 4. Tócala otra vez y elige <b>Formato de fecha: ISO 8601</b> (sin hora)</p>
       </div>
     </li>
     <li>Agrega <span class="accion">Obtener valor del diccionario</span>: obtener <b>Valor</b> de <span class="txt">mensaje</span> en <span class="var">Contenido de URL</span>.</li>
@@ -82,8 +84,8 @@
     <ul class="usos">
       <li>Di <b>«Oye Siri, Gasto»</b> o tócalo en la app Atajos.</li>
       <li>También puedes ponerlo en la pantalla de inicio, en el Centro de control o en el botón de acción.</li>
-      <li>Al guardar te llega una notificación, por ejemplo «Gasto guardado · $25.000 · Almuerzo». En Pilares sale en Finanzas al abrir la app.</li>
-      <li>Si cambias la clave en la ruedita, pega la nueva en el paso 4.</li>
+      <li>Al guardar te llega una notificación, por ejemplo «Gasto guardado · $25.000 · Almuerzo · ayer». En Pilares sale en Finanzas al abrir la app.</li>
+      <li>Si cambias la clave en la ruedita, pega la nueva en el paso 5.</li>
     </ul>
   </div>
   <p class="nota" style="margin-top:22px"><a href="/">Volver a Pilares</a></p>
