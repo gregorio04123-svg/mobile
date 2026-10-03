@@ -61,16 +61,22 @@ const TIPOS_BASE = [
 const DIA_LARGO = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 // Colores para grupos nuevos (los 4 primeros son los de siempre).
 const PALETA = ['#4B7BE5', '#E05C5C', '#5EA37D', '#9B6BD6', '#CE7F55', '#57B9A0', '#D4A843', '#8E9AAE'];
-// Tres tipos de gasto: Comida, Ocio y Trabajo (todo lo que no es comida ni ocio).
-// Pilares lo deduce del motivo; si la persona lo cambia, lo recuerda para ese mismo motivo.
+// Tres tipos de gasto, según el motivo:
+// · Alimentos: cualquier comida o bebida (también cerveza y trago).
+// · Trabajo: lo necesario — transporte (gasolina, bus…), la universidad (carnet, matrícula…),
+//   arriendo y servicios, el celular y la salud.
+// · Ocio: todo lo demás.
+// Si la persona cambia el tipo de un gasto, Pilares lo recuerda para ese mismo motivo.
 const TIPOS_GASTO = [
-  { k: 'comida', n: 'Comida', c: '#CE7F55', tint: 'rgba(206,127,85,.16)',
-    re: /almuerz|\bcena|desayun|comida|\bcomi\b|restaur|\bcafe|\btinto\b|pizza|hamburg|perro caliente|empanada|snack|mecato|mercado|supermerc|\btienda\b|domicilio|rappi|helado|\bpan\b|panader|bebida|gaseosa|\bjugo|\bagua\b|fruta|verdura|\bcarne|pollo|arepa|sushi|postre|dulce|\bonces\b|merienda|galleta|chocolate/ },
-  { k: 'ocio', n: 'Ocio', c: '#B49AD0', tint: 'rgba(180,154,208,.16)',
-    re: /\bcine|netflix|spotify|youtube|\bjuego|fiesta|salida|concierto|\bbar\b|discoteca|rumba|cerveza|\btrago|licor|paseo|viaje|steam|playstation|xbox|regalo|suscripcion|disney|\bhbo\b|\bprime\b|\bentrada|boleta|\bropa\b|camisa|camiseta|pantalon|zapato|\btenis\b|\bjean|perfume|maquillaje|peluquer|barber/ },
-  { k: 'trabajo', n: 'Trabajo', c: '#57B9A0', tint: 'rgba(87,185,160,.16)', re: null },
+  { k: 'comida', n: 'Alimentos', c: '#CE7F55', tint: 'rgba(206,127,85,.16)',
+    re: /almuerz|\bcena|desayun|comida|\bcomi\b|\bcomer\b|restaur|corrientazo|\bcafe|\btinto\b|pizza|hamburg|perro caliente|salchipapa|empanada|\barepa|\bpan\b|panader|pandebono|bunuelo|snack|mecato|paquete de papas|\bpapas\b|galleta|chocolate|dulce|postre|helado|\bonces\b|merienda|\bfruta|verdura|\bcarnes?\b|pollo|pescado|\bhuevo|\bleche|\bqueso|\barroz|mercado|supermerc|\bd1\b|\bara\b|exito|olimpica|\btienda\b|domicilio|rappi|didi food|sushi|\bwok\b|bebida|gaseosa|\bcoca\b|\bjugo|\bagua\b|limonada|aromatica|energizante|cerveza|\bpola|\bguaro|aguardiente|\bron\b|whisky|\bvino\b|\btrago|licor|coctel/ },
+  { k: 'trabajo', n: 'Trabajo', c: '#57B9A0', tint: 'rgba(87,185,160,.16)',
+    re: /gasolina|tanque|\bacpm\b|diesel|\buber\b|\btaxi|\bbus\b|buseta|colectivo|\bmetro\b|transmi|\bsitp\b|\bmio\b|\bdidi\b|indrive|cabify|picap|pasaje|parqueadero|parqueo|\bpeaje|\bmoto\b|taller|mecanic|\baceite\b|llanta|\bsoat\b|tecnomecanica|lavada|universidad|\bla u\b|\bu\b|carnet|matricula|semestre|credito icetex|icetex|\blibro|fotocopia|copias|impresion|imprimir|papeleria|cuaderno|\bcurso|\bclase|trabajo|oficina|herramienta|uniforme|arriendo|\brenta\b|alquiler|administracion|recibo|factura|\bluz\b|energia|\bgas\b|internet|\bwifi\b|servicios?\b|celular|\bplan (del? )?(celular|datos|movil)|recarga|\bdatos\b|minutos|farmacia|drogueria|medicament|medicina|\bmedico|doctor|\bcita\b|\beps\b|odontolog|dentista|examen|laboratorio|vacuna|terapia|optica|gafas|lentes/ },
+  { k: 'ocio', n: 'Ocio', c: '#B49AD0', tint: 'rgba(180,154,208,.16)', re: null },
 ];
-const TIPO_GASTO = { comida: TIPOS_GASTO[0], ocio: TIPOS_GASTO[1], trabajo: TIPOS_GASTO[2] };
+const TIPO_GASTO = { comida: TIPOS_GASTO[0], trabajo: TIPOS_GASTO[1], ocio: TIPOS_GASTO[2] };
+// Pagos de la casa que nombran algo que también se toma («recibo del agua», «servicio de gas»): van a Trabajo.
+const PAGO_CASA = /\brecibo|factura|servicios? de|pago del?\b|\bcuenta de\b/;
 function motivoClave(nota) {
   return String(nota || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 }
@@ -78,10 +84,11 @@ function motivoClave(nota) {
 function motivoUtil(nota) { const t = motivoClave(nota); return !!t && !/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(t); }
 function tipoGasto(l, aprendidos) {
   if (l.cat && TIPO_GASTO[l.cat]) return TIPO_GASTO[l.cat];
-  if (!motivoUtil(l.nota)) return TIPO_GASTO.trabajo;
+  if (!motivoUtil(l.nota)) return TIPO_GASTO.ocio;
   const t = motivoClave(l.nota);
   if (aprendidos && aprendidos[t]) return TIPO_GASTO[aprendidos[t]];
-  return TIPOS_GASTO.find(x => x.re && x.re.test(t)) || TIPO_GASTO.trabajo;
+  if (PAGO_CASA.test(t)) return TIPO_GASTO.trabajo;
+  return TIPOS_GASTO.find(x => x.re && x.re.test(t)) || TIPO_GASTO.ocio;
 }
 
 // Plan semanal: índice = día de la semana (0 domingo … 6 sábado), valor = id del grupo o null (descanso).
@@ -3207,7 +3214,7 @@ class Component extends DCLogic {
                    elegir: () => setLib(l.id, x => ({ ...x, cat: t.k })) };
         }),
         tipoAyuda: l.cat ? (motivoUtil(l.nota) ? 'Elegido por ti. Los gastos con este motivo irán aquí.' : 'Elegido por ti.')
-                         : (motivoUtil(l.nota) ? 'Pilares lo eligió por el motivo. Toca otro si no es.' : 'Sin motivo va a Trabajo. Escribe el motivo o elige otro.'),
+                         : (motivoUtil(l.nota) ? 'Pilares lo eligió por el motivo. Toca otro si no es.' : 'Sin motivo va a Ocio. Escribe el motivo o elige otro.'),
       };
     };
     const mkLib = l => {
