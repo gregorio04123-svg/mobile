@@ -277,12 +277,13 @@
   /* ------------------------------------------------------------------
    * 5. Indicador de "jalar para actualizar"
    * ---------------------------------------------------------------- */
-  // Una orbe (orbe.js): mientras se jala gira con el dedo y crece; al pasar
-  // el umbral arranca a girar sola (ya se puede soltar) y sigue así hasta
-  // que termina de actualizar. Si se devuelve el dedo, vuelve a seguirlo
-  // desde donde va, sin saltos.
+  // Una orbe naranja (orbe.js): mientras se jala gira con el dedo y crece;
+  // al pasar el umbral arranca a girar sola (ya se puede soltar) y sigue así
+  // hasta que termina de actualizar. Si se devuelve el dedo, vuelve a
+  // seguirlo desde donde va, sin saltos.
   var indicador = null, orbe = null, baseOrbe = 0;
   var UMBRAL_JALAR = 64, REPOSO_JALAR = 52, TAM_ORBE = 32, PX_POR_SEG = 45;
+  var COLOR_ORBE = '#FFD28F';   // el naranja de la muestra de Libraries.dev
 
   function crearIndicador() {
     indicador = doc.createElement('div');
@@ -291,6 +292,7 @@
     orbe = doc.createElement('pilares-orbe');
     orbe.setAttribute('tam', String(TAM_ORBE));
     orbe.setAttribute('estado', 'searching');
+    orbe.setAttribute('color', COLOR_ORBE);
     orbe.tiempo = 0;
     indicador.appendChild(orbe);
     doc.body.appendChild(indicador);

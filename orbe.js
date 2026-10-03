@@ -8,11 +8,12 @@
  *  - tam: 20, 32 o 64 (los tamaños afinados por el motor).
  *  - estado: working, searching, solving, listening, connecting,
  *    weaving, composing, breathing o shaping.
+ *  - color (opcional): "#RRGGBB". Los puntos de adelante salen de ese
+ *    color y los de atrás, del mismo tono más hondo y más tenues (ver
+ *    pintarTinte). Sin color, puntos claros (afinación oscura del motor).
  *  - .tiempo = número: se queda quieta en ese instante (para seguir al
  *    dedo, p. ej. al jalar para actualizar); .tiempo = null: corre sola
  *    desde donde quedó, sin saltos. .instante: el último dibujado.
- *  - Puntos claros (afinación oscura del motor): el tinte de color los
- *    apaga demasiado sobre el fondo de Pilares, por eso no se usa.
  *
  * Rendimiento: un solo requestAnimationFrame para todas; solo se anima
  * la que se ve en pantalla y con la app al frente; con "Reducir
@@ -32,6 +33,36 @@
   var mq = global.matchMedia ? global.matchMedia('(prefers-reduced-motion: reduce)') : null;
   function reducido() { return !!(mq && mq.matches); }
   function ahora() { return global.performance ? performance.now() : Date.now(); }
+  // El tono hondo es el color multiplicado por sí mismo dos veces: el mismo
+  // matiz, más saturado y oscuro (#FFD28F → #FF8E2D), en vez de ir a negro.
+  function tinteDe(v) {
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(v || '').trim());
+    if (!m) return null;
+    var c = [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+    return { claro: c, hondo: c.map(function (x) { return x * x * x / 65025; }) };
+  }
+
+  // Con el tinte del motor (que oscurece hacia negro, con puntos al 45 %)
+  // el naranja se ve café sobre el fondo de Pilares. Aquí los puntos van
+  // del tono claro (adelante) al hondo (atrás), con el doble de opacidad y
+  // perdiendo hasta un 45 % hacia atrás: se lee naranja y conserva la
+  // profundidad del motor.
+  function tinta(tinte, w, a) {
+    var k = Math.min(1, Math.max(0, w) / 0.6), c = tinte.claro, h = tinte.hondo;
+    return 'rgba(' + Math.round(c[0] + (h[0] - c[0]) * k) + ',' + Math.round(c[1] + (h[1] - c[1]) * k) + ',' +
+      Math.round(c[2] + (h[2] - c[2]) * k) + ',' + (Math.min(1, (a == null ? 1 : a) * 2) * (1 - 0.45 * k)).toFixed(3) + ')';
+  }
+  function pintarTinte(ctx, cuadro, tinte) {
+    cuadro.lines.forEach(function (l) {
+      ctx.strokeStyle = tinta(tinte, l.white, l.a);
+      ctx.lineWidth = l.w;
+      ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke();
+    });
+    cuadro.dots.forEach(function (d) {
+      ctx.fillStyle = tinta(tinte, d.white, d.a);
+      ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
+    });
+  }
 
   function cargarMotor() {
     if (motor || pidiendo) return;
@@ -60,7 +91,7 @@
   }
 
   class Orbe extends HTMLElement {
-    static get observedAttributes() { return ['tam', 'estado']; }
+    static get observedAttributes() { return ['tam', 'estado', 'color']; }
 
     constructor() {
       super();
@@ -116,6 +147,7 @@
       if (c.width !== Math.round(tam * dpr)) { c.width = c.height = Math.round(tam * dpr); }
       c.style.width = c.style.height = tam + 'px';
       this.__ctx = c.getContext('2d');
+      this.__tinte = tinteDe(this.getAttribute('color'));
       this.__cfg = null;
       this.__revisar();
     }
@@ -146,7 +178,9 @@
       var ctx = this.__ctx, tam = this.__tam, cfg2 = this.__cfg;
       ctx.setTransform(this.__dpr, 0, 0, this.__dpr, 0, 0);
       ctx.clearRect(0, 0, tam, tam);
-      motor.pintar(ctx, motor.cuadros[cfg2.mode](tam, t, cfg2.opts), true);
+      var cuadro = motor.cuadros[cfg2.mode](tam, t, cfg2.opts);
+      if (this.__tinte) pintarTinte(ctx, cuadro, this.__tinte);
+      else motor.pintar(ctx, cuadro, true);
     }
   }
 
