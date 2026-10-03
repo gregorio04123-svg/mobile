@@ -458,9 +458,10 @@ class Component extends DCLogic {
     // pantalla. En segundo plano se suelta la conexión (no gasta cuota del
     // plan) y al volver se lee lo que pasó mientras tanto.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') { this.refrescar(); this.conectarTiempoReal(); }
+      if (document.visibilityState === 'visible') { this.refrescar(); this.conectarTiempoReal(); this.revisarVersion(); }
       else this.desconectarTiempoReal();
     });
+    this.revisarVersion();
     window.addEventListener('online', () => this.subir());
     // Respaldo por si el tiempo real se cae sin avisar.
     this.poll = setInterval(() => {
@@ -517,6 +518,19 @@ class Component extends DCLogic {
     );
   }
   componentWillUnmount() { clearInterval(this.timer); clearInterval(this.poll); this.desconectarTiempoReal(); }
+
+  /** En el iPhone la app puede quedar abierta días sin recargarse. Al abrirla se
+   *  anota qué versión de app.js está publicada; al volver a ella, si ya hay otra,
+   *  se recarga sola (salvo que falte subir algo: entonces espera a la próxima vez). */
+  revisarVersion() {
+    if (!window.fetch || location.protocol !== 'https:') return;
+    fetch('app.js', { method: 'HEAD', cache: 'no-store' }).then(r => {
+      const v = r.ok ? (r.headers.get('etag') || r.headers.get('last-modified')) : null;
+      if (!v) return;
+      if (!this.version) { this.version = v; return; }
+      if (v !== this.version && !this.hayPendientes()) location.reload();
+    }).catch(() => {});
+  }
 
   componentDidUpdate() {
     if (this.anclaChat != null) {
