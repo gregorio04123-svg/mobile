@@ -261,17 +261,6 @@ function previewChat(c, me) {
   if (c.tipo === 'rutina') return yo + (d.tipo === 'semana' ? 'Rutina · semana completa' : 'Rutina · «' + (d.nombre || 'grupo') + '»');
   return '';
 }
-const SECCION_AVISO = { actividad: 'ESTUDIO', recordatorio: 'ESTUDIO', libreta: 'FINANZAS', abono: 'FINANZAS', rutina: 'AMIGOS',
-                        grupo: 'AMIGOS', libreta_grupo: 'FINANZAS', abono_grupo: 'FINANZAS' };
-function hace(ts) {
-  const d = new Date(ts), min = Math.round((Date.now() - d.getTime()) / 60000);
-  if (!(min >= 0)) return '';
-  if (min < 1) return 'AHORA';
-  if (min < 60) return 'HACE ' + min + ' MIN';
-  if (min < 60 * 24 && d.getDate() === new Date().getDate()) return 'HACE ' + Math.round(min / 60) + ' H';
-  if (isoOf(d) === isoOf(addDays(new Date(), -1))) return 'AYER';
-  return d.getDate() + ' ' + MONTHS_SH[d.getMonth()];
-}
 
 /** Rutina que llega de otra persona (invitación o vista de un amigo): solo
  *  se copian los campos conocidos, con límites, antes de mostrarla o guardarla. */
@@ -449,6 +438,10 @@ class Component extends DCLogic {
       if (e.key === 'Enter' && !e.isComposing && x && x.matches && x.matches('[data-apodo-entrada]')) {
         e.preventDefault();
         this.guardarApodo();
+      }
+      if (e.key === 'Enter' && !e.isComposing && x && x.matches && x.matches('[data-amigos-buscar]')) {
+        e.preventDefault();
+        x.blur();
       }
       if (e.key === 'Enter' && !e.isComposing && x && x.matches && x.matches('[data-elegir-buscar]')) {
         e.preventDefault();
@@ -1201,11 +1194,6 @@ class Component extends DCLogic {
 
   /* ── Avisos y notificaciones ─────────────────────────────────────── */
 
-  avisosNuevos(desde) {
-    const t0 = Date.parse(desde || '') || 0;
-    return this.state.avisos.filter(a => Date.parse(a.creado) > t0).length;
-  }
-
   /** Después de cada lectura: número del ícono, este dispositivo a nombre
    *  de la cuenta y enlace pendiente. */
   trasLeer() {
@@ -1299,19 +1287,9 @@ class Component extends DCLogic {
     return hallado;
   }
 
-  /** Al abrir el panel se ven los avisos: los nuevos quedan marcados solo
-   *  mientras el panel siga abierto. */
   abrirPanel() {
-    const s = this.state;
-    this.setState({ panel: true, avisosAntes: s.avisosLeidos, avisosTodos: false, pushMsg: '', pushSuena: false });
+    this.setState({ panel: true, amigosQ: '', pushMsg: '', pushSuena: false });
     this.actualizarPush();
-    if (!this.avisosNuevos(s.avisosLeidos)) return;
-    Nube.marcarAvisosLeidos().then(hasta => {
-      if (!hasta || !this.uid) return;
-      this.setState({ avisosLeidos: hasta });
-      setTimeout(() => this.guardarCache(), 0);
-      this.actualizarGlobo();
-    }, e => console.warn('[pilares] avisos leídos', e));
   }
 
   async actualizarPush() {
@@ -1347,33 +1325,16 @@ class Component extends DCLogic {
     }
   }
 
+  /** La ruedita: su número y la campanita (los avisos ya no se listan: llegan
+   *  como notificación y el Resumen muestra lo pendiente). */
   valsAvisos(s) {
     const self = this;
-    const antes = Date.parse(s.avisosAntes || '') || 0;
-    const nuevos = this.avisosNuevos(s.avisosLeidos);
-    const nuevosAlAbrir = s.avisos.filter(a => Date.parse(a.creado) > antes).length;
     const on = s.push === 'activo';
-    // El número de la ruedita: avisos nuevos + mensajes sin leer + solicitudes de amistad.
-    const globo = nuevos + s.chats.reduce((t, c) => t + (c.sinLeer || 0), 0) + s.gAmigos.reduce((t, g) => t + (g.sinLeer || 0), 0)
+    // El número de la ruedita: mensajes sin leer + solicitudes de amistad.
+    const globo = s.chats.reduce((t, c) => t + (c.sinLeer || 0), 0) + s.gAmigos.reduce((t, g) => t + (g.sinLeer || 0), 0)
       + s.amigos.filter(a => a.estado === 'pendiente' && !a.yo).length;
-    const lista = s.avisosTodos ? s.avisos : s.avisos.slice(0, 3);
     return {
       avisosBadge: globo > 0, avisosBadgeTxt: globo > 9 ? '9+' : String(globo),
-      avisosNuevosTxt: nuevosAlAbrir ? cuenta(nuevosAlAbrir, 'NUEVO', 'NUEVOS') : '',
-      avisosList: lista.map(a => {
-        const nuevo = Date.parse(a.creado) > antes, dest = destinoDe(a);
-        return {
-          titulo: a.titulo, cuerpo: a.cuerpo, hayCuerpo: !!a.cuerpo,
-          cuando: [hace(a.creado), SECCION_AVISO[a.tipo]].filter(Boolean).join(' · '),
-          punto: nuevo ? AMBER : 'transparent',
-          bg: nuevo ? 'rgba(206,127,85,.07)' : '#121724', border: nuevo ? 'rgba(206,127,85,.26)' : 'rgba(255,255,255,.07)',
-          ir: () => { if (!dest) return; self.cerrarHoja('panel'); self.irA(dest, false); },
-        };
-      }),
-      avisosVacio: s.avisos.length === 0,
-      avisosMas: s.avisos.length > 3,
-      avisosMasTxt: s.avisosTodos ? 'Ver menos' : 'Ver todos (' + s.avisos.length + ')',
-      avisosAlternar: () => self.setState(st => ({ avisosTodos: !st.avisosTodos })),
       // Campanita: naranja y llena = prendidas; gris y tachada = apagadas o no disponibles.
       campanaEstado: on ? (s.pushSuena ? 'suena' : 'on') : 'off', campanaOn: on ? 'true' : 'false',
       campanaLabel: on ? 'Notificaciones prendidas en este celular. Toca para apagarlas.'
@@ -1394,8 +1355,8 @@ class Component extends DCLogic {
     return this.state.chats.reduce((t, c) => t + (c.sinLeerTexto || 0), 0)
          + this.state.gAmigos.reduce((t, g) => t + (g.sinLeerTexto || 0), 0);
   }
-  /** Número del ícono de la app: avisos sin ver + mensajes sin leer. */
-  actualizarGlobo() { Nube.ponerGlobo(this.avisosNuevos(this.state.avisosLeidos) + this.textoSinLeer()); }
+  /** Número del ícono de la app: mensajes sin leer + solicitudes de amistad (igual que la ruedita). */
+  actualizarGlobo() { Nube.ponerGlobo(this.textoSinLeer() + this.state.amigos.filter(a => a.estado === 'pendiente' && !a.yo).length); }
 
   /** Clave de la conversación abierta (o null). */
   hiloAbierto(s) { s = s || this.state; return s.chatG ? 'g:' + s.chatG : s.chatCon; }
@@ -1790,12 +1751,12 @@ class Component extends DCLogic {
     const filas = acept.map(a => {
       const c = porId[a.id] || null;
       const visto = nombreVisto(a.id, a.nombre);
-      return { en: c ? c.en : '', nombre: visto, v: {
+      return { en: c ? c.en : '', nombre: visto, busca: norm(visto) + ' ' + norm(a.nombre), v: {
         nombre: visto, inicial: (visto || '?').charAt(0).toUpperCase(), color: colorDe(a.id), radio: '50%', letra: '17px',
         preview: c ? previewChat(c, me) : 'Toca para escribirle', sinLeer: c ? c.sinLeer : 0,
         abrir: () => self.abrirChat(a.id),
       } };
-    }).concat(s.gAmigos.map(g => ({ en: g.ult ? g.ult.en : (g.unido || ''), nombre: g.nombre, v: {
+    }).concat(s.gAmigos.map(g => ({ en: g.ult ? g.ult.en : (g.unido || ''), nombre: g.nombre, busca: norm(g.nombre), v: {
       nombre: g.nombre, inicial: inicialesDe(g.nombre), color: colorDe(g.id), radio: '15px', letra: '15px',
       preview: previewGrupo(g.ult, me), sinLeer: g.sinLeer,
       abrir: () => self.abrirGrupo(g.id),
@@ -1807,14 +1768,25 @@ class Component extends DCLogic {
     const sinLeer = acept.reduce((t, a) => t + ((porId[a.id] || {}).sinLeer || 0), 0) + s.gAmigos.reduce((t, g) => t + (g.sinLeer || 0), 0);
     const solicitudes = s.amigos.filter(a => a.estado === 'pendiente' && !a.yo);
     const esperando = s.amigos.filter(a => a.estado === 'pendiente' && a.yo);
+    // Buscador (con más de 4 chats): por apodo, nombre de Pilares o nombre del grupo,
+    // sin tildes ni mayúsculas. Mientras se busca solo quedan los chats que coinciden.
+    const buscarOn = filas.length > 4, q = buscarOn ? norm(s.amigosQ) : '';
+    const vistas = q ? filas.filter(f => f.busca.includes(q)) : filas;
+    const ponerQ = v => self.setState({ amigosQ: v });
     return {
       amigosSinLeerTxt: sinLeer ? sinLeer + ' SIN LEER' : '',
-      solicitudes: solicitudes.map(a => ({
+      amigosBuscarOn: buscarOn, amigosQ: s.amigosQ || '',
+      onAmigosQ: ev => ponerQ(ev.target.value),
+      limpiarAmigosQ: () => { ponerQ(''); const x = document.querySelector('[data-amigos-buscar]'); if (x) x.focus(); },
+      amigosVacioTxt: q && !vistas.length ? 'Nadie coincide con «' + String(s.amigosQ).trim() + '»' : '',
+      // Con búsqueda, la hoja se queda alta: así el buscador no baja detrás del teclado.
+      panelAlto: q ? 'calc(100% - env(safe-area-inset-top,0px) - 44px)' : 'auto',
+      solicitudes: q ? [] : solicitudes.map(a => ({
         nombre: a.nombre, codigo: a.codigo, inicial: (a.nombre || '?').charAt(0).toUpperCase(), color: colorDe(a.id),
         aceptar: () => self.conexion('aceptar', a),
         rechazar: () => self.conexion('rechazar', a),
       })),
-      chatsList: filas.map(f => {
+      chatsList: vistas.map(f => {
         const n = f.v.sinLeer || 0;
         return Object.assign({}, f.v, {
           previewColor: n ? '#EDF1F7' : '#8E9AAE', previewPeso: n ? '600' : '500',
@@ -1824,7 +1796,7 @@ class Component extends DCLogic {
       }),
       nuevoGrupoOn: acept.length > 0,
       nuevoGrupo: () => self.hojaChat('grupoNuevo', { nombre: '', sel: [] }),
-      hayEsperando: esperando.length > 0,
+      hayEsperando: !q && esperando.length > 0,
       esperando: esperando.map(a => ({ nombre: a.nombre, codigo: a.codigo, cancelar: () => self.conexion('quitar', a) })),
       sinAmigos: !acept.length && !solicitudes.length && !esperando.length && !s.gAmigos.length,
       abrirAgregar: () => { self.setState({ amigoMsg: '' }); self.hojaChat('agregar'); },
