@@ -109,7 +109,7 @@
    * ---------------------------------------------------------------- */
   async function cargar(uid) {
     var q = await Promise.all([
-      sb.from('perfiles').select('nombre,altura,peso,sexo,codigo,hora_recordatorio,zona_horaria,avisos_leidos_hasta,tipos_actividad').eq('id', uid).single(),
+      sb.from('perfiles').select('nombre,codigo,avisos_leidos_hasta,tipos_actividad').eq('id', uid).single(),
       // Trae mis cuadernos y los de mis amigos (para asignarles actividades).
       sb.from('cuadernos').select('id,user_id,nombre,orden,creado_en').order('orden').order('creado_en'),
       sb.from('archivos').select('id,cuaderno_id,nombre,tamano,creado_en').eq('user_id', uid).order('creado_en'),
@@ -190,9 +190,7 @@
     });
 
     return {
-      profile: { nombre: perfil.nombre || '', altura: perfil.altura || '', peso: perfil.peso || '', sexo: perfil.sexo || '',
-                 hora: perfil.hora_recordatorio == null ? 19 : perfil.hora_recordatorio, zona: perfil.zona_horaria || '',
-                 tipos: Array.isArray(perfil.tipos_actividad) ? perfil.tipos_actividad : null },
+      profile: { nombre: perfil.nombre || '', tipos: Array.isArray(perfil.tipos_actividad) ? perfil.tipos_actividad : null },
       avisosLeidos: perfil.avisos_leidos_hasta || null,
       chats: (q[12].data || []).map(chatDe),
       gAmigos: (q[13].data || []).map(grupoDe),
@@ -257,11 +255,7 @@
     TABLAS.forEach(function (k) { t[k] = {}; });
 
     var p = d.profile || {};
-    var perfil = { nombre: p.nombre || '', altura: p.altura || '', peso: p.peso || '', sexo: p.sexo || '' };
-    // Hora del recordatorio y zona horaria solo si ya se leyeron del servidor
-    // (una copia local vieja no las trae y no debe pisar las de verdad).
-    if (typeof p.hora === 'number') perfil.hora_recordatorio = p.hora;
-    if (p.zona) perfil.zona_horaria = p.zona;
+    var perfil = { nombre: p.nombre || '' };
     if (Array.isArray(p.tipos) && p.tipos.length) perfil.tipos_actividad = p.tipos;
     t.perfiles[uid] = perfil;
 
@@ -706,9 +700,17 @@
     } catch (e) {}
   }
 
-  async function avisoDePrueba() {
-    var r = await sb.rpc('aviso_de_prueba');
-    if (r.error) throw new Error(/espera/.test(r.error.message) ? 'Espera unos segundos antes de otra prueba.' : mensajeDe(r.error));
+  /** La campanita apagada: este dispositivo deja de recibirlas (el permiso
+   *  queda dado, así que volver a prenderlas no pregunta otra vez). */
+  async function desactivarPush() {
+    if (!pushSoportado()) return 'no';
+    var reg = await registrarSW();
+    var sub = reg && await reg.pushManager.getSubscription();
+    if (!sub) return 'pedir';
+    var r = await sb.from('suscripciones_push').delete().eq('endpoint', sub.endpoint);
+    if (r.error) throw new Error(mensajeDe(r.error));
+    await sub.unsubscribe();
+    return 'pedir';
   }
 
   /** Devuelve la hora del servidor hasta la que ya se vieron los avisos. */
@@ -742,7 +744,7 @@
 
   async function exportar(uid, usuario) {
     var q = await Promise.all([
-      sb.from('perfiles').select('nombre,altura,peso,sexo,codigo,tipos_actividad,creado_en').eq('id', uid).single(),
+      sb.from('perfiles').select('nombre,codigo,tipos_actividad,creado_en').eq('id', uid).single(),
       sb.from('cuadernos').select('id,nombre,orden,creado_en').eq('user_id', uid).order('orden'),
       sb.from('archivos').select('id,cuaderno_id,nombre,tamano,creado_en').eq('user_id', uid).order('creado_en'),
       todas(function () { return sb.from('actividades').select('id,user_id,cuaderno_id,tipo,fecha,asunto,asignado_por,nota,con_urgencia,creado_en').order('fecha').order('id'); }),
@@ -800,7 +802,7 @@
     borrarLibretaGrupo: borrarLibretaGrupo, libretasGrupo: libretasGrupo,
     crearActividadGrupo: crearActividadGrupo, compartirRutinaGrupo: compartirRutinaGrupo,
     registrarSW: registrarSW, estadoPush: estadoPush, activarPush: activarPush, renovarPush: renovarPush,
-    soltarPush: soltarPush, avisoDePrueba: avisoDePrueba, marcarAvisosLeidos: marcarAvisosLeidos, ponerGlobo: ponerGlobo,
+    soltarPush: soltarPush, desactivarPush: desactivarPush, marcarAvisosLeidos: marcarAvisosLeidos, ponerGlobo: ponerGlobo,
     escuchar: escuchar, dejarDeEscuchar: dejarDeEscuchar, exportar: exportar,
   };
 })(window);

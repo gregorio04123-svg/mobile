@@ -146,6 +146,16 @@ input:focus { outline: none; border-color: rgba(87, 185, 160, .55); }
 .orbe-carga { animation: orbe-aparece .3s ease .18s both; }
 @keyframes orbe-aparece { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
 
+/* Campanita del panel: el color cambia suave y, justo al prenderla, suena una vez
+   (se balancea desde arriba, como una campana de verdad). */
+[data-campana] { transition: background-color .2s ease, border-color .2s ease, color .2s ease, opacity .2s ease; }
+[data-campana] .campana { transform-origin: 50% 12%; }
+[data-campana="suena"] .campana { animation: campana-suena .62s cubic-bezier(.36, .07, .19, .97) both; }
+@keyframes campana-suena {
+  0% { transform: rotate(0); } 18% { transform: rotate(16deg); } 36% { transform: rotate(-13deg); }
+  54% { transform: rotate(8deg); } 72% { transform: rotate(-4deg); } 100% { transform: rotate(0); }
+}
+
 /* Menos transparencia: superficies sólidas, sin desenfoque. */
 @media (prefers-reduced-transparency: reduce) {
   [data-vidrio] { background: #0B0F19 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }

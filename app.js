@@ -307,7 +307,7 @@ const NUBE_TXT = {
 function vacio() {
   return {
     logs: {}, days: componerDias([], PLAN_VACIO, {}, null), cuadernos: [], files: {}, acts: [], libs: [],
-    profile: { nombre: '', altura: '', peso: '', sexo: '' },
+    profile: { nombre: '' },
     grupos: [], plan: PLAN_VACIO.slice(), rutinaLista: false,
   };
 }
@@ -345,7 +345,7 @@ class Component extends DCLogic {
       menuDia: null, rutinaOn: false, rGrupo: null, rEj: null, rCompartir: null,
       invRutinas: [], verRutina: null,
       avisos: [], avisosLeidos: null, avisosAntes: null, avisosTodos: false,
-      push: '', pushBusy: false, pushMsg: '',
+      push: '', pushBusy: false, pushMsg: '', pushSuena: false,
       tipoEd: null,   // editor de un tipo de actividad (Modo edición)
       elegir: null,   // hoja «Elegir amigo»: { tipo: 'lib' | 'para', id, q }
       chats: [],      // un renglón por conversación (último mensaje, sin leer)
@@ -382,7 +382,9 @@ class Component extends DCLogic {
         ? componerDias(grupos, plan, logs, null)
         : WEEK.map(w => { const p = logs[w.fecha]; return (p && Array.isArray(p.ex) && p.ex.length) ? p : freshDay(w, null); }),
       cuadernos: d.cuadernos || [], files: d.files || {}, acts: d.acts || [], libs: d.libs || [],
-      profile: Object.assign({ nombre: '', altura: '', peso: '', sexo: '' }, d.profile),
+      // Solo nombre y tipos: altura, peso, sexo y la hora del recordatorio ya no se usan
+      // (una copia vieja en el teléfono los traía; aquí se descartan).
+      profile: { nombre: (d.profile && d.profile.nombre) || '', tipos: (d.profile && d.profile.tipos) || null },
     };
   }
 
@@ -1204,8 +1206,8 @@ class Component extends DCLogic {
     return this.state.avisos.filter(a => Date.parse(a.creado) > t0).length;
   }
 
-  /** Después de cada lectura: número del ícono, zona horaria del
-   *  dispositivo, este dispositivo a nombre de la cuenta y enlace pendiente. */
+  /** Después de cada lectura: número del ícono, este dispositivo a nombre
+   *  de la cuenta y enlace pendiente. */
   trasLeer() {
     const s = this.state;
     this.actualizarGlobo();
@@ -1220,9 +1222,6 @@ class Component extends DCLogic {
         if (document.visibilityState === 'visible') this.marcarLeidoGrupo(s.chatG);
       }
     }
-    let zona = '';
-    try { zona = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
-    if (zona && s.profile.zona && s.profile.zona !== zona) this.setState(st => ({ profile: { ...st.profile, zona } }));
     if (!this.pushRenovado) {
       this.pushRenovado = true;
       Nube.renovarPush().catch(e => console.warn('[pilares] push', e));
@@ -1257,7 +1256,6 @@ class Component extends DCLogic {
       this.abrirLibretaGrupo(d.lg);
       return true;
     } else if (d.ir === 'grupo') {
-      cambios.tab = 'amigos';
       if (d.g && s.gAmigos.some(g => g.id === d.g)) {
         this.setState(cambios);
         this.abrirGrupo(d.g);
@@ -1283,7 +1281,6 @@ class Component extends DCLogic {
       // (el aviso trae el apodo que le pusiste o, si no tiene, su nombre).
       const tocayos = !inv && d.quien ? s.amigos.filter(a => a.estado === 'aceptada' && (a.apodo || a.nombre) === d.quien) : [];
       const con = inv ? inv.de : d.con || (tocayos.length === 1 ? tocayos[0].id : null);
-      cambios.tab = 'amigos';
       if (con && s.amigos.some(a => a.id === con && a.estado === 'aceptada')) {
         this.setState(cambios);
         this.abrirChat(con);
@@ -1306,7 +1303,7 @@ class Component extends DCLogic {
    *  mientras el panel siga abierto. */
   abrirPanel() {
     const s = this.state;
-    this.setState({ panel: true, avisosAntes: s.avisosLeidos, avisosTodos: false, pushMsg: '' });
+    this.setState({ panel: true, avisosAntes: s.avisosLeidos, avisosTodos: false, pushMsg: '', pushSuena: false });
     this.actualizarPush();
     if (!this.avisosNuevos(s.avisosLeidos)) return;
     Nube.marcarAvisosLeidos().then(hasta => {
@@ -1324,27 +1321,27 @@ class Component extends DCLogic {
     } catch (err) { this.setState({ push: 'no' }); }
   }
 
-  async activarNotificaciones() {
-    if (this.state.pushBusy) return;
+  /** La campanita: prende o apaga las notificaciones en este dispositivo.
+   *  Si el sistema no las deja, explica qué hacer en vez de cambiar. */
+  async alternarPush() {
+    const s = this.state;
+    if (s.pushBusy) return;
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const explica = {
+      instalar: 'Para recibirlas en el iPhone, primero agrega Pilares a tu pantalla de inicio (Safari › Compartir › Agregar a inicio) y ábrela desde el ícono. Necesitas iOS 16.4 o más reciente.',
+      no: 'Este navegador no permite notificaciones. Tus avisos igual aparecen aquí.',
+      bloqueado: ios ? 'Están bloqueadas: actívalas en Ajustes › Notificaciones › Pilares.' : 'Están bloqueadas: permítelas en la configuración del navegador para este sitio.',
+    }[s.push];
+    if (explica) { this.setState({ pushMsg: explica }); return; }
+    if (s.push !== 'activo' && s.push !== 'pedir') return;   // aún revisando
+    const prender = s.push === 'pedir';
     this.setState({ pushBusy: true, pushMsg: '' });
     try {
-      const e = await Nube.activarPush();
-      this.setState({ push: e, pushMsg: e === 'activo' ? 'Listo: te llegarán a este dispositivo. Toca Probar para ver una.' : '' });
+      const e = prender ? await Nube.activarPush() : await Nube.desactivarPush();
+      this.setState({ push: e, pushSuena: e === 'activo', pushMsg: e === 'bloqueado' ? explica || 'No diste el permiso. Puedes darlo en los ajustes del celular.' : '' });
+      if (window.Fluido && (e === 'activo' || !prender)) Fluido.aviso(e === 'activo' ? 'Notificaciones prendidas en este celular' : 'Notificaciones apagadas en este celular');
     } catch (err) {
-      this.setState({ pushMsg: err.message || 'No se pudieron activar. Intenta de nuevo.' });
-    } finally {
-      this.setState({ pushBusy: false });
-    }
-  }
-
-  async probarNotificacion() {
-    if (this.state.pushBusy) return;
-    this.setState({ pushBusy: true, pushMsg: '' });
-    try {
-      await Nube.avisoDePrueba();
-      this.setState({ pushMsg: 'Enviada. Debe llegar en unos segundos.' });
-    } catch (err) {
-      this.setState({ pushMsg: err.message || 'No se pudo enviar la prueba.' });
+      this.setState({ pushMsg: err.message || (prender ? 'No se pudieron prender. Intenta de nuevo.' : 'No se pudieron apagar. Intenta de nuevo.') });
     } finally {
       this.setState({ pushBusy: false });
     }
@@ -1355,17 +1352,13 @@ class Component extends DCLogic {
     const antes = Date.parse(s.avisosAntes || '') || 0;
     const nuevos = this.avisosNuevos(s.avisosLeidos);
     const nuevosAlAbrir = s.avisos.filter(a => Date.parse(a.creado) > antes).length;
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const P = {
-      instalar: ['Notificaciones en el iPhone', 'Primero agrega Pilares a tu pantalla de inicio: en Safari toca Compartir › Agregar a inicio y ábrela desde el ícono. Necesitas iOS 16.4 o más reciente.', ''],
-      no: ['Notificaciones', 'Este navegador no permite notificaciones. Tus avisos igual aparecen aquí.', ''],
-      pedir: ['Notificaciones en este dispositivo', 'Actívalas para enterarte aunque la app esté cerrada.', s.pushBusy ? 'Activando…' : 'Activar'],
-      bloqueado: ['Notificaciones bloqueadas', ios ? 'Para recibirlas, actívalas en Ajustes › Notificaciones › Pilares.' : 'Para recibirlas, permítelas en la configuración del navegador para este sitio.', ''],
-      activo: ['Notificaciones activas', 'Te llegan a este dispositivo.', s.pushBusy ? 'Enviando…' : 'Probar'],
-    }[s.push] || ['Notificaciones', 'Revisando este dispositivo…', ''];
-    const lista = s.avisosTodos ? s.avisos : s.avisos.slice(0, 5);
+    const on = s.push === 'activo';
+    // El número de la ruedita: avisos nuevos + mensajes sin leer + solicitudes de amistad.
+    const globo = nuevos + s.chats.reduce((t, c) => t + (c.sinLeer || 0), 0) + s.gAmigos.reduce((t, g) => t + (g.sinLeer || 0), 0)
+      + s.amigos.filter(a => a.estado === 'pendiente' && !a.yo).length;
+    const lista = s.avisosTodos ? s.avisos : s.avisos.slice(0, 3);
     return {
-      avisosBadge: nuevos > 0, avisosBadgeTxt: nuevos > 9 ? '9+' : String(nuevos),
+      avisosBadge: globo > 0, avisosBadgeTxt: globo > 9 ? '9+' : String(globo),
       avisosNuevosTxt: nuevosAlAbrir ? cuenta(nuevosAlAbrir, 'NUEVO', 'NUEVOS') : '',
       avisosList: lista.map(a => {
         const nuevo = Date.parse(a.creado) > antes, dest = destinoDe(a);
@@ -1378,17 +1371,18 @@ class Component extends DCLogic {
         };
       }),
       avisosVacio: s.avisos.length === 0,
-      avisosMas: s.avisos.length > 5,
+      avisosMas: s.avisos.length > 3,
       avisosMasTxt: s.avisosTodos ? 'Ver menos' : 'Ver todos (' + s.avisos.length + ')',
       avisosAlternar: () => self.setState(st => ({ avisosTodos: !st.avisosTodos })),
-      pushTitulo: P[0], pushTexto: P[1], pushBtn: P[2], pushBtnOn: !!P[2],
-      pushGo: () => { if (s.push === 'activo') self.probarNotificacion(); else if (s.push === 'pedir') self.activarNotificaciones(); },
+      // Campanita: naranja y llena = prendidas; gris y tachada = apagadas o no disponibles.
+      campanaEstado: on ? (s.pushSuena ? 'suena' : 'on') : 'off', campanaOn: on ? 'true' : 'false',
+      campanaLabel: on ? 'Notificaciones prendidas en este celular. Toca para apagarlas.'
+        : (s.push === 'pedir' ? 'Notificaciones apagadas. Toca para prenderlas.' : 'Notificaciones no disponibles. Toca para ver por qué.'),
+      campanaColor: on ? AMBER : '#8E9AAE', campanaRelleno: on ? 'rgba(206,127,85,.28)' : 'none',
+      campanaBg: on ? 'rgba(206,127,85,.14)' : 'rgba(255,255,255,.05)', campanaBorde: on ? 'rgba(206,127,85,.42)' : 'transparent',
+      campanaTacha: on ? '0' : '1', campanaOpacidad: s.pushBusy ? '.55' : '1',
+      campanaTocar: () => self.alternarPush(),
       pushMsg: s.pushMsg,
-      horaSel: String(typeof s.profile.hora === 'number' ? s.profile.hora : 19),
-      onHora: ev => {
-        const v = parseInt(ev.target.value, 10);
-        if (v >= 0 && v <= 23) self.setState(st => ({ profile: { ...st.profile, hora: v } }));
-      },
     };
   }
 
@@ -1408,7 +1402,8 @@ class Component extends DCLogic {
 
   abrirChat(otro) {
     if (!this.state.amigos.some(a => a.id === otro && a.estado === 'aceptada')) return false;
-    this.setState(st => ({ tab: 'amigos', chatCon: otro, chatG: null, chatHoja: null, chatTexto: st.chatCon === otro ? st.chatTexto : '' }));
+    this.setState(st => ({ chatCon: otro, chatG: null, chatHoja: null, chatTexto: st.chatCon === otro ? st.chatTexto : '' }));
+    this.soltarPanel();
     this.cargarChat(otro, true);
     this.marcarLeido(otro);
     return true;
@@ -1416,7 +1411,8 @@ class Component extends DCLogic {
 
   abrirGrupo(g) {
     if (!this.state.gAmigos.some(x => x.id === g)) return false;
-    this.setState(st => ({ tab: 'amigos', chatG: g, chatCon: null, chatHoja: null, chatTexto: st.chatG === g ? st.chatTexto : '' }));
+    this.setState(st => ({ chatG: g, chatCon: null, chatHoja: null, chatTexto: st.chatG === g ? st.chatTexto : '' }));
+    this.soltarPanel();
     this.cargarChat('g:' + g, true);
     this.marcarLeidoGrupo(g);
     return true;
@@ -1425,6 +1421,15 @@ class Component extends DCLogic {
   cerrarChat() {
     this.soltarTeclado();
     this.setState({ chatCon: null, chatG: null, chatHoja: null, chatTexto: '' });
+  }
+
+  /** El chat se abre debajo de la ruedita y la hoja baja: queda el chat a la vista. */
+  soltarPanel() { if (this.state.panel) this.cerrarHoja('panel'); }
+
+  /** La flecha del chat: de vuelta a la ruedita, donde están los amigos. */
+  volverDelChat() {
+    this.cerrarChat();
+    this.abrirPanel();
   }
 
   traerMensajes(clave, antesDe) {
@@ -1511,7 +1516,7 @@ class Component extends DCLogic {
     const m = Nube.mensajeDe(n);
     const otro = m.de === me ? m.para : m.de;
     const s0 = this.state;
-    const abierto = s0.tab === 'amigos' && s0.chatCon === otro && document.visibilityState === 'visible';
+    const abierto = s0.chatCon === otro && document.visibilityState === 'visible';
     const cerca = abierto && this.chatAbajo();
     this.setState(st => {
       const hilo = st.chatMsgs[otro];
@@ -1542,7 +1547,7 @@ class Component extends DCLogic {
     if (m.tipo === 'libreta' || d.accion === 'borrar_libreta') this.cargarLibsG();
     if (!g0) return;
     const clave = 'g:' + m.g;
-    const abierto = s0.tab === 'amigos' && s0.chatG === m.g && document.visibilityState === 'visible';
+    const abierto = s0.chatG === m.g && document.visibilityState === 'visible';
     const cerca = abierto && this.chatAbajo();
     this.setState(st => {
       const hilo = st.chatMsgs[clave], ya = !!(hilo && hilo.lista.some(x => x.id === m.id));
@@ -1584,7 +1589,7 @@ class Component extends DCLogic {
       try {
         const lista = await Nube.misGrupos();
         if (uid !== this.uid) return;
-        const s = this.state, abierto = s.tab === 'amigos' && document.visibilityState === 'visible' ? s.chatG : null;
+        const s = this.state, abierto = document.visibilityState === 'visible' ? s.chatG : null;
         this.setState({ gAmigos: lista.map(g => g.id === abierto ? { ...g, sinLeer: 0, sinLeerTexto: 0 } : g) });
         // Salí del grupo (desde otro dispositivo): se cierra su chat.
         if (s.chatG && !lista.some(g => g.id === s.chatG)) this.cerrarChat();
@@ -1775,7 +1780,7 @@ class Component extends DCLogic {
       modal: { id: null, c: cuads[0] ? cuads[0].id : null, tipo: t0.nombre, urg: t0.urgencia, fecha: TODAY, asunto: [], tema: '', para: otro, por: null } });
   }
 
-  /** Lista de amigos, grupos y chats (pestaña Amigos). */
+  /** Lista de amigos, grupos y chats (en la ruedita, debajo de los avisos). */
   valsAmigos(s) {
     const self = this, me = this.uid;
     const acept = s.amigos.filter(a => a.estado === 'aceptada');
@@ -1802,10 +1807,8 @@ class Component extends DCLogic {
     const sinLeer = acept.reduce((t, a) => t + ((porId[a.id] || {}).sinLeer || 0), 0) + s.gAmigos.reduce((t, g) => t + (g.sinLeer || 0), 0);
     const solicitudes = s.amigos.filter(a => a.estado === 'pendiente' && !a.yo);
     const esperando = s.amigos.filter(a => a.estado === 'pendiente' && a.yo);
-    const partes = [acept.length ? cuenta(acept.length, 'AMIGO', 'AMIGOS') : '', s.gAmigos.length ? cuenta(s.gAmigos.length, 'GRUPO', 'GRUPOS') : ''].filter(Boolean);
     return {
-      amigosTabBadge: sinLeer + solicitudes.length,
-      amigosKicker: partes.length ? partes.join(' · ') + (sinLeer ? ' · ' + sinLeer + ' SIN LEER' : '') : 'CHATS',
+      amigosSinLeerTxt: sinLeer ? sinLeer + ' SIN LEER' : '',
       solicitudes: solicitudes.map(a => ({
         nombre: a.nombre, codigo: a.codigo, inicial: (a.nombre || '?').charAt(0).toUpperCase(), color: colorDe(a.id),
         aceptar: () => self.conexion('aceptar', a),
@@ -1815,7 +1818,7 @@ class Component extends DCLogic {
         const n = f.v.sinLeer || 0;
         return Object.assign({}, f.v, {
           previewColor: n ? '#EDF1F7' : '#8E9AAE', previewPeso: n ? '600' : '500',
-          cuando: f.en ? cuandoChat(f.en) : '', cuandoColor: n ? MINT : '#4A566B',
+          cuando: f.en ? cuandoChat(f.en) : '', cuandoColor: n ? MINT : '#8E9AAE',
           badgeOn: n > 0, badge: n > 99 ? '99+' : String(n),
         });
       }),
@@ -1831,10 +1834,9 @@ class Component extends DCLogic {
   /** Conversación abierta: con un amigo o con un grupo. */
   valsChat(s) {
     const self = this, me = this.uid;
-    const enAmigos = s.tab === 'amigos';
     const g = s.chatG ? s.gAmigos.find(x => x.id === s.chatG) : null;
     const a = !g && s.chatCon ? s.amigos.find(x => x.id === s.chatCon && x.estado === 'aceptada') : null;
-    if (!enAmigos || (!g && !a)) return { chatOn: false, listaAmigosOn: enAmigos };
+    if (!g && !a) return { chatOn: false };
     const clave = this.hiloAbierto(s);
     const hilo = s.chatMsgs[clave] || { lista: [], hayMas: false, cargando: true, error: '' };
     // Libreticas de grupo que ya se borraron (el mismo chat lo cuenta).
@@ -1871,7 +1873,7 @@ class Component extends DCLogic {
     });
     const listo = !!(s.chatTexto || '').trim();
     const comun = {
-      chatOn: true, listaAmigosOn: false,
+      chatOn: true,
       chatItems: items,
       chatVacio: !hilo.cargando && !hilo.error && !hilo.lista.some(m => m.tipo !== 'sistema'),
       chatCargando: !!hilo.cargando && !hilo.lista.length,
@@ -1882,7 +1884,7 @@ class Component extends DCLogic {
       chatEnviar: () => self.enviarMensaje(),
       chatEnviarBg: listo ? MINT : 'rgba(255,255,255,.08)',
       chatEnviarFg: listo ? '#0A0E1A' : '#6B778C',
-      chatVolver: () => self.cerrarChat(),
+      chatVolver: () => self.volverDelChat(),
     };
     if (g) {
       const otros = g.miembros.filter(x => x.id !== me);
@@ -2497,7 +2499,7 @@ class Component extends DCLogic {
       lgNota: soyCreador
         ? 'Cada persona registra lo que te paga y te llega un aviso. Cuando todos paguen, queda saldada.'
         : (mia ? 'Solo tú registras lo que pagas; ' + creador + ' recibe un aviso con cada abono.' : 'Cada persona registra lo que paga.'),
-      lgIrChatOn: s.gAmigos.some(x => x.id === l.grupo) && !(s.tab === 'amigos' && s.chatG === l.grupo),
+      lgIrChatOn: s.gAmigos.some(x => x.id === l.grupo) && s.chatG !== l.grupo,
       lgIrChat: () => { self.cerrarHoja('lg', true); self.abrirGrupo(l.grupo); },
     });
   }
@@ -2839,10 +2841,7 @@ class Component extends DCLogic {
     const days = WEEK.map((w, i) => (!actuales[w.fecha] && logs[w.fecha]) ? logs[w.fecha] : s.days[i]);
 
     const p = v.profile || {};
-    const profile = {
-      nombre: s.profile.nombre || p.nombre || '', altura: s.profile.altura || p.altura || '',
-      peso: s.profile.peso || p.peso || '', sexo: s.profile.sexo || p.sexo || '',
-    };
+    const profile = { ...s.profile, nombre: s.profile.nombre || p.nombre || '' };
 
     try { localStorage.setItem('pilares.importado.' + uid, '1'); } catch (e) {}
     this.setState({
@@ -3280,7 +3279,7 @@ class Component extends DCLogic {
     const nu = nextA ? self.urg(nextA) : { color: GREY, tint: 'rgba(142,154,174,.14)' };
     const nc = nextA ? s.cuadernos.find(c => c.id === nextA.c) : null;
 
-    const tabDefs = [[ 'Ejercicio', 'ejercicio', ['8px','14px','18px'] ], [ 'Estudio', 'estudio', ['16px','16px','16px'] ], [ 'Finanzas', 'finanzas', ['18px','10px','14px'] ], [ 'Amigos', 'amigos', ['11px','18px','11px'] ]];
+    const tabDefs = [[ 'Ejercicio', 'ejercicio', ['8px','14px','18px'] ], [ 'Estudio', 'estudio', ['16px','16px','16px'] ], [ 'Finanzas', 'finanzas', ['18px','10px','14px'] ]];
 
     const vChat = self.valsChat(s);
     return {
@@ -3289,7 +3288,6 @@ class Component extends DCLogic {
       ...self.valsRutina(s), ...self.valsMenu(s), ...self.valsVer(s), ...self.valsAvisos(s),
       ...self.valsAmigos(s), ...vChat, ...self.valsChatHoja(s), ...self.valsLG(s), ...self.valsElegir(s),
       isHome: s.tab === 'home', isEjercicio: s.tab === 'ejercicio', isEstudio: s.tab === 'estudio', isFinanzas: s.tab === 'finanzas',
-      isAmigos: s.tab === 'amigos',
       barraOn: !vChat.chatOn,
       editOn: s.edit, panelOn: s.panel, modalOn: !!m, restOn: s.restOn,
       goEjercicio: () => self.setState({ tab: 'ejercicio' }),
@@ -3481,19 +3479,8 @@ class Component extends DCLogic {
         { label: 'Por pagar', sub: nPagar + ' libreticas · yo debo', total: '$' + fmtMoney(sumOwe), color: RED, bg: 'rgba(196,100,97,.08)', border: 'rgba(196,100,97,.28)' },
       ],
 
-      pNombre: s.profile.nombre, pAltura: s.profile.altura, pPeso: s.profile.peso,
+      pNombre: s.profile.nombre,
       onNombre: ev => { const v = ev.target.value; self.setState(st => ({ profile: { ...st.profile, nombre: v } })); },
-      onAltura: ev => { const v = ev.target.value; self.setState(st => ({ profile: { ...st.profile, altura: v } })); },
-      onPeso: ev => { const v = ev.target.value; self.setState(st => ({ profile: { ...st.profile, peso: v } })); },
-      sexos: ['Hombre', 'Mujer', 'Otro'].map(t => ({
-        t, pick: () => self.setState(st => ({ profile: { ...st.profile, sexo: t } })),
-        bg: s.profile.sexo === t ? '#fff' : 'rgba(255,255,255,.05)',
-        border: s.profile.sexo === t ? '#fff' : 'rgba(255,255,255,.09)',
-        fg: s.profile.sexo === t ? '#090C14' : '#8E9AAE',
-      })),
-      profileNote: (s.profile.altura && s.profile.peso
-        ? miNombre + ', ' + s.profile.altura + ' cm · ' + s.profile.peso + ' kg. '
-        : 'Completa tu altura y peso. ') + 'Volumen sugerido: 12–18 series por grupo a la semana, compuestos primero y 2:00–2:30 de descanso en multiarticulares.',
 
       meUsuario: s.me ? '@' + s.me.usuario : '',
       meCodigo: s.codigo || '—',
@@ -3523,12 +3510,10 @@ class Component extends DCLogic {
 
       tabs: tabDefs.map(([label, key, hs]) => {
         const on = s.tab === key;
-        const n = key === 'amigos' ? self.valsAmigos(s).amigosTabBadge : 0;
         return {
           label, h1: hs[0], h2: hs[1], h3: hs[2],
           fg: on ? '#CE7F55' : '#8E9AAE', bg: on ? 'rgba(206,127,85,.12)' : 'transparent',
           border: on ? 'rgba(206,127,85,.26)' : 'transparent',
-          badgeOn: n > 0, badge: n > 99 ? '99+' : String(n),
           go: () => self.setState({ tab: key }),
         };
       }),

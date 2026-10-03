@@ -758,188 +758,104 @@
 </div>
 </sc-if>
 
-<sc-if value="{{ isAmigos }}">
-<div data-pantalla="amigos" style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
-  <sc-if value="{{ listaAmigosOn }}">
-  <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
-    <div data-cabecera data-vidrio="cabecera" style="position:absolute;top:0;left:0;right:0;z-index:30">
-    <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 60px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px">
-      <div style="font:700 9.5px/1 Manrope,sans-serif;letter-spacing:.16em;color:#4A566B">{{ amigosKicker }}</div>
-      <div style="font:italic 300 33px/1.12 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#EDF1F7">Amigos</div>
-      <div sc-camel-on-click="{{ abrirAgregar }}" aria-label="Agregar amigo" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px;width:44px;height:44px;border-radius:12px;background:rgba(87,185,160,.12);border:1px solid rgba(87,185,160,.32);display:flex;align-items:center;justify-content:center;cursor:pointer">
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#57B9A0" stroke-width="1.9" stroke-linecap="round"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 18.5c.8-3.3 3.4-5 6.5-5s5.7 1.7 6.5 5"></path><path d="M17.5 6.5v6M14.5 9.5h6"></path></svg>
-      </div>
-      <div sc-camel-on-click="{{ openPanel }}" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9AA6BA" stroke-linecap="round">
-          <path stroke-width="4.6" d="M20.2 12 L21.2 12 M3.8 12 L2.8 12 M12 20.2 L12 21.2 M12 3.8 L12 2.8 M17.8 17.8 L18.5 18.5 M6.2 6.2 L5.5 5.5 M6.2 17.8 L5.5 18.5 M17.8 6.2 L18.5 5.5"></path>
-          <circle cx="12" cy="12" r="7.4" stroke-width="5.2"></circle>
-        </svg>
-        <sc-if value="{{ avisosBadge }}"><div style="position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:#C46461;border:2px solid #090C14;font:800 10px/16px Manrope,sans-serif;color:#fff;text-align:center">{{ avisosBadgeTxt }}</div></sc-if>
-      </div>
+
+<!-- Chat con un amigo o un grupo: se abre desde la ruedita, encima del pilar
+     en que estés; volver regresa a la ruedita. -->
+<sc-if value="{{ chatOn }}">
+<div data-chat style="position:absolute;inset:0;z-index:45;display:flex;flex-direction:column;background:#090C14">
+  <div data-cabecera data-vidrio="cabecera" style="position:absolute;top:0;left:0;right:0;z-index:30">
+  <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 64px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;min-height:44px">
+    <div sc-camel-on-click="{{ chatVolver }}" aria-label="Volver a tu panel" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#9AA6BA" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5L5.5 9 11 14.5"></path></svg>
     </div>
+    <div style="display:flex;align-items:center;gap:9px;max-width:100%;margin-top:4px">
+      <div style="width:30px;height:30px;flex:none;border-radius:{{ chatRadio }};background:{{ chatColor }};display:flex;align-items:center;justify-content:center;font:800 {{ chatLetra }}/1 Manrope,sans-serif;color:#0A0E1A">{{ chatInicial }}</div>
+      <div style="min-width:0;font:italic 300 26px/1.15 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#EDF1F7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ chatNombre }}</div>
     </div>
-
-    <div data-desplaza style="flex:1;min-height:0;overflow:auto;padding:6px 16px calc(env(safe-area-inset-bottom,0px) + 112px);display:flex;flex-direction:column;gap:8px">
-      <sc-for list="{{ solicitudes }}" as="sq" hint-placeholder-count="0">
-        <div style="padding:13px 14px;border-radius:14px;background:rgba(206,127,85,.08);border:1px solid rgba(206,127,85,.3);display:flex;align-items:center;gap:11px">
-          <div style="width:40px;height:40px;flex:none;border-radius:50%;background:{{ sq.color }};display:flex;align-items:center;justify-content:center;font:800 15px/1 Manrope,sans-serif;color:#0A0E1A">{{ sq.inicial }}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font:700 14px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ sq.nombre }}</div>
-            <div style="font:700 9.5px/1.2 Manrope,sans-serif;letter-spacing:.08em;color:#CE7F55;margin-top:6px">QUIERE AGREGARTE</div>
-          </div>
-          <div sc-camel-on-click="{{ sq.aceptar }}" style="flex:none;padding:11px 12px;border-radius:10px;cursor:pointer;background:#57B9A0;font:800 11px/1 Manrope,sans-serif;color:#0A0E1A">Aceptar</div>
-          <div sc-camel-on-click="{{ sq.rechazar }}" aria-label="Rechazar" style="flex:none;width:36px;height:36px;border-radius:10px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font:600 16px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
-        </div>
-      </sc-for>
-
-      <sc-if value="{{ nuevoGrupoOn }}">
-        <div sc-camel-on-click="{{ nuevoGrupo }}" style="padding:11px 13px;border-radius:16px;border:1px dashed rgba(87,185,160,.34);display:flex;align-items:center;gap:12px;cursor:pointer" style-active="transform:scale(.99)">
-          <div style="width:46px;height:46px;flex:none;border-radius:15px;background:rgba(87,185,160,.12);display:flex;align-items:center;justify-content:center">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#57B9A0" stroke-width="1.8" stroke-linecap="round"><circle cx="8.5" cy="8" r="3"></circle><circle cx="16" cy="9" r="2.4"></circle><path d="M3 18.5c.6-2.9 2.8-4.5 5.5-4.5s4.9 1.6 5.5 4.5"></path><path d="M15.2 13.8c2.4 0 4.3 1.4 4.9 3.9"></path></svg>
-          </div>
-          <div style="flex:1;min-width:0">
-            <div style="font:700 15px/1.2 Manrope,sans-serif;color:#57B9A0">Nuevo grupo</div>
-            <div style="font:500 12.5px/1.3 Manrope,sans-serif;color:#8E9AAE;margin-top:5px">Chat y libreticas con varios amigos</div>
-          </div>
-        </div>
-      </sc-if>
-
-      <sc-for list="{{ chatsList }}" as="ch" hint-placeholder-count="4">
-        <div sc-camel-on-click="{{ ch.abrir }}" style="padding:12px 13px;border-radius:16px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:12px;cursor:pointer">
-          <div style="width:46px;height:46px;flex:none;border-radius:{{ ch.radio }};background:{{ ch.color }};display:flex;align-items:center;justify-content:center;font:800 {{ ch.letra }}/1 Manrope,sans-serif;color:#0A0E1A">{{ ch.inicial }}</div>
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:baseline;gap:8px">
-              <div style="flex:1;min-width:0;font:700 15px/1.2 Manrope,sans-serif;color:#EDF1F7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ch.nombre }}</div>
-              <div style="flex:none;font:700 10.5px/1 Manrope,sans-serif;color:{{ ch.cuandoColor }}">{{ ch.cuando }}</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
-              <div style="flex:1;min-width:0;font:{{ ch.previewPeso }} 13px/1.3 Manrope,sans-serif;color:{{ ch.previewColor }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ch.preview }}</div>
-              <sc-if value="{{ ch.badgeOn }}">
-                <div style="flex:none;min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#57B9A0;font:800 11px/20px Manrope,sans-serif;color:#0A0E1A;text-align:center">{{ ch.badge }}</div>
-              </sc-if>
-            </div>
-          </div>
-        </div>
-      </sc-for>
-
-      <sc-if value="{{ hayEsperando }}">
-        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:14px 2px 2px">ESPERANDO RESPUESTA</div>
-        <sc-for list="{{ esperando }}" as="es" hint-placeholder-count="0">
-          <div style="padding:11px 13px;border-radius:12px;border:1px dashed rgba(255,255,255,.12);display:flex;align-items:center;gap:10px">
-            <div style="flex:1;min-width:0;font:600 13.5px/1.2 Manrope,sans-serif;color:#9AA6BA;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ es.nombre }}</div>
-            <div sc-camel-on-click="{{ es.cancelar }}" style="flex:none;padding:9px 11px;border-radius:9px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font:700 11px/1 Manrope,sans-serif;color:#8E9AAE">Cancelar</div>
-          </div>
-        </sc-for>
-      </sc-if>
-
-      <sc-if value="{{ sinAmigos }}">
-        <div style="margin-top:8px;padding:22px 20px;border-radius:16px;border:1px dashed rgba(255,255,255,.14);text-align:center">
-          <div style="font:700 15px/1.3 Manrope,sans-serif;color:#EDF1F7">Aún no tienes amigos</div>
-          <div style="font:500 12.5px/1.5 Manrope,sans-serif;color:#8E9AAE;margin-top:8px;text-wrap:pretty">Pide su código de amigo y agrégalos. Luego podrán escribirse y enviarse rutinas, libreticas y actividades.</div>
-          <div sc-camel-on-click="{{ abrirAgregar }}" style="display:inline-block;margin-top:14px;padding:13px 18px;border-radius:11px;cursor:pointer;background:#57B9A0;font:800 13px/1 Manrope,sans-serif;color:#0A0E1A">Agregar amigo</div>
-        </div>
-      </sc-if>
+    <sc-if value="{{ chatSubOn }}">
+      <div style="max-width:100%;font:600 11.5px/1.3 Manrope,sans-serif;color:#8E9AAE;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ chatSub }}</div>
+    </sc-if>
+    <div sc-camel-on-click="{{ chatOpciones }}" aria-label="Opciones del chat" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;gap:3px;cursor:pointer">
+      <div style="width:4px;height:4px;border-radius:50%;background:#9AA6BA"></div><div style="width:4px;height:4px;border-radius:50%;background:#9AA6BA"></div><div style="width:4px;height:4px;border-radius:50%;background:#9AA6BA"></div>
     </div>
   </div>
-  </sc-if>
+  </div>
 
-  <sc-if value="{{ chatOn }}">
-  <div data-chat style="position:absolute;inset:0;display:flex;flex-direction:column;background:#090C14">
-    <div data-cabecera data-vidrio="cabecera" style="position:absolute;top:0;left:0;right:0;z-index:30">
-    <div style="padding:calc(env(safe-area-inset-top,0px) + 12px) 64px 12px;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;min-height:44px">
-      <div sc-camel-on-click="{{ chatVolver }}" aria-label="Volver a Amigos" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#9AA6BA" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5L5.5 9 11 14.5"></path></svg>
+  <div data-desplaza data-chat-lista style="flex:1;min-height:0;overflow:auto;padding:6px 14px 12px;display:flex;flex-direction:column">
+    <sc-if value="{{ chatHayMas }}">
+      <div data-chat-mas role="status" aria-label="Cargando mensajes anteriores" style="flex:none;height:44px;display:flex;align-items:center;justify-content:center">
+        <pilares-orbe tam="20" estado="searching"></pilares-orbe>
       </div>
-      <div style="display:flex;align-items:center;gap:9px;max-width:100%;margin-top:4px">
-        <div style="width:30px;height:30px;flex:none;border-radius:{{ chatRadio }};background:{{ chatColor }};display:flex;align-items:center;justify-content:center;font:800 {{ chatLetra }}/1 Manrope,sans-serif;color:#0A0E1A">{{ chatInicial }}</div>
-        <div style="min-width:0;font:italic 300 26px/1.15 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#EDF1F7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ chatNombre }}</div>
+    </sc-if>
+    <sc-if value="{{ chatCargando }}">
+      <div role="status" style="padding:40px 0;display:flex;flex-direction:column;align-items:center;gap:12px">
+        <pilares-orbe class="orbe-carga" tam="32" estado="searching"></pilares-orbe>
+        <div style="font:600 12.5px/1.4 Manrope,sans-serif;color:#8E9AAE">Cargando mensajes…</div>
       </div>
-      <sc-if value="{{ chatSubOn }}">
-        <div style="max-width:100%;font:600 11.5px/1.3 Manrope,sans-serif;color:#8E9AAE;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ chatSub }}</div>
+    </sc-if>
+    <sc-if value="{{ chatError }}">
+      <div style="padding:16px;text-align:center;font:600 12px/1.45 Manrope,sans-serif;color:#E08A87">{{ chatError }}</div>
+    </sc-if>
+    <sc-for list="{{ chatItems }}" as="mi" hint-placeholder-count="0">
+      <sc-if value="{{ mi.esDia }}">
+        <div style="align-self:center;margin:14px 0 6px;padding:5px 10px;border-radius:9px;background:rgba(255,255,255,.05);font:700 10px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE">{{ mi.dia }}</div>
       </sc-if>
-      <div sc-camel-on-click="{{ chatOpciones }}" aria-label="Opciones del chat" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:44px;height:44px;border-radius:12px;background:#121724;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;gap:3px;cursor:pointer">
-        <div style="width:4px;height:4px;border-radius:50%;background:#9AA6BA"></div><div style="width:4px;height:4px;border-radius:50%;background:#9AA6BA"></div><div style="width:4px;height:4px;border-radius:50%;background:#9AA6BA"></div>
-      </div>
-    </div>
-    </div>
-
-    <div data-desplaza data-chat-lista style="flex:1;min-height:0;overflow:auto;padding:6px 14px 12px;display:flex;flex-direction:column">
-      <sc-if value="{{ chatHayMas }}">
-        <div data-chat-mas role="status" aria-label="Cargando mensajes anteriores" style="flex:none;height:44px;display:flex;align-items:center;justify-content:center">
-          <pilares-orbe tam="20" estado="searching"></pilares-orbe>
+      <sc-if value="{{ mi.esSistema }}">
+        <div style="align-self:center;max-width:86%;margin:10px 0 4px;padding:6px 11px;border-radius:10px;background:rgba(255,255,255,.04);font:600 11.5px/1.4 Manrope,sans-serif;color:#8E9AAE;text-align:center;text-wrap:pretty">{{ mi.texto }}</div>
+      </sc-if>
+      <sc-if value="{{ mi.esTexto }}">
+        <div style="display:flex;justify-content:{{ mi.lado }};margin-top:{{ mi.sep }}">
+          <div sc-camel-on-click="{{ mi.tocar }}" style="max-width:78%;padding:9px 12px 7px;border-radius:{{ mi.radio }};background:{{ mi.bg }};border:1px solid {{ mi.borde }}">
+            <sc-if value="{{ mi.autorOn }}">
+              <div style="font:700 11.5px/1.2 Manrope,sans-serif;color:{{ mi.autorColor }};margin-bottom:3px">{{ mi.autor }}</div>
+            </sc-if>
+            <div style="font:500 15px/1.4 Manrope,sans-serif;color:#EDF1F7;white-space:pre-wrap;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text">{{ mi.texto }}</div>
+            <div style="font:600 10px/1 Manrope,sans-serif;color:{{ mi.pieColor }};margin-top:5px;text-align:right">{{ mi.pie }}</div>
+          </div>
         </div>
       </sc-if>
-      <sc-if value="{{ chatCargando }}">
-        <div role="status" style="padding:40px 0;display:flex;flex-direction:column;align-items:center;gap:12px">
-          <pilares-orbe class="orbe-carga" tam="32" estado="searching"></pilares-orbe>
-          <div style="font:600 12.5px/1.4 Manrope,sans-serif;color:#8E9AAE">Cargando mensajes…</div>
+      <sc-if value="{{ mi.esTarjeta }}">
+        <div style="display:flex;justify-content:{{ mi.lado }};margin-top:8px">
+          <div sc-camel-on-click="{{ mi.tocar }}" style="width:80%;max-width:300px;box-sizing:border-box;padding:13px 14px 11px;border-radius:16px;background:#121724;border:1px solid {{ mi.borde }};cursor:pointer">
+            <sc-if value="{{ mi.autorOn }}">
+              <div style="font:700 11.5px/1.2 Manrope,sans-serif;color:{{ mi.autorColor }};margin-bottom:8px">{{ mi.autor }}</div>
+            </sc-if>
+            <div style="font:800 9px/1.2 Manrope,sans-serif;letter-spacing:.14em;color:{{ mi.color }}">{{ mi.kicker }}</div>
+            <div style="font:800 19px/1.2 Manrope,sans-serif;letter-spacing:-.01em;color:#EDF1F7;margin-top:7px;overflow-wrap:anywhere">{{ mi.titulo }}</div>
+            <sc-if value="{{ mi.sub }}">
+              <div style="font:600 12.5px/1.4 Manrope,sans-serif;color:#B8C2D2;margin-top:4px">{{ mi.sub }}</div>
+            </sc-if>
+            <sc-if value="{{ mi.extra }}">
+              <div style="font:500 12px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:6px">{{ mi.extra }}</div>
+            </sc-if>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.06)">
+              <div style="font:700 11.5px/1 Manrope,sans-serif;color:{{ mi.color }}">{{ mi.accion }}</div>
+              <div style="flex:none;font:600 10px/1 Manrope,sans-serif;color:#6B778C">{{ mi.hora }}</div>
+            </div>
+          </div>
         </div>
       </sc-if>
-      <sc-if value="{{ chatError }}">
-        <div style="padding:16px;text-align:center;font:600 12px/1.45 Manrope,sans-serif;color:#E08A87">{{ chatError }}</div>
-      </sc-if>
-      <sc-for list="{{ chatItems }}" as="mi" hint-placeholder-count="0">
-        <sc-if value="{{ mi.esDia }}">
-          <div style="align-self:center;margin:14px 0 6px;padding:5px 10px;border-radius:9px;background:rgba(255,255,255,.05);font:700 10px/1 Manrope,sans-serif;letter-spacing:.06em;color:#8E9AAE">{{ mi.dia }}</div>
-        </sc-if>
-        <sc-if value="{{ mi.esSistema }}">
-          <div style="align-self:center;max-width:86%;margin:10px 0 4px;padding:6px 11px;border-radius:10px;background:rgba(255,255,255,.04);font:600 11.5px/1.4 Manrope,sans-serif;color:#8E9AAE;text-align:center;text-wrap:pretty">{{ mi.texto }}</div>
-        </sc-if>
-        <sc-if value="{{ mi.esTexto }}">
-          <div style="display:flex;justify-content:{{ mi.lado }};margin-top:{{ mi.sep }}">
-            <div sc-camel-on-click="{{ mi.tocar }}" style="max-width:78%;padding:9px 12px 7px;border-radius:{{ mi.radio }};background:{{ mi.bg }};border:1px solid {{ mi.borde }}">
-              <sc-if value="{{ mi.autorOn }}">
-                <div style="font:700 11.5px/1.2 Manrope,sans-serif;color:{{ mi.autorColor }};margin-bottom:3px">{{ mi.autor }}</div>
-              </sc-if>
-              <div style="font:500 15px/1.4 Manrope,sans-serif;color:#EDF1F7;white-space:pre-wrap;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text">{{ mi.texto }}</div>
-              <div style="font:600 10px/1 Manrope,sans-serif;color:{{ mi.pieColor }};margin-top:5px;text-align:right">{{ mi.pie }}</div>
-            </div>
-          </div>
-        </sc-if>
-        <sc-if value="{{ mi.esTarjeta }}">
-          <div style="display:flex;justify-content:{{ mi.lado }};margin-top:8px">
-            <div sc-camel-on-click="{{ mi.tocar }}" style="width:80%;max-width:300px;box-sizing:border-box;padding:13px 14px 11px;border-radius:16px;background:#121724;border:1px solid {{ mi.borde }};cursor:pointer">
-              <sc-if value="{{ mi.autorOn }}">
-                <div style="font:700 11.5px/1.2 Manrope,sans-serif;color:{{ mi.autorColor }};margin-bottom:8px">{{ mi.autor }}</div>
-              </sc-if>
-              <div style="font:800 9px/1.2 Manrope,sans-serif;letter-spacing:.14em;color:{{ mi.color }}">{{ mi.kicker }}</div>
-              <div style="font:800 19px/1.2 Manrope,sans-serif;letter-spacing:-.01em;color:#EDF1F7;margin-top:7px;overflow-wrap:anywhere">{{ mi.titulo }}</div>
-              <sc-if value="{{ mi.sub }}">
-                <div style="font:600 12.5px/1.4 Manrope,sans-serif;color:#B8C2D2;margin-top:4px">{{ mi.sub }}</div>
-              </sc-if>
-              <sc-if value="{{ mi.extra }}">
-                <div style="font:500 12px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:6px">{{ mi.extra }}</div>
-              </sc-if>
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.06)">
-                <div style="font:700 11.5px/1 Manrope,sans-serif;color:{{ mi.color }}">{{ mi.accion }}</div>
-                <div style="flex:none;font:600 10px/1 Manrope,sans-serif;color:#6B778C">{{ mi.hora }}</div>
-              </div>
-            </div>
-          </div>
-        </sc-if>
-      </sc-for>
-      <sc-if value="{{ chatVacio }}">
-        <div style="margin:auto 10px;padding:24px 18px;text-align:center;font:500 13px/1.55 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">{{ chatVacioTxt }}</div>
-      </sc-if>
-    </div>
+    </sc-for>
+    <sc-if value="{{ chatVacio }}">
+      <div style="margin:auto 10px;padding:24px 18px;text-align:center;font:500 13px/1.55 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">{{ chatVacioTxt }}</div>
+    </sc-if>
+  </div>
 
-    <div data-chat-redactar style="flex:none;display:flex;align-items:center;gap:8px;padding:8px 10px var(--pie, calc(max(env(safe-area-inset-bottom,0px), var(--app-oculto,0px)) + 10px));background:#0B0F19;border-top:1px solid rgba(255,255,255,.07)">
-      <div sc-camel-on-click="{{ chatAdjuntar }}" aria-label="{{ chatAdjuntarTxt }}" style="flex:none;width:42px;height:42px;border-radius:50%;background:rgba(206,127,85,.14);border:1px solid rgba(206,127,85,.34);display:flex;align-items:center;justify-content:center;cursor:pointer">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#CE7F55" stroke-width="2" stroke-linecap="round"><path d="M8 2.5v11M2.5 8h11"></path></svg>
-      </div>
-      <input data-chat-entrada value="{{ chatTexto }}" sc-camel-on-change="{{ onChatTexto }}" placeholder="Mensaje" enterkeyhint="send" maxlength="2000" autocomplete="off" style="flex:1;min-width:0;box-sizing:border-box;height:42px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:21px;color:#fff;font:500 16px Manrope,sans-serif;padding:0 16px">
-      <div sc-camel-on-click="{{ chatEnviar }}" aria-label="Enviar mensaje" style="flex:none;width:42px;height:42px;border-radius:50%;background:{{ chatEnviarBg }};display:flex;align-items:center;justify-content:center;cursor:pointer">
-        <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="{{ chatEnviarFg }}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"></path></svg>
-      </div>
+  <div data-chat-redactar style="flex:none;display:flex;align-items:center;gap:8px;padding:8px 10px var(--pie, calc(max(env(safe-area-inset-bottom,0px), var(--app-oculto,0px)) + 10px));background:#0B0F19;border-top:1px solid rgba(255,255,255,.07)">
+    <div sc-camel-on-click="{{ chatAdjuntar }}" aria-label="{{ chatAdjuntarTxt }}" style="flex:none;width:42px;height:42px;border-radius:50%;background:rgba(206,127,85,.14);border:1px solid rgba(206,127,85,.34);display:flex;align-items:center;justify-content:center;cursor:pointer">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#CE7F55" stroke-width="2" stroke-linecap="round"><path d="M8 2.5v11M2.5 8h11"></path></svg>
+    </div>
+    <input data-chat-entrada value="{{ chatTexto }}" sc-camel-on-change="{{ onChatTexto }}" placeholder="Mensaje" enterkeyhint="send" maxlength="2000" autocomplete="off" style="flex:1;min-width:0;box-sizing:border-box;height:42px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:21px;color:#fff;font:500 16px Manrope,sans-serif;padding:0 16px">
+    <div sc-camel-on-click="{{ chatEnviar }}" aria-label="Enviar mensaje" style="flex:none;width:42px;height:42px;border-radius:50%;background:{{ chatEnviarBg }};display:flex;align-items:center;justify-content:center;cursor:pointer">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="{{ chatEnviarFg }}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"></path></svg>
     </div>
   </div>
-  </sc-if>
 </div>
 </sc-if>
 
 <sc-if value="{{ barraOn }}">
 <div data-vidrio="barra" style="position:absolute;left:0;right:0;bottom:0;z-index:40;padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 20px);display:flex;gap:5px">
-  <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+  <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
     <div sc-camel-on-click="{{ t.go }}" style="position:relative;flex:1;min-width:0;padding:10px 2px 8px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;background:{{ t.bg }};border:1px solid {{ t.border }}" style-active="transform:translateY(1px)">
       <div style="height:18px;display:flex;align-items:flex-end;gap:3px">
         <div style="width:4px;border-radius:2px;background:{{ t.fg }};height:{{ t.h1 }}"></div>
@@ -947,9 +863,6 @@
         <div style="width:4px;border-radius:2px;background:{{ t.fg }};height:{{ t.h3 }}"></div>
       </div>
       <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.02em;color:{{ t.fg }}">{{ t.label }}</div>
-      <sc-if value="{{ t.badgeOn }}">
-        <div style="position:absolute;top:4px;left:calc(50% + 8px);min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#57B9A0;border:2px solid #0B0F19;font:800 9.5px/14px Manrope,sans-serif;color:#0A0E1A;text-align:center">{{ t.badge }}</div>
-      </sc-if>
     </div>
   </sc-for>
 </div>
@@ -966,7 +879,7 @@
       </svg>
       <div style="position:relative;z-index:1;font:800 64px/1 Manrope,sans-serif;letter-spacing:-3px;color:{{ restColor }}">{{ restTxt }}</div>
     </div>
-    <div style="font:500 12.5px/1 Manrope,sans-serif;color:#4A566B;margin-top:22px">Recomendado {{ restTotalTxt }}</div>
+    <div style="font:500 12.5px/1 Manrope,sans-serif;color:#8E9AAE;margin-top:22px">Descanso de tu rutina · {{ restTotalTxt }}</div>
     <div style="display:flex;gap:14px;margin-top:44px;align-items:center">
       <div sc-camel-on-click="{{ restMinus }}" style="width:68px;height:68px;border-radius:34px;background:#1A2131;border:1px solid #28324A;color:#8E9AAE;font:700 13px/1 Manrope,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:#3A4661" style-active="transform:translateY(1px)">−15s</div>
       <div sc-camel-on-click="{{ stopRest }}" style="height:58px;padding:0 34px;border-radius:12px;background:#57B9A0;color:#0A0E1A;font:800 16px/1 Manrope,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#7FD3BC" style-active="transform:translateY(1px)">Listo</div>
@@ -1108,13 +1021,21 @@
     <div data-hoja-velo style="position:absolute;inset:0;background:rgba(3,5,10,.62)"></div>
     <div data-hoja="panel" style="position:relative;box-sizing:border-box;width:100%;max-height:calc(100% - env(safe-area-inset-top,0px) - 44px);overflow:auto;background:#0E131F;border-top:1px solid rgba(255,255,255,.1);border-radius:28px 28px 0 0;padding:10px 22px calc(env(safe-area-inset-bottom,0px) + 30px)">
       <div style="width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.2);margin:0 auto 16px"></div>
-      <div style="display:flex;align-items:flex-start;justify-content:space-between">
-        <div>
-          <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">PANEL DE CUSTOMIZACIÓN</div>
-          <div style="font:800 24px/1.1 Manrope,sans-serif;letter-spacing:-.02em;margin-top:9px">Tu panel</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="font:800 24px/1.1 Manrope,sans-serif;letter-spacing:-.02em">Tu panel</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <!-- Campanita: naranja = notificaciones prendidas en este celular. -->
+          <div data-campana="{{ campanaEstado }}" sc-camel-on-click="{{ campanaTocar }}" role="switch" aria-checked="{{ campanaOn }}" aria-label="{{ campanaLabel }}" style="width:34px;height:34px;border-radius:9px;background:{{ campanaBg }};border:1px solid {{ campanaBorde }};display:flex;align-items:center;justify-content:center;cursor:pointer;color:{{ campanaColor }};opacity:{{ campanaOpacidad }}">
+            <svg class="campana" width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1.2 1.3H2.8L4 11.5z" fill="{{ campanaRelleno }}"></path><path d="M6.5 14.2a1.6 1.6 0 0 0 3 0"></path><path d="M2.5 2.5l11 11" stroke-opacity="{{ campanaTacha }}"></path></svg>
+          </div>
+          <div sc-camel-on-click="{{ closePanel }}" role="button" aria-label="Cerrar" style="width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#8E9AAE">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"></path></svg>
+          </div>
         </div>
-        <div sc-camel-on-click="{{ closePanel }}" style="width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 16px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
       </div>
+      <sc-if value="{{ pushMsg }}">
+        <div role="status" style="font:600 11.5px/1.45 Manrope,sans-serif;color:#9AA6BA;margin-top:10px;text-wrap:pretty">{{ pushMsg }}</div>
+      </sc-if>
 
       <div style="margin-top:22px;display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:8px">
@@ -1132,102 +1053,96 @@
               <sc-if value="{{ av.hayCuerpo }}">
                 <div style="font:500 12px/1.45 Manrope,sans-serif;color:#9AA6BA;margin-top:4px;white-space:pre-line;text-wrap:pretty">{{ av.cuerpo }}</div>
               </sc-if>
-              <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.1em;color:#4A566B;margin-top:8px">{{ av.cuando }}</div>
+              <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.1em;color:#8E9AAE;margin-top:8px">{{ av.cuando }}</div>
             </div>
           </div>
         </sc-for>
         <sc-if value="{{ avisosVacio }}">
-          <div style="padding:16px;border-radius:12px;border:1px dashed rgba(255,255,255,.12);font:500 12px/1.5 Manrope,sans-serif;color:#8E9AAE;text-align:center;text-wrap:pretty">Aquí verás cuando un amigo te asigne una actividad, te comparta una libretica, registre un abono o te envíe una rutina, y el recordatorio de tus entregas.</div>
+          <div style="padding:12px 14px;border-radius:12px;border:1px dashed rgba(255,255,255,.12);font:500 12px/1.5 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">Sin avisos. Aquí llega lo que te envíen tus amigos.</div>
         </sc-if>
         <sc-if value="{{ avisosMas }}">
           <div sc-camel-on-click="{{ avisosAlternar }}" style="padding:12px;border-radius:11px;text-align:center;cursor:pointer;font:700 12px/1 Manrope,sans-serif;color:#8E9AAE;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07)">{{ avisosMasTxt }}</div>
         </sc-if>
       </div>
 
-      <div style="margin-top:12px;padding:15px 16px;border-radius:14px;background:#121724;border:1px solid rgba(255,255,255,.07)">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="flex:1;min-width:0">
-            <div style="font:700 13.5px/1.25 Manrope,sans-serif;color:#EDF1F7">{{ pushTitulo }}</div>
-            <div style="font:500 11.5px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:5px;text-wrap:pretty">{{ pushTexto }}</div>
-          </div>
-          <sc-if value="{{ pushBtnOn }}">
-            <div sc-camel-on-click="{{ pushGo }}" style="flex:none;padding:11px 14px;border-radius:10px;cursor:pointer;background:rgba(87,185,160,.12);border:1px solid rgba(87,185,160,.34);font:700 12.5px/1 Manrope,sans-serif;color:#57B9A0">{{ pushBtn }}</div>
+      <div style="margin-top:26px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <svg width="15" height="15" viewBox="0 0 22 22" fill="none" stroke="#8E9AAE" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="7.5" r="3.5"></circle><path d="M2 18.5c.8-3.3 3.4-5 6.5-5s5.7 1.7 6.5 5"></path><path d="M15 4.6a3.2 3.2 0 0 1 0 6M17.4 13.8c1.5.7 2.4 2.2 2.8 4.2"></path></svg>
+          <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">AMIGOS</div>
+          <sc-if value="{{ amigosSinLeerTxt }}">
+            <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.1em;color:#57B9A0">{{ amigosSinLeerTxt }}</div>
           </sc-if>
         </div>
-        <sc-if value="{{ pushMsg }}">
-          <div style="font:600 11.5px/1.45 Manrope,sans-serif;color:#9AA6BA;margin-top:10px">{{ pushMsg }}</div>
+        <div sc-camel-on-click="{{ abrirAgregar }}" role="button" aria-label="Agregar amigo" style="flex:none;height:34px;padding:0 12px 0 10px;box-sizing:border-box;border-radius:9px;background:rgba(87,185,160,.12);border:1px solid rgba(87,185,160,.32);display:flex;align-items:center;gap:7px;cursor:pointer;font:700 12px/1 Manrope,sans-serif;color:#57B9A0">
+          <svg width="16" height="16" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 18.5c.8-3.3 3.4-5 6.5-5s5.7 1.7 6.5 5"></path><path d="M17.5 6.5v6M14.5 9.5h6"></path></svg>
+          Agregar
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+        <sc-for list="{{ solicitudes }}" as="sq" hint-placeholder-count="0">
+          <div style="padding:13px 14px;border-radius:14px;background:rgba(206,127,85,.08);border:1px solid rgba(206,127,85,.3);display:flex;align-items:center;gap:11px">
+            <div style="width:40px;height:40px;flex:none;border-radius:50%;background:{{ sq.color }};display:flex;align-items:center;justify-content:center;font:800 15px/1 Manrope,sans-serif;color:#0A0E1A">{{ sq.inicial }}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font:700 14px/1.2 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ sq.nombre }}</div>
+              <div style="font:700 9.5px/1.2 Manrope,sans-serif;letter-spacing:.08em;color:#CE7F55;margin-top:6px">QUIERE AGREGARTE</div>
+            </div>
+            <div sc-camel-on-click="{{ sq.aceptar }}" style="flex:none;padding:11px 12px;border-radius:10px;cursor:pointer;background:#57B9A0;font:800 11px/1 Manrope,sans-serif;color:#0A0E1A">Aceptar</div>
+            <div sc-camel-on-click="{{ sq.rechazar }}" aria-label="Rechazar" style="flex:none;width:36px;height:36px;border-radius:10px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font:600 16px/1 Manrope,sans-serif;color:#8E9AAE">×</div>
+          </div>
+        </sc-for>
+
+        <sc-for list="{{ chatsList }}" as="ch" hint-placeholder-count="4">
+          <div sc-camel-on-click="{{ ch.abrir }}" style="padding:12px 13px;border-radius:16px;background:#121724;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:12px;cursor:pointer">
+            <div style="width:46px;height:46px;flex:none;border-radius:{{ ch.radio }};background:{{ ch.color }};display:flex;align-items:center;justify-content:center;font:800 {{ ch.letra }}/1 Manrope,sans-serif;color:#0A0E1A">{{ ch.inicial }}</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <div style="flex:1;min-width:0;font:700 15px/1.2 Manrope,sans-serif;color:#EDF1F7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ch.nombre }}</div>
+                <div style="flex:none;font:700 10.5px/1 Manrope,sans-serif;color:{{ ch.cuandoColor }}">{{ ch.cuando }}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+                <div style="flex:1;min-width:0;font:{{ ch.previewPeso }} 13px/1.3 Manrope,sans-serif;color:{{ ch.previewColor }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ch.preview }}</div>
+                <sc-if value="{{ ch.badgeOn }}">
+                  <div style="flex:none;min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#57B9A0;font:800 11px/20px Manrope,sans-serif;color:#0A0E1A;text-align:center">{{ ch.badge }}</div>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+
+        <sc-if value="{{ nuevoGrupoOn }}">
+          <div sc-camel-on-click="{{ nuevoGrupo }}" style="padding:11px 13px;border-radius:16px;border:1px dashed rgba(87,185,160,.34);display:flex;align-items:center;gap:12px;cursor:pointer" style-active="transform:scale(.99)">
+            <div style="width:46px;height:46px;flex:none;border-radius:15px;background:rgba(87,185,160,.12);display:flex;align-items:center;justify-content:center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#57B9A0" stroke-width="1.8" stroke-linecap="round"><circle cx="8.5" cy="8" r="3"></circle><circle cx="16" cy="9" r="2.4"></circle><path d="M3 18.5c.6-2.9 2.8-4.5 5.5-4.5s4.9 1.6 5.5 4.5"></path><path d="M15.2 13.8c2.4 0 4.3 1.4 4.9 3.9"></path></svg>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font:700 15px/1.2 Manrope,sans-serif;color:#57B9A0">Nuevo grupo</div>
+              <div style="font:500 12.5px/1.3 Manrope,sans-serif;color:#8E9AAE;margin-top:5px">Chat y libreticas con varios amigos</div>
+            </div>
+          </div>
         </sc-if>
-        <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:12px">
-          <div style="flex:1;min-width:0">
-            <div style="font:700 13px/1.25 Manrope,sans-serif;color:#EDF1F7">Recordatorio de entregas</div>
-            <div style="font:500 11px/1.4 Manrope,sans-serif;color:#8E9AAE;margin-top:4px">El día anterior a cada entrega</div>
+
+        <sc-if value="{{ hayEsperando }}">
+          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.14em;color:#8E9AAE;margin:14px 2px 2px">ESPERANDO RESPUESTA</div>
+          <sc-for list="{{ esperando }}" as="es" hint-placeholder-count="0">
+            <div style="padding:11px 13px;border-radius:12px;border:1px dashed rgba(255,255,255,.12);display:flex;align-items:center;gap:10px">
+              <div style="flex:1;min-width:0;font:600 13.5px/1.2 Manrope,sans-serif;color:#9AA6BA;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ es.nombre }}</div>
+              <div sc-camel-on-click="{{ es.cancelar }}" style="flex:none;padding:9px 11px;border-radius:9px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font:700 11px/1 Manrope,sans-serif;color:#8E9AAE">Cancelar</div>
+            </div>
+          </sc-for>
+        </sc-if>
+
+        <sc-if value="{{ sinAmigos }}">
+          <div style="margin-top:8px;padding:22px 20px;border-radius:16px;border:1px dashed rgba(255,255,255,.14);text-align:center">
+            <div style="font:700 15px/1.3 Manrope,sans-serif;color:#EDF1F7">Aún no tienes amigos</div>
+            <div style="font:500 12.5px/1.5 Manrope,sans-serif;color:#8E9AAE;margin-top:8px;text-wrap:pretty">Pide su código de amigo y agrégalos. Luego podrán escribirse y enviarse rutinas, libreticas y actividades.</div>
+            <div sc-camel-on-click="{{ abrirAgregar }}" style="display:inline-block;margin-top:14px;padding:13px 18px;border-radius:11px;cursor:pointer;background:#57B9A0;font:800 13px/1 Manrope,sans-serif;color:#0A0E1A">Agregar amigo</div>
           </div>
-          <select value="{{ horaSel }}" sc-camel-on-change="{{ onHora }}" aria-label="Hora del recordatorio" style="flex:none;appearance:none;-webkit-appearance:none;background:rgba(255,255,255,.06) url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239AA6BA' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;) no-repeat right 12px center / 10px 6px;border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#fff;font:700 14px Manrope,sans-serif;padding:10px 32px 10px 12px;min-height:40px;color-scheme:dark">
-            <option value="0">12:00 a. m.</option>
-            <option value="1">1:00 a. m.</option>
-            <option value="2">2:00 a. m.</option>
-            <option value="3">3:00 a. m.</option>
-            <option value="4">4:00 a. m.</option>
-            <option value="5">5:00 a. m.</option>
-            <option value="6">6:00 a. m.</option>
-            <option value="7">7:00 a. m.</option>
-            <option value="8">8:00 a. m.</option>
-            <option value="9">9:00 a. m.</option>
-            <option value="10">10:00 a. m.</option>
-            <option value="11">11:00 a. m.</option>
-            <option value="12">12:00 p. m.</option>
-            <option value="13">1:00 p. m.</option>
-            <option value="14">2:00 p. m.</option>
-            <option value="15">3:00 p. m.</option>
-            <option value="16">4:00 p. m.</option>
-            <option value="17">5:00 p. m.</option>
-            <option value="18">6:00 p. m.</option>
-            <option value="19">7:00 p. m.</option>
-            <option value="20">8:00 p. m.</option>
-            <option value="21">9:00 p. m.</option>
-            <option value="22">10:00 p. m.</option>
-            <option value="23">11:00 p. m.</option>
-          </select>
-        </div>
+        </sc-if>
       </div>
 
-      <div style="margin-top:24px;font:700 10px/1 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">TU PERFIL</div>
-      <div style="margin-top:12px;display:flex;flex-direction:column;gap:11px">
-        <div>
-          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">NOMBRE</div>
-          <input value="{{ pNombre }}" sc-camel-on-change="{{ onNombre }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:700 15px Manrope,sans-serif;padding:11px 12px">
-        </div>
-        <div style="display:flex;gap:9px">
-          <div style="flex:1">
-            <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">ALTURA (CM)</div>
-            <input value="{{ pAltura }}" sc-camel-on-change="{{ onAltura }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:700 15px Manrope,sans-serif;padding:11px 12px">
-          </div>
-          <div style="flex:1">
-            <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">PESO (KG)</div>
-            <input value="{{ pPeso }}" sc-camel-on-change="{{ onPeso }}" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:700 15px Manrope,sans-serif;padding:11px 12px">
-          </div>
-        </div>
-        <div>
-          <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">SEXO</div>
-          <div style="display:flex;gap:7px">
-            <sc-for list="{{ sexos }}" as="s" hint-placeholder-count="3">
-              <div sc-camel-on-click="{{ s.pick }}" style="flex:1;padding:13px;border-radius:11px;text-align:center;cursor:pointer;font:700 12.5px/1 Manrope,sans-serif;background:{{ s.bg }};border:1px solid {{ s.border }};color:{{ s.fg }}" style-active="transform:translateY(1px)">{{ s.t }}</div>
-            </sc-for>
-          </div>
-        </div>
-      </div>
-
-      <div style="margin-top:16px;padding:15px 16px;border-radius:12px;background:rgba(87,185,160,.08);border:1px solid rgba(87,185,160,.22)">
-        <div style="display:flex;align-items:center;gap:9px">
-          <div style="width:7px;height:7px;border-radius:50%;background:#57B9A0"></div>
-          <div style="font:700 10px/1 Manrope,sans-serif;letter-spacing:.12em;color:#57B9A0">RUTINA AJUSTADA SEGÚN TU PERFIL</div>
-        </div>
-        <div style="font:500 11.5px/1.5 Manrope,sans-serif;color:#8E9AAE;margin-top:9px;text-wrap:pretty">{{ profileNote }}</div>
-      </div>
-
-      <div sc-camel-on-click="{{ toggleEdit }}" style="margin-top:14px;padding:17px;border-radius:14px;background:{{ editCardBg }};border:1px solid {{ editCardBorder }};display:flex;align-items:center;gap:14px;cursor:pointer">
+      <div sc-camel-on-click="{{ toggleEdit }}" style="margin-top:22px;padding:15px 16px;border-radius:14px;background:{{ editCardBg }};border:1px solid {{ editCardBorder }};display:flex;align-items:center;gap:14px;cursor:pointer">
         <div style="flex:1;min-width:0">
-          <div style="font:700 15px/1.1 Manrope,sans-serif;color:{{ editTitleColor }}">Modo edición</div>
+          <div style="font:700 14.5px/1.1 Manrope,sans-serif;color:{{ editTitleColor }}">Modo edición</div>
           <div style="font:500 11.5px/1.4 Manrope,sans-serif;color:#8E9AAE;margin-top:6px">Renombrar y editar valores en Ejercicio y Estudio</div>
         </div>
         <div style="width:48px;height:28px;flex:none;border-radius:12px;padding:3px;background:{{ switchBg }};display:flex;justify-content:{{ switchJustify }}">
@@ -1235,11 +1150,11 @@
         </div>
       </div>
 
-      <div style="margin-top:12px;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);font:500 11.5px/1.5 Manrope,sans-serif;color:#8E9AAE;text-wrap:pretty">En Finanzas la edición está siempre habilitada: los campos de la libretica se editan directamente en la tarjeta.</div>
-
       <div style="margin-top:24px;font:700 10px/1 Manrope,sans-serif;letter-spacing:.18em;color:#8E9AAE">TU CUENTA</div>
       <div style="margin-top:10px;padding:16px;border-radius:14px;background:#121724;border:1px solid rgba(255,255,255,.07)">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE;margin-bottom:6px">TU NOMBRE</div>
+        <input value="{{ pNombre }}" sc-camel-on-change="{{ onNombre }}" aria-label="Tu nombre" maxlength="40" autocomplete="name" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font:700 16px Manrope,sans-serif;padding:10px 12px">
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;gap:10px">
           <div style="min-width:0">
             <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE">USUARIO</div>
             <div style="font:700 15px/1.2 Manrope,sans-serif;margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ meUsuario }}</div>
@@ -1249,14 +1164,6 @@
             <div style="font:700 11px/1.2 Manrope,sans-serif;margin-top:7px;color:{{ nubeColor }}">{{ nubeTxt }}</div>
           </div>
         </div>
-        <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px">
-          <div style="flex:1;min-width:0">
-            <div style="font:700 9px/1 Manrope,sans-serif;letter-spacing:.12em;color:#8E9AAE">TU CÓDIGO DE AMIGO</div>
-            <div style="font:800 20px/1 Manrope,sans-serif;letter-spacing:.06em;color:#CE7F55;margin-top:9px">{{ meCodigo }}</div>
-          </div>
-          <div sc-camel-on-click="{{ copiarCodigo }}" style="flex:none;padding:11px 13px;border-radius:10px;cursor:pointer;background:rgba(206,127,85,.12);border:1px solid rgba(206,127,85,.34);font:700 10px/1 Manrope,sans-serif;letter-spacing:.1em;color:#CE7F55" style-active="transform:translateY(1px)">{{ copiarTxt }}</div>
-        </div>
-        <div style="font:500 11px/1.45 Manrope,sans-serif;color:#8E9AAE;margin-top:10px;text-wrap:pretty">Compártelo para que te agreguen. Tus amigos y chats están en la pestaña Amigos.</div>
       </div>
 
       <sc-if value="{{ importarOn }}">
