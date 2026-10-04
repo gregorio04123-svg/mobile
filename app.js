@@ -851,7 +851,6 @@ class Component extends DCLogic {
         rCompQue: rc.gid
           ? '"' + (gc ? gc.nombre || 'Sin nombre' : 'Grupo') + '" con ' + cuenta(gc ? gc.ejercicios.length : 0, 'ejercicio', 'ejercicios') + '.'
           : 'Tu semana con sus ' + cuenta(enSemana.length, 'grupo', 'grupos') + ' y los días de descanso.',
-        rCompNota: 'Le llega como invitación. Si la acepta, queda como copia suya: lo que cambie después no afecta la tuya. Solo va la rutina, nunca tus pesos.',
         rCompVacia: vacia,
         rCompSinAmigos: !vacia && amigos.length === 0,
         rCompHayAmigos: !vacia && amigos.length > 0,
@@ -1239,9 +1238,6 @@ class Component extends DCLogic {
         };
       }),
       vSinGrupos: datos.grupos.length === 0,
-      vNota: !inv ? '' : inv.tipo === 'semana'
-        ? 'Si la aceptas, tu semana pasa a ser esta y sus grupos se añaden a los tuyos como copia propia. Tus grupos actuales no se borran.'
-        : 'Si lo aceptas, se añade a tus grupos como copia propia. Luego lo asignas a un día manteniéndolo presionado en la semana.',
       vAceptar: () => { if (inv) self.aceptarRutina(inv); },
       vRechazar: () => { if (inv) self.rechazarRutina(inv); },
     });
@@ -2144,9 +2140,6 @@ class Component extends DCLogic {
           const clave = f.gid || 'semana', enviando = h.enviando === clave;
           return { titulo: f.titulo, meta: f.meta, color: f.color, accion: enviando ? 'Enviando…' : 'Enviar', enviar: () => self.enviarRutinaChat(f.gid) };
         }),
-        hjRutinaNota: g
-          ? 'Les llega a todos los del grupo como tarjeta en este chat. Quien la acepte la tiene como copia suya. Solo va la rutina, nunca tus pesos.'
-          : 'Le llega a ' + quien + ' como tarjeta en este chat. Si la acepta, queda como copia suya. Solo va la rutina, nunca tus pesos.',
       });
     }
     if (h.vista === 'libreta') {
@@ -2163,9 +2156,7 @@ class Component extends DCLogic {
         hjEnviarBg: c.bg, hjEnviarFg: c.fg,
         hjEnviarTxt: 'Enviar a ' + quien,
         hjEnviar: () => self.crearLibretaChat(),
-        hjLibNota: listo
-          ? 'A ' + quien + ' le llegará: «' + (h.meDebe ? 'Te debe ' : 'Le debes ') + '… ' + pesosTxt(monto) + '». Queda también en Finanzas.'
-          : 'Escribe el monto para poder enviarla.',
+        hjLibNotaOn: !listo, hjLibNota: 'Escribe el monto para poder enviarla.',
       });
     }
     if (h.vista === 'opciones') {
@@ -2180,9 +2171,6 @@ class Component extends DCLogic {
         hjApodoGuardarOn: limpio !== actual || h.enviando === 'apodo',
         hjApodoGuardarTxt: h.enviando === 'apodo' ? 'Guardando…' : 'Guardar',
         hjApodoGuardar: () => self.guardarApodo(),
-        hjApodoNota: !a ? '' : (actual
-          ? 'Solo tú ves este nombre. Bórralo y guarda para volver a «' + a.nombre + '».'
-          : 'Ponle el nombre que quieras: solo tú lo ves, ' + primerNombre(a.nombre) + ' no se entera.'),
         hjQuitar: () => {
           if (!a || !window.confirm('¿Quitar a ' + nombreVisto(a.id, a.nombre) + ' de tus amigos? Las libreticas que ya comparten se conservan.')) return;
           self.cerrarHoja('chat', true);
@@ -2214,9 +2202,7 @@ class Component extends DCLogic {
         }),
         hjGCrear: () => self.crearGrupoNuevo(),
         hjGCrearTxt: h.enviando ? 'Creando…' : 'Crear grupo', hjGCrearBg: c.bg, hjGCrearFg: c.fg,
-        hjGNota: elegidos.length
-          ? 'Con ' + listaNombres(elegidos.map(x => nombreCorto(x.id, x.nombre)).concat(['tú'])) + '. Después cualquiera del grupo puede agregar a sus amigos.'
-          : 'Elige al menos un amigo. Después cualquiera del grupo puede agregar a sus amigos.',
+        hjGNotaOn: !elegidos.length, hjGNota: 'Elige al menos un amigo.',
       });
     }
     if (h.vista === 'grupoOpciones') {
@@ -2573,9 +2559,6 @@ class Component extends DCLogic {
       lgPagarTodoTxt: s.lgBusy ? 'Registrando…' : 'Pagar lo que falta · ' + pesosTxt(miSaldo),
       lgBorrarOn: soyCreador,
       lgBorrar: () => self.borrarLG(),
-      lgNota: soyCreador
-        ? 'Cada persona registra lo que te paga y te llega un aviso. Cuando todos paguen, queda saldada.'
-        : (mia ? 'Solo tú registras lo que pagas; ' + creador + ' recibe un aviso con cada abono.' : 'Cada persona registra lo que paga.'),
       lgIrChatOn: s.gAmigos.some(x => x.id === l.grupo) && s.chatG !== l.grupo,
       lgIrChat: () => { self.cerrarHoja('lg', true); self.abrirGrupo(l.grupo); },
     });
@@ -2951,9 +2934,8 @@ class Component extends DCLogic {
       authCta: s.authBusy ? (crear ? 'Creando cuenta…' : 'Entrando…') : (crear ? 'Crear cuenta' : 'Entrar'),
       authBtnBg: s.authBusy ? 'rgba(206,127,85,.55)' : '#CE7F55',
       authGo: () => self.autenticar(),
-      authNota: crear
-        ? 'Guarda bien tu usuario y tu contraseña: como no hay correo, no hay forma automática de recuperarlos.'
-        : 'Cada persona tiene su propia cuenta y sus datos. Con el código de amigo pueden compartir agenda y libreticas.',
+      // Sin correo no hay cómo recuperar la cuenta: esto sí hay que decirlo al crearla.
+      authNotaOn: crear, authNota: 'Guarda bien tu usuario y tu contraseña: como no hay correo, no hay forma automática de recuperarlos.',
     };
   }
 
@@ -3227,8 +3209,6 @@ class Component extends DCLogic {
           return { n: t.n, c: t.c, on, bg: on ? t.tint : 'rgba(255,255,255,.04)', border: on ? t.c : 'rgba(255,255,255,.09)', fg: on ? t.c : '#8E9AAE',
                    elegir: () => setLib(l.id, x => ({ ...x, cat: t.k })) };
         }),
-        tipoAyuda: l.cat ? (motivoUtil(l.nota) ? 'Elegido por ti. Los gastos con este motivo irán aquí.' : 'Elegido por ti.')
-                         : (motivoUtil(l.nota) ? 'Pilares lo eligió por el motivo. Toca otro si no es.' : 'Sin motivo va a Ocio. Escribe el motivo o elige otro.'),
       };
     };
     const mkLib = l => {
@@ -3269,9 +3249,7 @@ class Component extends DCLogic {
         enviarTxt: 'Enviar a ' + quien,
         enviarBg: montoOk ? MINT : 'rgba(87,185,160,.14)',
         enviarFg: montoOk ? '#0A0E1A' : 'rgba(87,185,160,.55)',
-        enviarNota: montoOk
-          ? quien + ' aún no la ve. Le llegará con el monto' + ((l.nota || '').trim() ? ' y el concepto.' : '.')
-          : 'Escribe el monto para poder enviarla.',
+        enviarNotaOn: !montoOk, enviarNota: 'Escribe el monto para poder enviarla.',
         enviar: () => self.enviarLibreta(l.id),
         hayConcepto: !!(l.nota || '').trim(),
         // Con quién se comparte: un botón que abre la hoja «Elegir amigo» (con buscador).
@@ -3304,7 +3282,7 @@ class Component extends DCLogic {
           mio: a.por === me,
           remove: () => setLib(l.id, x => conAbonos(x, x.abonos.filter(y => y.id !== a.id))),
         })),
-        noAbonos: n === 0,
+
         abonoMonto: fmtMoney(s.abonoMonto),
         onAbono: ev => { const val = ev.target.value.replace(/\D/g, ''); self.setState({ abonoMonto: val }); },
         addAbono: () => {
@@ -3571,8 +3549,6 @@ class Component extends DCLogic {
             : (m.id
               ? (mPara !== me ? 'En la agenda de ' + nombreDe(mPara) + '.' : (m.por ? 'Te la asignó ' + nombreDe(m.por) + '.' : ''))
               : (mPara !== me ? 'Aparecerá en la agenda de ' + nombreDe(mPara) + '.' : ''))))),
-      modalCuadNotaOn: mGrupoNueva,
-      modalCuadNota: 'A cada uno le queda en su cuaderno con el mismo nombre, si tiene uno.',
       modalLibre: !mFijo, modalFijo: mFijo,
       modalFijoTipo: m ? m.tipo : '',
       modalFijoFecha: m ? fechaLarga(m.fecha) : '',
@@ -3681,11 +3657,11 @@ class Component extends DCLogic {
       amigoMsg: s.amigoMsg,
       importarOn: !!s.importMsg || self.hayDatosLocales(),
       importarTxt: s.importMsg || 'Importar datos de este dispositivo',
-      importarSub: s.importMsg ? 'Ya quedaron en tu cuenta.' : 'Sube a tu cuenta lo que esta app tenía guardado aquí antes de las cuentas. Hazlo una sola vez.',
+      importarSubOn: !!s.importMsg, importarSub: 'Ya quedaron en tu cuenta.',
       importar: () => { if (!s.importMsg) self.importarLocal(); },
       respaldoBtn: s.respaldo === 'preparando' ? 'Preparando respaldo…' : (s.respaldo === 'listo' ? 'Guardar respaldo' : 'Exportar mis datos'),
       respaldoColor: s.respaldo === 'error' ? RED : (s.respaldo === 'listo' ? MINT : '#fff'),
-      respaldoSub: s.respaldoMsg || 'Descarga un archivo con todo lo tuyo (gimnasio, agenda, cuadernos, libreticas con abonos, chats y perfil). Guárdalo como respaldo.',
+      respaldoSubOn: !!s.respaldoMsg, respaldoSub: s.respaldoMsg || '',
       respaldoGo: () => { if (s.respaldo === 'listo') self.descargarRespaldo(); else self.prepararRespaldo(); },
       salir: () => self.salir(),
       editCardBg: s.edit ? 'rgba(206,127,85,.1)' : '#121724',

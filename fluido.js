@@ -102,7 +102,9 @@
   function fijar(el, props) {
     el.__fijo = el.__fijo || {};
     for (var k in props) {
-      if (props[k] === null) { delete el.__fijo[k]; el.style.removeProperty(k); }
+      // Al soltar un estilo, el siguiente redibujo vuelve a leer los atributos del
+      // DOM (runtime.js) y repone lo que la plantilla tenía.
+      if (props[k] === null) { delete el.__fijo[k]; el.style.removeProperty(k); el.__v = null; }
       else { el.__fijo[k] = props[k]; el.style.setProperty(k, props[k]); }
     }
   }
@@ -127,7 +129,8 @@
     var fondo = hoja.closest('[data-hoja-fondo]');
     var velo = fondo && fondo.querySelector('[data-hoja-velo]');
     if (velo) {
-      var alto = hoja.offsetHeight || 1;
+      // El alto se mide al abrir o al empezar a arrastrar, no en cada cuadro de la animación.
+      var alto = hoja.__alto || (hoja.__alto = hoja.offsetHeight || 1);
       fijar(velo, { opacity: String(Math.max(0, Math.min(1, 1 - y / alto))) });
     }
   }
@@ -146,7 +149,8 @@
       var h = hojas[i];
       if (h.__viva) continue;
       h.__viva = true;
-      ponerHoja(h, h.offsetHeight || 700);
+      h.__alto = h.offsetHeight || 700;
+      ponerHoja(h, h.__alto);
       moverHoja(h, 0, 0, SUAVE);
     }
   }
@@ -189,19 +193,31 @@
     ? new global.ResizeObserver(function (lista) { lista.forEach(function (e) { ajustarCabecera(e.target); }); })
     : null;
 
-  function ajustarCabecera(cab) {
+  function zonaDe(cab) {
     var padre = cab.parentElement;
-    var zona = padre && padre.querySelector(':scope > [data-desplaza]');
-    if (!zona) return;
-    if (zona.__padBase === undefined) zona.__padBase = parseFloat(global.getComputedStyle(zona).paddingTop) || 0;
-    fijar(zona, { 'padding-top': (cab.offsetHeight + zona.__padBase) + 'px' });
+    return padre && padre.querySelector(':scope > [data-desplaza]');
   }
 
+  function ajustarCabecera(cab) {
+    var zona = zonaDe(cab);
+    cab.__zona = zona;
+    if (!zona) return;
+    if (zona.__padBase === undefined) zona.__padBase = parseFloat(global.getComputedStyle(zona).paddingTop) || 0;
+    var pad = (cab.offsetHeight + zona.__padBase) + 'px';
+    if (zona.__fijo && zona.__fijo['padding-top'] === pad) return;
+    fijar(zona, { 'padding-top': pad });
+  }
+
+  /* Medir la cabecera obliga al navegador a calcular toda la pantalla en ese
+     instante: se hace solo con una cabecera o una zona nueva. Si después cambia
+     de alto, el ResizeObserver avisa. */
   function medirCabeceras() {
     var cabs = doc.querySelectorAll('[data-cabecera]');
     for (var i = 0; i < cabs.length; i++) {
-      if (!cabs[i].__observada) { cabs[i].__observada = true; if (observador) observador.observe(cabs[i]); }
-      ajustarCabecera(cabs[i]);
+      var cab = cabs[i];
+      if (!cab.__observada) { cab.__observada = true; if (observador) observador.observe(cab); }
+      else if (observador && cab.__zona === zonaDe(cab)) continue;
+      ajustarCabecera(cab);
     }
   }
 
@@ -433,7 +449,7 @@
     var h = g.hoja;
     g.estado = 'activo';
     if (h.__anim) h.__anim.parar();
-    var base = h.__y || 0, alto = h.offsetHeight || 1;
+    var base = h.__y || 0, alto = h.__alto = h.offsetHeight || 1;
     g.mover = function (dx, dy) {
       var y = base + dy;
       if (y < 0) y = goma(y, alto);
